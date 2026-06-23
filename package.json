@@ -8,10 +8,22 @@
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "prisma": "prisma",
+    "prisma:generate": "prisma generate",
+    "db:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.1"
   },
   "devDependencies": {
+    "@types/node": "^20",
     "prettier": "latest",
+    "prisma": "^6.19.1",
+    "tsx": "^4.20.6",
     "typescript": "latest"
   }
 }
