@@ -1,6 +1,6 @@
 # Product context
 
-We are building a modern, customizable alternative to current termopane offer-generation tools.
+We are building a modern, customizable alternative to existing termopane offer-generation tools.
 
 Primary use:
 - web app;
@@ -9,7 +9,7 @@ Primary use:
 - authenticated users;
 - tenant/company-specific customization;
 - generate customer offers;
-- save/filter generated offers.
+- save and filter generated offers.
 
 Highlighted business requirements:
 - choose between door, window, or custom form;
@@ -22,6 +22,9 @@ Highlighted business requirements:
 - saved generated offers with filters.
 
 MVP boundary:
-- quote generation, not full production ERP;
+- quote generation first;
 - common rectangular windows/doors first;
-- production, CNC, stock, CE/DoP later.
+- production, CNC, stock, CE/DoP, and invoicing later.
+
+Important product principle:
+Use real interviews, sample offers, exported PDFs, actual price lists, and production data before finalizing business formulas.

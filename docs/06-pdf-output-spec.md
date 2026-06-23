@@ -1,9 +1,16 @@
-Template A: detailed Fenestra-style offer
+# PDF output spec
+
+The MVP should support customer-ready PDF offers.
+
+## Template A: detailed offer
+
+Inspired by Fenestra-style output:
 - offer number/date;
 - page number;
 - title;
-- product drawing;
-- dimensions;
+- customer greeting;
+- item name;
+- drawing with dimensions;
 - profile details;
 - hardware details;
 - glass/panel details;
@@ -12,14 +19,25 @@ Template A: detailed Fenestra-style offer
 - total price;
 - discount;
 - VAT;
-- final total;
-- delivery/advance/warranty/validity fields.
+- final value;
+- delivery, advance, warranty, validity, address, and footer fields.
 
-Template B: compact FCCPLAST-style proposal
+## Template B: compact proposal
+
+Inspired by FCCPLAST-style output:
 - company header;
+- proposal title;
 - repeated item blocks;
 - drawing left;
 - description center;
-- MU/Qty/Unit Cost right;
-- blue total band per item;
-- final summary with total m2 and total document value.
+- MU/quantity/unit cost right;
+- total band per item;
+- accessories/services as line items;
+- final summary with total m² and total document value.
+
+## Rules
+
+- Generated PDFs belong to a specific QuoteVersion.
+- Sent PDFs are immutable.
+- Do not regenerate sent documents silently.
+- Store PDF metadata and the calculation snapshot used to create it.
