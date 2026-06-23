@@ -1,0 +1,17 @@
+{
+  "name": "termopane-app",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm -r --if-present build",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "latest",
+    "typescript": "latest"
+  }
+}

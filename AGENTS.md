@@ -10,29 +10,23 @@ Do not implement production ERP, CNC export, stock management, full cut optimiza
 
 ## Required context
 
-Before implementing any feature, read the relevant docs:
+Before implementing features, read the relevant docs:
 
 - `docs/00-product-context.md`
 - `docs/01-mvp-scope.md`
+- `docs/02-domain-glossary.md`
+- `docs/03-user-roles.md`
 - `docs/04-data-model.md`
 - `docs/05-calculation-spec.md`
 - `docs/06-pdf-output-spec.md`
+- `docs/07-mobile-ux-spec.md`
+- `docs/08-codex-tasking-guide.md`
 - `docs/09-non-goals.md`
-
-For calculation work, also read:
-
-- `fixtures/calculation-cases/README.md`
-- `packages/calculation/README.md` if it exists
-
-For PDF work, also read:
-
-- `fixtures/reference-offers/README.md`
-- `docs/06-pdf-output-spec.md`
 
 ## Business rules
 
 - Never invent real production formulas.
-- Unknown glass deduction, profile deduction, reinforcement, hardware, or pricing rules must be represented as configurable fields or explicit TODOs.
+- Unknown glass deduction, profile deduction, reinforcement, hardware, or pricing rules must be configurable fields or explicit TODOs.
 - Quote versions must be immutable after sending.
 - Price list updates must not silently change old quotes.
 - Manual price overrides must be audited.
@@ -48,21 +42,17 @@ For PDF work, also read:
 - Do not let calculation modules read from the database directly.
 - Calculation inputs must be frozen snapshots.
 - Calculation outputs must include warnings and trace data.
-- Prefer small, composable components.
 - Keep mobile responsiveness as a default requirement.
+- Keep PRs small and scoped.
 
 ## Commands
 
-Use these commands when applicable:
-
 - Install: `pnpm install`
+- Dev: `pnpm dev`
+- Build: `pnpm build`
 - Lint: `pnpm lint`
 - Typecheck: `pnpm typecheck`
-- Unit tests: `pnpm test`
-- E2E tests: `pnpm test:e2e`
-- Prisma generate: `pnpm prisma generate`
-- Prisma migrate: `pnpm prisma migrate dev`
-- Seed: `pnpm db:seed`
+- Test: `pnpm test`
 
 If a command is missing, add it before relying on it.
 

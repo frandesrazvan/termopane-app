@@ -8,6 +8,7 @@ generation time.
 
 - Generate PDFs only from saved quote versions, not from unsaved UI state.
 - Locked/sent quote versions are immutable; correcting a sent document requires a new quote version.
+- Sent PDFs are immutable and must not be regenerated silently.
 - Use tenant company settings for logo, company name, address, contact data, tax text, footer text,
   warranty, delivery, payment, advance-payment, and offer validity fields.
 - Hide internal material costs, supplier prices, margins, and restricted trace details from
@@ -28,14 +29,16 @@ Required visible fields:
 - company header and customer block;
 - offer number, quote version, date, and page number;
 - document title;
-- product drawing or schematic placeholder;
+- customer greeting where configured;
+- item name;
+- product drawing or schematic placeholder with dimensions;
 - item dimensions, quantity, and surface area where available;
 - profile system/details;
 - hardware details;
 - glass or panel details;
 - accessory/service lines where selected;
-- unit price, discount, VAT/tax, item total, and final total;
-- delivery, advance payment, warranty, validity, and notes fields.
+- unit price, discount, VAT/tax, item total, and final value;
+- delivery, advance payment, warranty, validity, address, footer, and notes fields.
 
 Implementation notes:
 
@@ -52,11 +55,13 @@ Template B is a compact FCCPLAST-style proposal optimized for quick item compari
 Required visible fields:
 
 - company header;
+- proposal title;
 - repeated item blocks;
 - drawing or schematic on the left;
 - customer-facing description in the center;
 - unit of measure, quantity, and unit cost on the right;
 - colored total band per item;
+- accessories/services as line items where selected;
 - final summary with total surface area where available and total document value.
 
 Implementation notes:
@@ -69,6 +74,7 @@ Implementation notes:
 
 - Store a `GeneratedPdf` record or equivalent metadata with `tenantId`, `quoteVersionId`, template
   key, generator user, timestamp, and file/checksum reference.
+- Store or reference the calculation snapshot used to create the PDF.
 - Regenerating a PDF for the same quote version should either create a new generated PDF record or
   update metadata in an auditable way.
 - If company settings or templates change after generation, old PDFs should still be explainable by

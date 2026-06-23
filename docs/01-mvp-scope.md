@@ -1,33 +1,38 @@
 # MVP scope
 
 The MVP is a focused offer-generation SaaS/PWA for termopane businesses. It should let a tenant
-configure enough catalog and company data to create, save, calculate, and export customer offers
-for windows, doors, and custom items.
+configure enough catalog and company data to create, save, calculate, version, and export customer
+offers for windows, doors, and custom items.
 
 ## In scope
 
-- Authentication and tenant isolation:
+- Authentication and tenant setup:
   - sign in/out and session handling;
   - one or more users per tenant;
   - all tenant-owned records scoped by `tenantId`;
   - role-based visibility for catalog, pricing, costs, and generated offers.
-- Company and user customization:
+- Company settings and user preferences:
   - company name, address, contact details, logo, tax/VAT defaults, currency, and PDF footer text;
   - offer validity, warranty, delivery, payment, and advance-payment text as configurable fields;
   - per-user profile basics such as display name and role.
+- Customer and project records:
+  - customer contact and address details;
+  - project/site notes where needed for offer preparation;
+  - no customer PII in logs, seed data, or screenshots.
 - Catalog admin:
   - PVC and aluminium profile systems;
-  - glass units, panels, hardware, accessories, and optional service lines;
+  - glass units, panels, hardware, colors, accessories, services, taxes, and price lists;
   - configurable calculation parameters for deductions, waste, pricing, and commercial additions;
   - price list versions or snapshots so historical quotes remain stable.
 - Quote creation:
   - structured forms for common rectangular windows and doors;
   - custom item lines for non-standard MVP items;
-  - dimensions, quantities, opening style, profile, glass/panel, hardware, accessories, notes, and
-    customer-facing descriptions;
+  - dimensions, quantities, opening style, profile, glass/panel, hardware, colors, accessories,
+    services, notes, and customer-facing descriptions;
   - draft, sent/locked, revised, accepted, rejected, and archived-style statuses as needed by the UI.
 - Calculation:
   - rough material/commercial/tax totals;
+  - discounts and manual overrides;
   - automatic glass dimensions;
   - profile linear-meter requirements;
   - warnings and trace data for missing or uncertain configuration;
@@ -42,12 +47,17 @@ for windows, doors, and custom items.
 
 ## Out of scope for MVP
 
-- Invoicing, accounting exports, payment collection, or fiscal receipt generation.
-- Production ERP, manufacturing scheduling, task dispatch, installation planning, or delivery routing.
-- Inventory/stock management, supplier ordering, warehouse reservations, or automatic purchase orders.
+- Invoicing, accounting exports, e-Factura integration, payment collection, or fiscal receipt
+  generation.
+- Production ERP, manufacturing scheduling, task dispatch, installation planning, or delivery
+  routing.
+- Inventory/stock management, supplier ordering, warehouse reservations, or automatic purchase
+  orders.
 - CNC export, machine-specific cutting files, or fabrication automation.
 - Full cut optimization, nesting, reinforcement optimization, or production-grade waste minimization.
-- CE/DoP compliance generation, declaration packs, or legal certification workflows.
+- CE/DoP documents, Uw claims, declaration packs, legal certification workflows, or regulated product
+  documentation.
+- Advanced irregular shapes and production-grade geometry beyond common rectangular MVP items.
 - Real production formulas unless they are provided and validated by the business owner.
 - Real customer/private data in fixtures, tests, screenshots, or documentation examples.
 

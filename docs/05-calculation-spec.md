@@ -12,7 +12,7 @@ Inputs:
 - price list snapshot;
 - quote version snapshot;
 - quote item configuration snapshots;
-- profile, glass, panel, hardware, and accessory catalog snapshots;
+- profile, glass, panel, hardware, color, accessory, service, and tax catalog snapshots;
 - commercial rule snapshot;
 - manual override snapshot.
 
@@ -21,7 +21,7 @@ Outputs:
 - material requirements by item and by quote;
 - glass cuts by item, pane, width, height, area, and source rule;
 - profile linear meters by item, profile type, and source rule;
-- hardware/accessory quantities;
+- hardware/accessory/service quantities;
 - item material totals, commercial totals, discounts, VAT/tax, and final totals;
 - quote-level totals;
 - warnings;
@@ -35,6 +35,8 @@ The calculation function must not:
 - hide missing configuration by inventing fallback production formulas;
 - log customer PII.
 
+Money should use integer minor units where possible.
+
 ## Input snapshots
 
 Snapshots must contain all information needed to reproduce a quote version later. A locked quote
@@ -44,7 +46,8 @@ Required snapshot groups:
 
 - company and tax settings: currency, VAT/tax rate or tax mode, rounding settings, document defaults;
 - commercial rules: markup, margin, discount, service additions, override permissions;
-- catalog selections: selected profile system, profiles, glass/panel, hardware, accessories;
+- catalog selections: selected profile system, profiles, glass/panel, hardware, colors,
+  accessories, and services;
 - item dimensions and quantity;
 - configurable deduction values for glass, panel, profile, reinforcement, hardware, and any
   tenant-provided rules;
@@ -67,6 +70,26 @@ fields and emit warnings when missing.
   include override audit references in trace data.
 - Round values only through configured rounding policy. If no policy exists, use a documented default
   and add a trace entry.
+
+## Formula placeholders
+
+These placeholders are not validated production formulas. Use them only as implementation scaffolding
+when the corresponding deduction/configuration values are supplied by fixtures or tenant settings.
+
+```text
+glassWidthMm = cellInnerWidthMm - glassDeductionWidthMm
+glassHeightMm = cellInnerHeightMm - glassDeductionHeightMm
+glassAreaM2 = glassWidthMm * glassHeightMm / 1_000_000
+billableAreaM2 = max(glassAreaM2, glassPackage.minBillableAreaM2)
+
+outerFrameLengthM = 2 * widthM + 2 * heightM
+sashLengthM = sum(2 * sashWidthM + 2 * sashHeightM)
+mullionLengthM = sum(verticalDividerLengths)
+transomLengthM = sum(horizontalDividerLengths)
+```
+
+Do not hard-code supplier-specific values without a fixture/test explaining them and explicit
+business validation.
 
 ## Warnings
 
