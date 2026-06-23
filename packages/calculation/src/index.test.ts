@@ -128,6 +128,123 @@ describe("calculateElement", () => {
       "MISSING_GLASS_DEDUCTION",
     );
   });
+
+  it("zeros total quantities and costs for zero quantity", () => {
+    const result = calculateElement({
+      ...baseInput,
+      quantity: 0,
+    });
+
+    expect(result.glass.widthMm).toBe(1_120);
+    expect(result.glass.heightMm).toBe(1_300);
+    expect(result.glass.totalBillableAreaM2).toBe(0);
+    expect(result.profiles[0]?.linearMetersPerElement).toBe(0);
+    expect(result.profiles[0]?.totalLinearMeters).toBe(0);
+    expect(result.totals).toMatchObject({
+      glassCostMinor: 0,
+      profileCostMinor: 0,
+      materialCostMinor: 0,
+      totalWithVatMinor: 0,
+    });
+    expect(result.warnings.map((warning) => warning.code)).toContain(
+      "INVALID_QUANTITY",
+    );
+    expect(result.trace.some((entry) => entry.note?.includes("quantity is invalid"))).toBe(
+      true,
+    );
+  });
+
+  it("zeros total quantities and costs for negative quantity", () => {
+    const result = calculateElement({
+      ...baseInput,
+      quantity: -2,
+    });
+
+    expect(result.glass.totalBillableAreaM2).toBe(0);
+    expect(result.profiles[0]?.totalLinearMeters).toBe(0);
+    expect(result.totals.glassCostMinor).toBe(0);
+    expect(result.totals.profileCostMinor).toBe(0);
+    expect(result.totals.totalWithVatMinor).toBe(0);
+    expect(result.warnings.map((warning) => warning.code)).toContain(
+      "INVALID_QUANTITY",
+    );
+  });
+
+  it("blocks glass and profile calculations for zero width", () => {
+    const result = calculateElement({
+      ...baseInput,
+      dimensions: {
+        ...baseInput.dimensions,
+        widthMm: 0,
+      },
+    });
+
+    expect(result.glass.widthMm).toBeNull();
+    expect(result.glass.heightMm).toBeNull();
+    expect(result.profiles[0]?.linearMetersPerElement).toBe(0);
+    expect(result.profiles[0]?.totalLinearMeters).toBe(0);
+    expect(result.totals.materialCostMinor).toBe(0);
+    expect(result.totals.totalWithVatMinor).toBe(0);
+    expect(result.warnings.map((warning) => warning.code)).toEqual(
+      expect.arrayContaining(["INVALID_DIMENSION", "CALCULATION_BLOCKED"]),
+    );
+    expect(result.trace.some((entry) => entry.note?.includes("width or height is invalid"))).toBe(
+      true,
+    );
+  });
+
+  it("blocks glass and profile calculations for negative height", () => {
+    const result = calculateElement({
+      ...baseInput,
+      dimensions: {
+        ...baseInput.dimensions,
+        heightMm: -1,
+      },
+    });
+
+    expect(result.glass.widthMm).toBeNull();
+    expect(result.glass.heightMm).toBeNull();
+    expect(result.profiles[0]?.linearMetersPerElement).toBe(0);
+    expect(result.profiles[0]?.totalLinearMeters).toBe(0);
+    expect(result.totals.materialCostMinor).toBe(0);
+    expect(result.totals.totalWithVatMinor).toBe(0);
+    expect(result.warnings.map((warning) => warning.code)).toEqual(
+      expect.arrayContaining(["INVALID_DIMENSION", "CALCULATION_BLOCKED"]),
+    );
+  });
+
+  it("does not produce negative or override-inflated totals from invalid input", () => {
+    const result = calculateElement({
+      ...baseInput,
+      quantity: -3,
+      dimensions: {
+        widthMm: 0,
+        heightMm: -1,
+      },
+      manualOverride: {
+        target: "totalWithVat",
+        amountMinor: 50_000,
+        reason: "Synthetic override that should be ignored for invalid input",
+      },
+    });
+
+    const totals = Object.values(result.totals);
+
+    expect(totals.every((total) => total >= 0)).toBe(true);
+    expect(result.totals.totalWithVatMinor).toBe(0);
+    expect(result.totals.manualAdjustmentMinor).toBe(0);
+    expect(result.profiles[0]?.totalLinearMeters).toBe(0);
+    expect(result.warnings.map((warning) => warning.code)).toEqual(
+      expect.arrayContaining([
+        "INVALID_DIMENSION",
+        "INVALID_QUANTITY",
+        "CALCULATION_BLOCKED",
+      ]),
+    );
+    expect(result.trace.some((entry) => entry.note?.includes("Manual override was not applied"))).toBe(
+      true,
+    );
+  });
 });
 
 describe("calculateQuote", () => {

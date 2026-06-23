@@ -4,6 +4,7 @@ export type BasisPoints = number;
 export type CalculationWarningCode =
   | "INVALID_DIMENSION"
   | "INVALID_QUANTITY"
+  | "CALCULATION_BLOCKED"
   | "MISSING_GLASS_DEDUCTION"
   | "GLASS_DIMENSION_NON_POSITIVE"
   | "MISSING_GLASS_PRICE"
@@ -140,21 +141,31 @@ export function calculateElement(input: FixedWindowElementInput): ElementCalcula
   const warnings: CalculationWarning[] = [];
   const trace: CalculationTraceEntry[] = [];
   const quantity = input.quantity;
+  const hasValidWidth = isPositiveFinite(input.dimensions.widthMm);
+  const hasValidHeight = isPositiveFinite(input.dimensions.heightMm);
+  const hasValidDimensions = hasValidWidth && hasValidHeight;
+  const hasValidQuantity = Number.isInteger(quantity) && quantity > 0;
 
-  if (!Number.isFinite(input.dimensions.widthMm) || input.dimensions.widthMm <= 0) {
+  if (!hasValidWidth) {
     warnings.push(warning("INVALID_DIMENSION", "Width must be a positive millimeter value.", "dimensions.widthMm"));
   }
 
-  if (!Number.isFinite(input.dimensions.heightMm) || input.dimensions.heightMm <= 0) {
+  if (!hasValidHeight) {
     warnings.push(warning("INVALID_DIMENSION", "Height must be a positive millimeter value.", "dimensions.heightMm"));
   }
 
-  if (!Number.isInteger(quantity) || quantity <= 0) {
+  if (!hasValidQuantity) {
     warnings.push(warning("INVALID_QUANTITY", "Quantity must be a positive integer.", "quantity"));
   }
 
-  const glass = calculateGlass(input, warnings, trace);
-  const profileRequirement = calculateFrameProfile(input, quantity, warnings, trace);
+  const glass = calculateGlass(input, hasValidDimensions, hasValidQuantity, warnings, trace);
+  const profileRequirement = calculateFrameProfile(
+    input,
+    hasValidDimensions,
+    hasValidQuantity,
+    warnings,
+    trace,
+  );
   const glassCostMinor = calculateGlassCost(input, glass, warnings, trace);
 
   const profileCostMinor = profileRequirement.costMinor;
@@ -189,6 +200,7 @@ export function calculateElement(input: FixedWindowElementInput): ElementCalcula
   const overrideResult = applyManualOverride(
     totalBeforeManualOverrideMinor,
     input.manualOverride,
+    hasValidDimensions && hasValidQuantity,
     warnings,
     trace,
   );
@@ -264,6 +276,8 @@ export function calculateQuote(input: QuoteCalculationInput): QuoteCalculationRe
 
 function calculateGlass(
   input: FixedWindowElementInput,
+  hasValidDimensions: boolean,
+  hasValidQuantity: boolean,
   warnings: CalculationWarning[],
   trace: CalculationTraceEntry[],
 ): GlassCalculation {
@@ -284,6 +298,31 @@ function calculateGlass(
         "glass.deductionHeightMm",
       ),
     );
+  }
+
+  if (!hasValidDimensions) {
+    warnings.push(
+      warning(
+        "CALCULATION_BLOCKED",
+        "Glass dimensions were not calculated because element dimensions are invalid.",
+        "dimensions",
+      ),
+    );
+    const incompleteGlass = incompleteGlassCalculation(deductionWidthMm, deductionHeightMm);
+
+    trace.push({
+      step: "glassDimensions",
+      inputs: {
+        widthMm: input.dimensions.widthMm,
+        heightMm: input.dimensions.heightMm,
+        deductionWidthMm,
+        deductionHeightMm,
+      },
+      output: { complete: false },
+      note: "Glass dimensions were blocked because width or height is invalid.",
+    });
+
+    return incompleteGlass;
   }
 
   if (deductionWidthMm === undefined || deductionHeightMm === undefined) {
@@ -329,7 +368,7 @@ function calculateGlass(
   const billableAreaM2 =
     areaM2 === null ? null : roundMeasurement(Math.max(areaM2, input.glass.minBillableAreaM2));
   const totalBillableAreaM2 =
-    billableAreaM2 === null ? null : roundMeasurement(billableAreaM2 * input.quantity);
+    billableAreaM2 === null ? null : hasValidQuantity ? roundMeasurement(billableAreaM2 * input.quantity) : 0;
 
   trace.push({
     step: "glassDimensions",
@@ -342,6 +381,9 @@ function calculateGlass(
       quantity: input.quantity,
     },
     output: { widthMm, heightMm, areaM2, billableAreaM2, totalBillableAreaM2 },
+    note: hasValidQuantity
+      ? undefined
+      : "Total billable glass area was zeroed because quantity is invalid.",
   });
 
   return Object.freeze({
@@ -386,20 +428,57 @@ function calculateGlassCost(
 
 function calculateFrameProfile(
   input: FixedWindowElementInput,
-  quantity: number,
+  hasValidDimensions: boolean,
+  hasValidQuantity: boolean,
   warnings: CalculationWarning[],
   trace: CalculationTraceEntry[],
 ): ProfileRequirement {
-  const widthM = input.dimensions.widthMm / 1_000;
-  const heightM = input.dimensions.heightMm / 1_000;
-  const linearMetersPerElement = roundMeasurement(2 * widthM + 2 * heightM);
-  const totalLinearMeters = roundMeasurement(linearMetersPerElement * quantity);
-
   if (input.frameProfile.unitPriceMinorPerMeter === undefined) {
     warnings.push(
       warning("MISSING_PROFILE_PRICE", "Frame profile unit price is required.", "frameProfile.unitPriceMinorPerMeter"),
     );
   }
+
+  if (!hasValidDimensions || !hasValidQuantity) {
+    if (!hasValidDimensions) {
+      warnings.push(
+        warning(
+          "CALCULATION_BLOCKED",
+          "Profile meters were zeroed because element dimensions are invalid.",
+          "dimensions",
+        ),
+      );
+    }
+
+    trace.push({
+      step: "frameProfileLinearMeters",
+      inputs: {
+        widthMm: input.dimensions.widthMm,
+        heightMm: input.dimensions.heightMm,
+        quantity: input.quantity,
+        profileId: input.frameProfile.id,
+        unitPriceMinorPerMeter: input.frameProfile.unitPriceMinorPerMeter,
+      },
+      output: { linearMetersPerElement: 0, totalLinearMeters: 0, costMinor: 0 },
+      note: hasValidDimensions
+        ? "Total profile meters were zeroed because quantity is invalid."
+        : "Profile meter calculation was blocked because width or height is invalid.",
+    });
+
+    return Object.freeze({
+      profileId: input.frameProfile.id,
+      label: input.frameProfile.label,
+      linearMetersPerElement: 0,
+      totalLinearMeters: 0,
+      unitPriceMinorPerMeter: input.frameProfile.unitPriceMinorPerMeter ?? null,
+      costMinor: 0,
+    });
+  }
+
+  const widthM = input.dimensions.widthMm / 1_000;
+  const heightM = input.dimensions.heightMm / 1_000;
+  const linearMetersPerElement = roundMeasurement(2 * widthM + 2 * heightM);
+  const totalLinearMeters = roundMeasurement(linearMetersPerElement * input.quantity);
 
   const costMinor =
     input.frameProfile.unitPriceMinorPerMeter === undefined
@@ -411,7 +490,7 @@ function calculateFrameProfile(
     inputs: {
       widthMm: input.dimensions.widthMm,
       heightMm: input.dimensions.heightMm,
-      quantity,
+      quantity: input.quantity,
       profileId: input.frameProfile.id,
       unitPriceMinorPerMeter: input.frameProfile.unitPriceMinorPerMeter,
     },
@@ -429,13 +508,58 @@ function calculateFrameProfile(
   });
 }
 
+function incompleteGlassCalculation(
+  deductionWidthMm: number | undefined,
+  deductionHeightMm: number | undefined,
+): GlassCalculation {
+  return Object.freeze({
+    widthMm: null,
+    heightMm: null,
+    areaM2: null,
+    billableAreaM2: null,
+    totalBillableAreaM2: null,
+    deductionWidthMm: deductionWidthMm ?? null,
+    deductionHeightMm: deductionHeightMm ?? null,
+  });
+}
+
 function applyManualOverride(
   totalBeforeManualOverrideMinor: MoneyMinor,
   override: ManualOverrideInput | undefined,
+  canApplyOverride: boolean,
   warnings: CalculationWarning[],
   trace: CalculationTraceEntry[],
 ): Readonly<{ totalWithVatMinor: MoneyMinor; manualAdjustmentMinor: MoneyMinor }> {
   if (!override) {
+    return Object.freeze({
+      totalWithVatMinor: totalBeforeManualOverrideMinor,
+      manualAdjustmentMinor: 0,
+    });
+  }
+
+  if (!canApplyOverride) {
+    warnings.push(
+      warning(
+        "CALCULATION_BLOCKED",
+        "Manual override was ignored because the base calculation input is invalid.",
+        "manualOverride",
+      ),
+    );
+
+    trace.push({
+      step: "manualOverride",
+      inputs: {
+        target: override.target,
+        amountMinor: override.amountMinor,
+        hasReason: Boolean(override.reason?.trim()),
+        actorId: override.actorId,
+        timestamp: override.timestamp,
+        totalBeforeManualOverrideMinor,
+      },
+      output: { totalWithVatMinor: totalBeforeManualOverrideMinor, manualAdjustmentMinor: 0 },
+      note: "Manual override was not applied because dimensions or quantity are invalid.",
+    });
+
     return Object.freeze({
       totalWithVatMinor: totalBeforeManualOverrideMinor,
       manualAdjustmentMinor: 0,
@@ -491,6 +615,10 @@ function multiplyMoneyByMeasurement(amountMinor: MoneyMinor, measurement: number
 
 function roundMeasurement(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }
 
 function warning(
