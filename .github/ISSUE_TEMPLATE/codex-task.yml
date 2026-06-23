@@ -1,0 +1,51 @@
+name: Codex task
+description: PR-sized implementation task for Codex
+title: "COD-___: "
+labels: ["codex-ready"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should Codex build or change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Docs, files, business rules, examples, and constraints Codex must read.
+      value: |
+        Read:
+        - AGENTS.md
+        - docs/00-product-context.md
+        - docs/01-mvp-scope.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      value: |
+        - Keep this PR scoped.
+        - Do not invent business formulas.
+        - Do not commit secrets or real customer data.
+        - Update docs if behavior changes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      value: |
+        - Implementation matches this issue.
+        - Tests are added or updated.
+        - pnpm lint passes.
+        - pnpm typecheck passes.
+        - pnpm test passes.
+        - pnpm build passes.
+    validations:
+      required: true
