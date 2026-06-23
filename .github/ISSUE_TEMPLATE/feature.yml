@@ -1,0 +1,62 @@
+name: Feature request
+description: Propose a scoped product or engineering improvement
+title: "Feature: "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should change, and why?
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      value: |
+        In scope:
+        -
+
+        Out of scope:
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: docs
+    attributes:
+      label: Required context
+      value: |
+        Read:
+        - AGENTS.md
+        - docs/00-product-context.md
+        - docs/01-mvp-scope.md
+        - docs/09-non-goals.md
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: guardrails
+    attributes:
+      label: Guardrails
+      options:
+        - label: This stays inside the MVP boundary unless explicitly approved.
+          required: true
+        - label: No production formulas are invented.
+          required: true
+        - label: No real customer/private data is required.
+          required: true
+
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      value: |
+        - Implementation matches this request.
+        - Relevant docs are updated.
+        - Relevant tests are added or updated.
+        - `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` pass.
+    validations:
+      required: true

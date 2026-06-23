@@ -60,11 +60,21 @@ The web app runs at `http://localhost:3000` by default.
 Run the same checks as CI:
 
 ```powershell
+pnpm install --frozen-lockfile
+pnpm prisma generate
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+Or run the aggregate local check after dependencies are installed:
+
+```powershell
+pnpm verify
+```
+
+Tests should follow the conventions in `tests/README.md`.
 
 ## Workspace layout
 
