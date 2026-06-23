@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a reproducible defect
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: List the smallest steps needed to reproduce the issue.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: checks
+    attributes:
+      label: Local checks
+      value: |
+        - [ ] `pnpm lint`
+        - [ ] `pnpm typecheck`
+        - [ ] `pnpm test`
+        - [ ] `pnpm build`
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: No real customer/private data is included.
+          required: true
+        - label: Logs/screenshots are free of customer PII.
+          required: true
