@@ -19,6 +19,18 @@ Use this case for unit tests around `calculateElement`.
 - Frame profile perimeter: `2 * 1.2m + 2 * 1.4m = 5.2m`
 - Frame profile unit price: `1000` minor units per meter
 - Frame profile cost: `5200` minor units
+- Glass cuts output contains one `main` pane using the configured deduction rule.
+- Profile linear meters output uses one grouped frame profile requirement.
+
+## Custom manual line
+
+Use this case for unit tests around explicit non-standard MVP items.
+
+- Element type: `custom-line`
+- Quantity: `2`
+- Unit price: `5000` minor units
+- Custom line cost: `10000` minor units
+- No geometry, glass, profile, hardware, reinforcement, labor, or accessory formula is inferred.
 
 ## Commercial totals
 
@@ -28,6 +40,18 @@ Commercial test values use integer minor units and basis points.
 - Markup: `markupBasisPoints / 10000`
 - Discount: applied after markup
 - VAT: applied after discount
-- Manual override: may replace final total with an audited amount and trace entry
+- Item manual override: may replace an item final total with an audited amount and trace entry
+- Quote discount: may adjust the quote subtotal after item aggregation
+- Quote manual override: may replace final quote total with an audited amount and trace entry
+
+## Warning fixtures
+
+Tests intentionally cover:
+
+- missing glass deductions;
+- missing glass/profile/custom prices;
+- unsupported item types;
+- explicit hardware/accessory snapshots, without automatic formulas;
+- manual override and quote discount trace entries.
 
 All values are synthetic and exist only to keep tests deterministic.
