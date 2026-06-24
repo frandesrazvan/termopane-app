@@ -5,35 +5,44 @@ import {
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
+  TenantMemberStatus,
   TenantRole,
+  TenantStatus,
 } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+const tenantId = "seed_tenant_synthetic_termopane";
+const ownerUserId = "seed_user_owner";
+const quoteId = "seed_quote_001";
+const quoteVersionId = "seed_quote_001_v1";
+
 async function main() {
   const tenant = await prisma.tenant.upsert({
-    where: { slug: "demo-termopane" },
+    where: { slug: "synthetic-termopane-demo" },
     update: {
-      name: "Demo Termopane SRL",
-      status: "ACTIVE",
+      name: "Synthetic Termopane Demo",
+      status: TenantStatus.ACTIVE,
     },
     create: {
-      name: "Demo Termopane SRL",
-      slug: "demo-termopane",
-      status: "ACTIVE",
+      id: tenantId,
+      name: "Synthetic Termopane Demo",
+      slug: "synthetic-termopane-demo",
+      status: TenantStatus.ACTIVE,
     },
   });
 
   const owner = await prisma.user.upsert({
-    where: { email: "owner.demo@example.test" },
+    where: { email: "owner@example.test" },
     update: {
-      displayName: "Owner Demo",
+      displayName: "Synthetic Owner",
     },
     create: {
-      email: "owner.demo@example.test",
-      displayName: "Owner Demo",
-      authProvider: "synthetic",
-      authProviderId: "synthetic-owner-demo",
+      id: ownerUserId,
+      email: "owner@example.test",
+      displayName: "Synthetic Owner",
+      authProvider: "seed",
+      authProviderSubject: "synthetic-owner",
     },
   });
 
@@ -46,95 +55,101 @@ async function main() {
     },
     update: {
       role: TenantRole.OWNER,
-      status: "ACTIVE",
+      status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: true,
+      joinedAt: new Date("2026-01-01T00:00:00.000Z"),
     },
     create: {
+      id: "seed_member_owner",
       tenantId: tenant.id,
       userId: owner.id,
       role: TenantRole.OWNER,
-      status: "ACTIVE",
+      status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: true,
+      joinedAt: new Date("2026-01-01T00:00:00.000Z"),
     },
   });
 
-  await prisma.companySettings.upsert({
+  const companySettings = await prisma.companySettings.upsert({
     where: { tenantId: tenant.id },
     update: {
-      companyName: "Demo Termopane SRL",
+      legalName: "Synthetic Termopane SRL",
+      displayName: "Synthetic Termopane",
       defaultCurrency: "RON",
-      defaultVatRate: "19.00",
-    },
-    create: {
-      tenantId: tenant.id,
-      companyName: "Demo Termopane SRL",
-      legalName: "Demo Termopane SRL",
-      taxId: "RO00000000",
-      registrationNumber: "J40/0000/2026",
-      addressLine1: "Strada Exemplu 1",
-      city: "Bucuresti",
-      country: "RO",
-      phone: "+40 700 000 000",
-      email: "contact@example.test",
-      defaultCurrency: "RON",
-      defaultVatRate: "19.00",
-      offerValidityDays: 30,
-      warrantyText: "Garantie sintetica pentru date demo.",
-      deliveryText: "Termen de livrare demo, fara angajament comercial.",
-      paymentTermsText: "Conditii de plata demo.",
-      advancePaymentText: "Avans demo configurabil.",
-      pdfFooterText: "Oferta demo generata cu date sintetice.",
+      vatRateBasisPoints: 1900,
+      offerValidityDays: 14,
+      paymentTermsText: "Synthetic payment terms for local development only.",
+      warrantyText: "Synthetic warranty text. Requires business validation before production use.",
+      deliveryText: "Synthetic delivery text. Requires business validation before production use.",
+      pdfFooterText: "Synthetic footer for generated offer previews.",
       commercialDefaults: {
-        requiresBusinessValidation: true,
+        note: "Placeholder commercial defaults; no production pricing formula is encoded.",
       },
       calculationDefaults: {
-        requiresBusinessValidation: true,
-      },
-      documentTemplateDefaults: {
-        quoteTemplate: "template-a",
+        note: "Calculation settings require business validation before production use.",
       },
     },
-  });
-
-  let customer = await prisma.customer.findFirst({
-    where: {
+    create: {
+      id: "seed_company_settings",
       tenantId: tenant.id,
-      email: "client.demo@example.test",
-    },
-  });
-
-  customer ??= await prisma.customer.create({
-    data: {
-      tenantId: tenant.id,
-      displayName: "Client Demo",
-      companyName: "Client Demo SRL",
-      contactName: "Client Demo",
-      email: "client.demo@example.test",
-      phone: "+40 711 111 111",
-      addressLine1: "Strada Clientului 10",
-      city: "Brasov",
+      legalName: "Synthetic Termopane SRL",
+      displayName: "Synthetic Termopane",
+      addressLine1: "Synthetic Business Street 1",
+      city: "Bucharest",
       country: "RO",
-      notes: "Date sintetice pentru seed.",
+      email: "office@example.test",
+      phone: "+40000000000",
+      defaultCurrency: "RON",
+      vatRateBasisPoints: 1900,
+      offerValidityDays: 14,
+      paymentTermsText: "Synthetic payment terms for local development only.",
+      warrantyText: "Synthetic warranty text. Requires business validation before production use.",
+      deliveryText: "Synthetic delivery text. Requires business validation before production use.",
+      pdfFooterText: "Synthetic footer for generated offer previews.",
+      commercialDefaults: {
+        note: "Placeholder commercial defaults; no production pricing formula is encoded.",
+      },
+      calculationDefaults: {
+        note: "Calculation settings require business validation before production use.",
+      },
     },
   });
 
-  let project = await prisma.project.findFirst({
-    where: {
+  const customer = await prisma.customer.upsert({
+    where: { id: "seed_customer_demo" },
+    update: {
+      displayName: "Synthetic Residential Customer",
+      contactName: "Synthetic Contact",
+      email: "customer@example.test",
+      phone: "+40000000001",
+    },
+    create: {
+      id: "seed_customer_demo",
+      tenantId: tenant.id,
+      displayName: "Synthetic Residential Customer",
+      contactName: "Synthetic Contact",
+      email: "customer@example.test",
+      phone: "+40000000001",
+      addressLine1: "Synthetic Site Street 10",
+      city: "Bucharest",
+      country: "RO",
+      notes: "Synthetic customer used only for local seed data.",
+    },
+  });
+
+  const project = await prisma.project.upsert({
+    where: { id: "seed_project_demo" },
+    update: {
+      name: "Synthetic Apartment Renovation",
+      siteAddress: "Synthetic Site Street 10",
+    },
+    create: {
+      id: "seed_project_demo",
       tenantId: tenant.id,
       customerId: customer.id,
-      name: "Casa Demo",
-    },
-  });
-
-  project ??= await prisma.project.create({
-    data: {
-      tenantId: tenant.id,
-      customerId: customer.id,
-      name: "Casa Demo",
-      siteAddressLine1: "Strada Santierului 5",
-      city: "Brasov",
-      country: "RO",
-      notes: "Proiect sintetic pentru fluxul comercial MVP.",
+      name: "Synthetic Apartment Renovation",
+      siteAddress: "Synthetic Site Street 10",
+      notes: "Synthetic project used only for local seed data.",
     },
   });
 
@@ -142,26 +157,29 @@ async function main() {
     where: {
       tenantId_quoteNumber: {
         tenantId: tenant.id,
-        quoteNumber: "DEMO-2026-0001",
+        quoteNumber: "SYN-0001",
       },
     },
     update: {
       customerId: customer.id,
       projectId: project.id,
       status: QuoteStatus.DRAFT,
+      title: "Synthetic fixed-window offer",
       assignedToId: owner.id,
     },
     create: {
+      id: quoteId,
       tenantId: tenant.id,
       customerId: customer.id,
       projectId: project.id,
-      quoteNumber: "DEMO-2026-0001",
+      quoteNumber: "SYN-0001",
       status: QuoteStatus.DRAFT,
-      title: "Oferta demo termopane",
-      notes: "Oferta sintetica pentru validarea schemei Prisma.",
-      tags: ["demo", "synthetic"],
+      title: "Synthetic fixed-window offer",
+      currency: "RON",
       createdById: owner.id,
       assignedToId: owner.id,
+      tags: ["seed", "synthetic"],
+      internalNotes: "Synthetic quote. Do not use as production pricing guidance.",
     },
   });
 
@@ -174,50 +192,250 @@ async function main() {
     },
     update: {
       status: QuoteVersionStatus.DRAFT,
-      subtotalAmount: "1200.00",
-      taxAmount: "228.00",
-      totalAmount: "1428.00",
+      isLocked: false,
+      customerSnapshot: {
+        displayName: customer.displayName,
+        contactName: customer.contactName,
+        email: customer.email,
+      },
+      companySettingsSnapshot: {
+        displayName: companySettings.displayName,
+        defaultCurrency: companySettings.defaultCurrency,
+        vatRateBasisPoints: companySettings.vatRateBasisPoints,
+      },
+      priceSnapshot: {
+        note: "Synthetic placeholder. Real price lists are outside this task.",
+      },
+      totalsSnapshot: {
+        materialCostMinor: 0,
+        totalWithVatMinor: 0,
+        note: "Calculation placeholder only.",
+      },
     },
     create: {
+      id: quoteVersionId,
       tenantId: tenant.id,
       quoteId: quote.id,
       versionNumber: 1,
       status: QuoteVersionStatus.DRAFT,
-      createdById: owner.id,
+      isLocked: false,
       currency: "RON",
       customerSnapshot: {
         displayName: customer.displayName,
-        companyName: customer.companyName,
-        city: customer.city,
-        country: customer.country,
+        contactName: customer.contactName,
+        email: customer.email,
       },
       companySettingsSnapshot: {
-        companyName: "Demo Termopane SRL",
-        defaultCurrency: "RON",
-        defaultVatRate: "19.00",
+        displayName: companySettings.displayName,
+        defaultCurrency: companySettings.defaultCurrency,
+        vatRateBasisPoints: companySettings.vatRateBasisPoints,
       },
-      catalogSnapshot: {
-        note: "Catalog models are intentionally out of scope for COD-004.",
+      priceSnapshot: {
+        note: "Synthetic placeholder. Real price lists are outside this task.",
       },
-      priceListSnapshot: {
-        note: "Synthetic placeholder; no production pricing formulas.",
+      itemSnapshot: {
+        note: "Quote item snapshots are stored on each QuoteItem.",
       },
-      commercialSnapshot: {
-        requiresBusinessValidation: true,
+      totalsSnapshot: {
+        materialCostMinor: 0,
+        totalWithVatMinor: 0,
+        note: "Calculation placeholder only.",
       },
-      calculationWarnings: [
+      warningsSnapshot: [
         {
-          code: "requires_business_validation",
-          message: "Synthetic seed data does not encode production formulas.",
+          code: "REQUIRES_BUSINESS_VALIDATION",
+          message: "Seed values are synthetic and must not be treated as production formulas.",
         },
       ],
       traceSummary: {
-        source: "seed",
+        note: "No production calculation trace is seeded.",
       },
-      subtotalAmount: "1200.00",
-      discountAmount: "0.00",
-      taxAmount: "228.00",
-      totalAmount: "1428.00",
+      subtotalMinor: 0,
+      vatMinor: 0,
+      totalMinor: 0,
+      createdById: owner.id,
+    },
+  });
+
+  await prisma.quoteItem.upsert({
+    where: { id: "seed_quote_item_window" },
+    update: {
+      quoteVersionId: quoteVersion.id,
+      type: QuoteItemType.WINDOW,
+      quantity: 1,
+      widthMm: 1200,
+      heightMm: 1400,
+      customerDescription: "Synthetic fixed-window item",
+      configurationSnapshot: {
+        type: "fixed-window",
+        note: "Synthetic configuration only.",
+      },
+      catalogSnapshot: {
+        note: "No catalog model is implemented in COD-004.",
+      },
+      calculationSnapshot: {
+        note: "No pricing formula is seeded.",
+      },
+      totalsSnapshot: {
+        totalWithVatMinor: 0,
+      },
+    },
+    create: {
+      id: "seed_quote_item_window",
+      tenantId: tenant.id,
+      quoteVersionId: quoteVersion.id,
+      type: QuoteItemType.WINDOW,
+      sortOrder: 1,
+      quantity: 1,
+      widthMm: 1200,
+      heightMm: 1400,
+      customerDescription: "Synthetic fixed-window item",
+      internalNotes: "Synthetic item for local seed data only.",
+      configurationSnapshot: {
+        type: "fixed-window",
+        note: "Synthetic configuration only.",
+      },
+      catalogSnapshot: {
+        note: "No catalog model is implemented in COD-004.",
+      },
+      calculationSnapshot: {
+        note: "No pricing formula is seeded.",
+      },
+      totalsSnapshot: {
+        totalWithVatMinor: 0,
+      },
+    },
+  });
+
+  await prisma.quoteCalculationResult.upsert({
+    where: { quoteVersionId: quoteVersion.id },
+    update: {
+      calculatorVersion: "seed-placeholder",
+      inputSnapshot: {
+        quoteVersionId: quoteVersion.id,
+        source: "synthetic-seed",
+      },
+      outputSnapshot: {
+        totals: {
+          totalWithVatMinor: 0,
+        },
+      },
+      warnings: [
+        {
+          code: "REQUIRES_BUSINESS_VALIDATION",
+          message: "Synthetic seed result is not a production calculation.",
+        },
+      ],
+      trace: [
+        {
+          step: "seed",
+          note: "Placeholder calculation result created without pricing formulas.",
+        },
+      ],
+    },
+    create: {
+      id: "seed_quote_calculation_result",
+      tenantId: tenant.id,
+      quoteVersionId: quoteVersion.id,
+      calculatorVersion: "seed-placeholder",
+      inputHash: "synthetic-seed",
+      inputSnapshot: {
+        quoteVersionId: quoteVersion.id,
+        source: "synthetic-seed",
+      },
+      outputSnapshot: {
+        totals: {
+          totalWithVatMinor: 0,
+        },
+      },
+      warnings: [
+        {
+          code: "REQUIRES_BUSINESS_VALIDATION",
+          message: "Synthetic seed result is not a production calculation.",
+        },
+      ],
+      trace: [
+        {
+          step: "seed",
+          note: "Placeholder calculation result created without pricing formulas.",
+        },
+      ],
+    },
+  });
+
+  await prisma.document.upsert({
+    where: { id: "seed_document_quote_pdf" },
+    update: {
+      quoteVersionId: quoteVersion.id,
+      type: DocumentType.QUOTE_PDF,
+      templateKey: "template-a",
+      visibleTotalsSnapshot: {
+        totalWithVatMinor: 0,
+      },
+    },
+    create: {
+      id: "seed_document_quote_pdf",
+      tenantId: tenant.id,
+      quoteVersionId: quoteVersion.id,
+      type: DocumentType.QUOTE_PDF,
+      templateKey: "template-a",
+      fileName: "synthetic-offer.pdf",
+      storageKey: "seed/synthetic-offer.pdf",
+      mimeType: "application/pdf",
+      checksum: "synthetic-placeholder",
+      visibleTotalsSnapshot: {
+        totalWithVatMinor: 0,
+      },
+      generatedById: owner.id,
+    },
+  });
+
+  await prisma.savedFilter.upsert({
+    where: { id: "seed_saved_filter_drafts" },
+    update: {
+      name: "Synthetic draft quotes",
+      filter: {
+        status: [QuoteStatus.DRAFT],
+      },
+      isDefault: true,
+    },
+    create: {
+      id: "seed_saved_filter_drafts",
+      tenantId: tenant.id,
+      userId: owner.id,
+      name: "Synthetic draft quotes",
+      entityType: "Quote",
+      filter: {
+        status: [QuoteStatus.DRAFT],
+      },
+      isDefault: true,
+    },
+  });
+
+  await prisma.auditLog.upsert({
+    where: { id: "seed_audit_quote_created" },
+    update: {
+      action: AuditAction.QUOTE_CREATED,
+      entityType: "Quote",
+      entityId: quote.id,
+      metadata: {
+        source: "synthetic-seed",
+      },
+    },
+    create: {
+      id: "seed_audit_quote_created",
+      tenantId: tenant.id,
+      actorUserId: owner.id,
+      action: AuditAction.QUOTE_CREATED,
+      entityType: "Quote",
+      entityId: quote.id,
+      afterSnapshot: {
+        quoteNumber: quote.quoteNumber,
+        status: quote.status,
+      },
+      metadata: {
+        source: "synthetic-seed",
+      },
     },
   });
 
@@ -228,164 +446,14 @@ async function main() {
     },
   });
 
-  const existingItem = await prisma.quoteItem.findFirst({
-    where: {
-      tenantId: tenant.id,
-      quoteVersionId: quoteVersion.id,
-      sortOrder: 1,
-    },
-  });
-
-  const quoteItem =
-    existingItem ??
-    (await prisma.quoteItem.create({
-      data: {
-        tenantId: tenant.id,
-        quoteVersionId: quoteVersion.id,
-        type: QuoteItemType.WINDOW,
-        sortOrder: 1,
-        quantity: 2,
-        widthMm: 1200,
-        heightMm: 1400,
-        customerDescription: "Fereastra PVC demo 1200x1400 mm",
-        internalNotes: "Linie sintetica, fara formula de productie.",
-        configurationSnapshot: {
-          itemKind: "window",
-          openingStyle: "demo",
-          requiresBusinessValidation: true,
-        },
-        catalogSnapshot: {
-          profileSystem: "Demo PVC",
-          glassUnit: "Demo glass",
-        },
-        pricingSnapshot: {
-          note: "Placeholder synthetic values only.",
-        },
-        unitPrice: "600.00",
-        lineSubtotal: "1200.00",
-        discountAmount: "0.00",
-        taxAmount: "228.00",
-        lineTotal: "1428.00",
-      },
-    }));
-
-  await prisma.quoteCalculationResult.upsert({
-    where: { quoteVersionId: quoteVersion.id },
-    update: {
-      outputSnapshot: {
-        totals: {
-          subtotalAmount: "1200.00",
-          taxAmount: "228.00",
-          totalAmount: "1428.00",
-        },
-      },
-    },
-    create: {
-      tenantId: tenant.id,
-      quoteVersionId: quoteVersion.id,
-      createdById: owner.id,
-      calculationVersion: "seed-placeholder-v1",
-      inputSnapshot: {
-        quoteVersionId: quoteVersion.id,
-        frozen: true,
-      },
-      outputSnapshot: {
-        totals: {
-          subtotalAmount: "1200.00",
-          taxAmount: "228.00",
-          totalAmount: "1428.00",
-        },
-      },
-      warnings: [
-        {
-          code: "placeholder_calculation",
-          message: "No production formulas are implemented in seed data.",
-        },
-      ],
-      trace: {
-        note: "Synthetic placeholder trace.",
-      },
-      inputHash: "synthetic-seed-placeholder",
-    },
-  });
-
-  await prisma.document.upsert({
-    where: {
-      tenantId_storageKey: {
-        tenantId: tenant.id,
-        storageKey: "demo/quotes/DEMO-2026-0001-v1.pdf",
-      },
-    },
-    update: {
-      quoteVersionId: quoteVersion.id,
-      generatedById: owner.id,
-    },
-    create: {
-      tenantId: tenant.id,
-      quoteVersionId: quoteVersion.id,
-      type: DocumentType.QUOTE_PDF,
-      fileName: "DEMO-2026-0001-v1.pdf",
-      storageKey: "demo/quotes/DEMO-2026-0001-v1.pdf",
-      mimeType: "application/pdf",
-      byteSize: 0,
-      checksum: "synthetic-placeholder",
-      templateKey: "template-a",
-      generatedById: owner.id,
-    },
-  });
-
-  await prisma.savedFilter.upsert({
-    where: {
-      tenantId_userId_entityType_name: {
-        tenantId: tenant.id,
-        userId: owner.id,
-        entityType: "quote",
-        name: "Draft demo quotes",
-      },
-    },
-    update: {
-      filterConfig: {
-        status: [QuoteStatus.DRAFT],
-      },
-      isDefault: true,
-    },
-    create: {
-      tenantId: tenant.id,
-      userId: owner.id,
-      entityType: "quote",
-      name: "Draft demo quotes",
-      filterConfig: {
-        status: [QuoteStatus.DRAFT],
-      },
-      isDefault: true,
-    },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      action: AuditAction.QUOTE_CREATED,
-      actorUserId: owner.id,
-      quoteId: quote.id,
-      quoteVersionId: quoteVersion.id,
-      quoteItemId: quoteItem.id,
-      targetType: "Quote",
-      targetId: quote.id,
-      reason: "Synthetic seed data for COD-004.",
-      metadata: {
-        source: "prisma/seed.ts",
-        containsCustomerPii: false,
-      },
-    },
-  });
+  console.info("Seeded synthetic tenant, owner, quote, quote version, item, calculation, document, saved filter, and audit log.");
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (error) => {
+  .catch((error) => {
     console.error(error);
-    await prisma.$disconnect();
     process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
   });

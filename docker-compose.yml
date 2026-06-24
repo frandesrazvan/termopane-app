@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: termopane-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: termopane
+      POSTGRES_PASSWORD: termopane
+      POSTGRES_DB: termopane_app
+    ports:
+      - "5432:5432"
+    volumes:
+      - termopane_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  termopane_postgres_data:

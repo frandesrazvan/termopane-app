@@ -63,20 +63,32 @@ All tenant-owned catalog and pricing records require `tenantId`.
     quantity, selected catalog snapshot, customer description, internal notes, ordering index;
   - item configuration must be sufficient for recalculation without reading current catalog rows.
 
-## Calculation and audit records
+## Calculation, document, saved filter, and audit records
 
-- CalculationOutput:
+- QuoteCalculationResult:
   - `id`, `tenantId`, `quoteVersionId`, input snapshot hash/version, material requirements,
     glass cuts, profile linear meters, item totals, quote totals, tax totals, warnings, trace data;
   - may be stored as structured JSON if the schema is not yet stable.
-- ManualOverrideAudit:
-  - `id`, `tenantId`, `quoteVersionId`, optional `quoteItemId`, actor user, field, old value,
-    new value, reason, timestamp;
-  - required for every manual price override and should not be editable by normal users.
-- GeneratedPdf:
+- Document:
   - `id`, `tenantId`, `quoteVersionId`, template key, file/storage reference, generatedBy,
     generatedAt, visible totals, language/locale, checksum or content hash;
   - must be bound to the quote version used to generate it.
+- AuditLog:
+  - `id`, `tenantId`, optional actor user, action, entity type/id, before snapshot, after snapshot,
+    metadata, timestamp;
+  - covers pricing, manual override, catalog, quote, auth, and document actions;
+  - required for every manual price override and should not be editable by normal users.
+- SavedFilter:
+  - `id`, `tenantId`, optional user, name, entity type, filter JSON, default flag, timestamps;
+  - supports saved offer filters by status, customer, date, author, total, or other UI criteria.
+
+## Prisma implementation notes
+
+The first committed Prisma schema uses the task names `QuoteCalculationResult`, `Document`,
+`AuditLog`, and `SavedFilter` for the MVP commercial quote loop. Catalog and price-list tables remain
+deferred; quote versions and quote items carry JSON snapshots so historical quotes do not depend on
+future catalog edits. The schema intentionally stores monetary totals as integer minor-unit fields or
+JSON snapshots and does not encode production pricing formulas.
 
 ## Data integrity rules
 

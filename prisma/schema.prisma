@@ -18,6 +18,7 @@ enum TenantRole {
   ADMIN
   ESTIMATOR
   DEALER
+  SUPPORT
 }
 
 enum TenantMemberStatus {
@@ -29,9 +30,9 @@ enum TenantMemberStatus {
 enum QuoteStatus {
   DRAFT
   SENT
-  REVISED
   ACCEPTED
   REJECTED
+  REVISED
   ARCHIVED
 }
 
@@ -43,67 +44,73 @@ enum QuoteVersionStatus {
 }
 
 enum QuoteItemType {
-  WINDOW @map("window")
-  DOOR   @map("door")
-  CUSTOM @map("custom")
+  WINDOW
+  DOOR
+  CUSTOM
 }
 
 enum DocumentType {
   QUOTE_PDF
-  COMPANY_LOGO
-  ATTACHMENT
+  QUOTE_PREVIEW
   OTHER
 }
 
 enum AuditAction {
+  AUTH_LOGIN
+  AUTH_LOGOUT
   PRICING_UPDATED
-  OVERRIDE_APPLIED
+  PRICING_OVERRIDE_APPLIED
+  CATALOG_CREATED
   CATALOG_UPDATED
+  CATALOG_ARCHIVED
   QUOTE_CREATED
   QUOTE_UPDATED
+  QUOTE_VERSION_CREATED
   QUOTE_VERSION_LOCKED
-  AUTH_EVENT
+  QUOTE_SENT
   DOCUMENT_GENERATED
+  DOCUMENT_DELETED
 }
 
 model Tenant {
-  id        String       @id @default(cuid())
-  name      String
-  slug      String       @unique
-  status    TenantStatus @default(ACTIVE)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id              String                   @id @default(cuid())
+  name            String
+  slug            String                   @unique
+  status          TenantStatus             @default(ACTIVE)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  auditLogs       AuditLog[]
+  companySettings CompanySettings?
+  customers       Customer[]
+  documents       Document[]
+  members         TenantMember[]
+  projects        Project[]
+  quoteItems      QuoteItem[]
+  quoteResults    QuoteCalculationResult[]
+  quoteVersions   QuoteVersion[]
+  quotes          Quote[]
+  savedFilters    SavedFilter[]
 
-  auditLogs          AuditLog[]
-  calculationResults QuoteCalculationResult[]
-  companySettings    CompanySettings?
-  customers          Customer[]
-  documents          Document[]
-  members            TenantMember[]
-  projects           Project[]
-  quoteItems         QuoteItem[]
-  quoteVersions      QuoteVersion[]
-  quotes             Quote[]
-  savedFilters       SavedFilter[]
+  @@index([status])
 }
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  displayName    String
-  authProvider   String?
-  authProviderId String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                   String         @id @default(cuid())
+  email                String         @unique
+  displayName          String
+  authProvider         String?
+  authProviderSubject  String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  assignedQuotes       Quote[]        @relation("QuoteAssignedTo")
+  auditLogs            AuditLog[]     @relation("AuditActor")
+  createdQuotes        Quote[]        @relation("QuoteCreatedBy")
+  createdQuoteVersions QuoteVersion[] @relation("QuoteVersionCreatedBy")
+  generatedDocuments   Document[]     @relation("DocumentGeneratedBy")
+  memberships          TenantMember[]
+  savedFilters         SavedFilter[]
 
-  auditLogs                 AuditLog[]               @relation("AuditActor")
-  calculationResultsCreated QuoteCalculationResult[] @relation("CalculationCreatedBy")
-  documentsGenerated        Document[]               @relation("DocumentGeneratedBy")
-  memberships               TenantMember[]
-  quoteVersionsCreated      QuoteVersion[]           @relation("QuoteVersionCreatedBy")
-  quotesAssigned            Quote[]                  @relation("QuoteAssignedTo")
-  quotesCreated             Quote[]                  @relation("QuoteCreatedBy")
-  savedFilters              SavedFilter[]
+  @@index([email])
 }
 
 model TenantMember {
@@ -111,13 +118,14 @@ model TenantMember {
   tenantId             String
   userId               String
   role                 TenantRole
-  status               TenantMemberStatus @default(ACTIVE)
+  status               TenantMemberStatus @default(INVITED)
   canViewInternalCosts Boolean            @default(false)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedAt            DateTime?
+  joinedAt             DateTime?
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, userId])
   @@index([tenantId, role])
@@ -126,59 +134,56 @@ model TenantMember {
 }
 
 model CompanySettings {
-  id                       String   @id @default(cuid())
-  tenantId                 String   @unique
-  companyName              String
-  legalName                String?
-  taxId                    String?
-  registrationNumber       String?
-  addressLine1             String?
-  addressLine2             String?
-  city                     String?
-  county                   String?
-  country                  String   @default("RO")
-  phone                    String?
-  email                    String?
-  website                  String?
-  logoReference            String?
-  defaultCurrency          String   @default("RON")
-  defaultVatRate           Decimal  @default(19.00) @db.Decimal(5, 2)
-  offerValidityDays        Int      @default(30)
-  warrantyText             String?
-  deliveryText             String?
-  paymentTermsText         String?
-  advancePaymentText       String?
-  pdfFooterText            String?
-  commercialDefaults       Json?
-  calculationDefaults      Json?
-  documentTemplateDefaults Json?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  legalName           String
+  displayName         String
+  taxIdentifier       String?
+  registrationNumber  String?
+  addressLine1        String?
+  addressLine2        String?
+  city                String?
+  country             String?
+  phone               String?
+  email               String?
+  website             String?
+  logoUrl             String?
+  defaultCurrency     String   @default("RON")
+  vatRateBasisPoints  Int?
+  offerValidityDays   Int?
+  paymentTermsText    String?
+  warrantyText        String?
+  deliveryText        String?
+  advancePaymentText  String?
+  pdfFooterText       String?
+  commercialDefaults  Json?
+  calculationDefaults Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId])
 }
 
 model Customer {
-  id           String   @id @default(cuid())
-  tenantId     String
-  displayName  String
-  companyName  String?
-  contactName  String?
-  email        String?
-  phone        String?
-  addressLine1 String?
-  addressLine2 String?
-  city         String?
-  county       String?
-  country      String   @default("RO")
-  postalCode   String?
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  projects Project[]
-  quotes   Quote[]
+  id            String    @id @default(cuid())
+  tenantId      String
+  displayName   String
+  companyName   String?
+  contactName   String?
+  email         String?
+  phone         String?
+  taxIdentifier String?
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  country       String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects      Project[]
+  quotes        Quote[]
 
   @@index([tenantId, displayName])
   @@index([tenantId, email])
@@ -186,51 +191,45 @@ model Customer {
 }
 
 model Project {
-  id               String   @id @default(cuid())
-  tenantId         String
-  customerId       String
-  name             String
-  siteAddressLine1 String?
-  siteAddressLine2 String?
-  city             String?
-  county           String?
-  country          String   @default("RO")
-  notes            String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  quotes   Quote[]
+  id          String   @id @default(cuid())
+  tenantId    String
+  customerId  String
+  name        String
+  siteAddress String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quotes      Quote[]
 
   @@index([tenantId, customerId])
   @@index([tenantId, name])
 }
 
 model Quote {
-  id               String      @id @default(cuid())
+  id               String         @id @default(cuid())
   tenantId         String
   customerId       String
   projectId        String?
   quoteNumber      String
-  status           QuoteStatus @default(DRAFT)
+  status           QuoteStatus    @default(DRAFT)
   title            String?
-  notes            String?
-  tags             Json?
-  createdById      String
+  currency         String         @default("RON")
+  createdById      String?
   assignedToId     String?
-  currentVersionId String?     @unique
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-
-  assignedTo     User?          @relation("QuoteAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
-  auditLogs      AuditLog[]
-  createdBy      User           @relation("QuoteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  currentVersion QuoteVersion?  @relation("QuoteCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  customer       Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  project        Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  versions       QuoteVersion[] @relation("QuoteVersions")
+  currentVersionId String?        @unique
+  tags             Json?
+  internalNotes    String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  assignedTo       User?          @relation("QuoteAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy        User?          @relation("QuoteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  currentVersion   QuoteVersion?  @relation("CurrentQuoteVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  customer         Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project          Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  versions         QuoteVersion[] @relation("QuoteVersions")
 
   @@unique([tenantId, quoteNumber])
   @@index([tenantId, status])
@@ -240,37 +239,35 @@ model Quote {
 }
 
 model QuoteVersion {
-  id                      String             @id @default(cuid())
+  id                      String                  @id @default(cuid())
   tenantId                String
   quoteId                 String
   versionNumber           Int
-  status                  QuoteVersionStatus @default(DRAFT)
-  createdById             String
-  currency                String             @default("RON")
+  status                  QuoteVersionStatus      @default(DRAFT)
+  isLocked                Boolean                 @default(false)
+  currency                String                  @default("RON")
   customerSnapshot        Json
   companySettingsSnapshot Json
-  catalogSnapshot         Json?
-  priceListSnapshot       Json?
-  commercialSnapshot      Json?
-  calculationWarnings     Json?
+  priceSnapshot           Json?
+  itemSnapshot            Json?
+  totalsSnapshot          Json?
+  warningsSnapshot        Json?
   traceSummary            Json?
-  subtotalAmount          Decimal            @default(0) @db.Decimal(12, 2)
-  discountAmount          Decimal            @default(0) @db.Decimal(12, 2)
-  taxAmount               Decimal            @default(0) @db.Decimal(12, 2)
-  totalAmount             Decimal            @default(0) @db.Decimal(12, 2)
+  subtotalMinor           BigInt                  @default(0)
+  vatMinor                BigInt                  @default(0)
+  totalMinor              BigInt                  @default(0)
+  createdById             String?
   lockedAt                DateTime?
   sentAt                  DateTime?
-  createdAt               DateTime           @default(now())
-  updatedAt               DateTime           @updatedAt
-
-  auditLogs         AuditLog[]
-  calculationResult QuoteCalculationResult?
-  createdBy         User                    @relation("QuoteVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  currentForQuote   Quote?                  @relation("QuoteCurrentVersion")
-  documents         Document[]
-  items             QuoteItem[]
-  quote             Quote                   @relation("QuoteVersions", fields: [quoteId], references: [id], onDelete: Cascade)
-  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  calculationResult       QuoteCalculationResult?
+  createdBy               User?                   @relation("QuoteVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  currentForQuote         Quote?                  @relation("CurrentQuoteVersion")
+  documents               Document[]
+  items                   QuoteItem[]
+  quote                   Quote                   @relation("QuoteVersions", fields: [quoteId], references: [id], onDelete: Cascade)
+  tenant                  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([quoteId, versionNumber])
   @@index([tenantId, quoteId])
@@ -283,74 +280,61 @@ model QuoteItem {
   tenantId              String
   quoteVersionId        String
   type                  QuoteItemType
-  sortOrder             Int
+  sortOrder             Int           @default(0)
   quantity              Int           @default(1)
   widthMm               Int?
   heightMm              Int?
-  customerDescription   String
+  customerDescription   String?
   internalNotes         String?
   configurationSnapshot Json
   catalogSnapshot       Json?
-  pricingSnapshot       Json?
-  unitPrice             Decimal       @default(0) @db.Decimal(12, 2)
-  lineSubtotal          Decimal       @default(0) @db.Decimal(12, 2)
-  discountAmount        Decimal       @default(0) @db.Decimal(12, 2)
-  taxAmount             Decimal       @default(0) @db.Decimal(12, 2)
-  lineTotal             Decimal       @default(0) @db.Decimal(12, 2)
-  overrideReason        String?
+  calculationSnapshot   Json?
+  totalsSnapshot        Json?
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
-
-  auditLogs    AuditLog[]
-  quoteVersion QuoteVersion @relation(fields: [quoteVersionId], references: [id], onDelete: Cascade)
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quoteVersion          QuoteVersion  @relation(fields: [quoteVersionId], references: [id], onDelete: Cascade)
+  tenant                Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, quoteVersionId])
+  @@index([quoteVersionId, sortOrder])
   @@index([tenantId, type])
-  @@index([tenantId, sortOrder])
 }
 
 model QuoteCalculationResult {
-  id                 String   @id @default(cuid())
-  tenantId           String
-  quoteVersionId     String   @unique
-  createdById        String?
-  calculationVersion String
-  inputSnapshot      Json
-  outputSnapshot     Json
-  warnings           Json
-  trace              Json
-  inputHash          String?
-  createdAt          DateTime @default(now())
-
-  createdBy    User?        @relation("CalculationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  quoteVersion QuoteVersion @relation(fields: [quoteVersionId], references: [id], onDelete: Cascade)
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                String       @id @default(cuid())
+  tenantId          String
+  quoteVersionId    String       @unique
+  calculatorVersion String?
+  inputHash         String?
+  inputSnapshot     Json
+  outputSnapshot    Json
+  warnings          Json?
+  trace             Json?
+  createdAt         DateTime     @default(now())
+  quoteVersion      QuoteVersion @relation(fields: [quoteVersionId], references: [id], onDelete: Cascade)
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, quoteVersionId])
   @@index([tenantId, createdAt])
 }
 
 model Document {
-  id             String       @id @default(cuid())
-  tenantId       String
-  quoteVersionId String?
-  type           DocumentType
-  fileName       String
-  storageKey     String
-  mimeType       String
-  byteSize       Int?
-  checksum       String?
-  templateKey    String?
-  locale         String       @default("ro-RO")
-  generatedById  String?
-  createdAt      DateTime     @default(now())
+  id                    String        @id @default(cuid())
+  tenantId              String
+  quoteVersionId        String?
+  type                  DocumentType
+  templateKey           String?
+  fileName              String?
+  storageKey            String?
+  mimeType              String?
+  checksum              String?
+  visibleTotalsSnapshot Json?
+  generatedById         String?
+  createdAt             DateTime      @default(now())
+  generatedBy           User?         @relation("DocumentGeneratedBy", fields: [generatedById], references: [id], onDelete: SetNull)
+  quoteVersion          QuoteVersion? @relation(fields: [quoteVersionId], references: [id], onDelete: SetNull)
+  tenant                Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  generatedBy  User?         @relation("DocumentGeneratedBy", fields: [generatedById], references: [id], onDelete: SetNull)
-  quoteVersion QuoteVersion? @relation(fields: [quoteVersionId], references: [id], onDelete: SetNull)
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, storageKey])
   @@index([tenantId, quoteVersionId])
   @@index([tenantId, type])
   @@index([tenantId, createdAt])
@@ -359,48 +343,36 @@ model Document {
 model AuditLog {
   id             String      @id @default(cuid())
   tenantId       String
-  action         AuditAction
   actorUserId    String?
-  quoteId        String?
-  quoteVersionId String?
-  quoteItemId    String?
-  targetType     String
-  targetId       String?
-  reason         String?
-  beforeValue    Json?
-  afterValue     Json?
+  action         AuditAction
+  entityType     String?
+  entityId       String?
+  beforeSnapshot Json?
+  afterSnapshot  Json?
   metadata       Json?
-  requestId      String?
   createdAt      DateTime    @default(now())
-
-  actor        User?         @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
-  quote        Quote?        @relation(fields: [quoteId], references: [id], onDelete: SetNull)
-  quoteItem    QuoteItem?    @relation(fields: [quoteItemId], references: [id], onDelete: SetNull)
-  quoteVersion QuoteVersion? @relation(fields: [quoteVersionId], references: [id], onDelete: SetNull)
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor          User?       @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, action, createdAt])
-  @@index([tenantId, targetType, targetId])
-  @@index([tenantId, quoteId])
-  @@index([tenantId, quoteVersionId])
+  @@index([tenantId, entityType, entityId])
   @@index([actorUserId])
 }
 
 model SavedFilter {
-  id           String   @id @default(cuid())
-  tenantId     String
-  userId       String
-  name         String
-  entityType   String
-  filterConfig Json
-  isDefault    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String?
+  name       String
+  entityType String   @default("Quote")
+  filter     Json
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, userId, entityType, name])
-  @@index([tenantId, userId])
+  @@unique([tenantId, userId, name])
   @@index([tenantId, entityType])
+  @@index([tenantId, userId])
 }

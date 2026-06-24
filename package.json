@@ -1,29 +1,31 @@
 {
   "name": "termopane-app",
-  "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "build": "pnpm typecheck",
-    "db:seed": "prisma db seed",
-    "lint": "eslint .",
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm -r --if-present build",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test && tsx tests/prisma-schema-invariants.test.ts",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "verify": "pnpm prisma generate && pnpm check",
+    "format": "prettier --write .",
     "prisma": "prisma",
-    "test": "node tests/schema-invariants.test.mjs",
-    "typecheck": "tsc --noEmit"
+    "prisma:generate": "prisma generate",
+    "db:seed": "prisma db seed"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "6.19.0"
+    "@prisma/client": "^6.19.1"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.4",
-    "@types/node": "20.19.43",
-    "eslint": "9.39.4",
-    "prisma": "6.19.0",
-    "tsx": "4.21.0",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.62.0"
+    "@types/node": "^20",
+    "prettier": "latest",
+    "prisma": "^6.19.1",
+    "tsx": "^4.20.6",
+    "typescript": "latest"
   }
 }
