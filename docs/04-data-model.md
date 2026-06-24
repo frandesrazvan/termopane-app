@@ -135,3 +135,10 @@ helpers. These helpers require a tenant scope (`tenantId`) or a verified tenant 
 tenant-owned record id is accepted, and every query adds `tenantId` to its `where` clause. Future
 CRUD work should use these helpers instead of calling Prisma delegates directly for tenant-owned
 commercial records.
+
+## COD-007 customer and project CRUD notes
+
+Customer and project create/update flows use the tenant-scoped repository helpers rather than direct
+Prisma calls from routes. Project creation and updates verify the parent customer through the same
+tenant scope, so a project cannot be created under or moved to a customer from another tenant.
+Customer search is server-side and limited to the active tenant across name and contact fields.
