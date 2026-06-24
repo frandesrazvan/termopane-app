@@ -115,3 +115,15 @@ pricing-formula models. A few conceptual records above are represented with impl
 
 Catalog and price-list relations remain JSON snapshots on quote versions and items until dedicated
 catalog/pricing tasks add those models.
+
+## COD-005 auth and tenant-context notes
+
+The current auth foundation uses signed HTTP-only session cookies for development and resolves app
+access through `User` plus active `TenantMember` records. A user can belong to multiple active
+tenants; the server chooses the selected tenant from the session when valid, otherwise it falls back
+to the first active membership.
+
+Tenant-owned data access must call server-side tenant-context helpers before querying tenant records.
+Dealer/restricted users do not see internal costs by default. Owner/admin roles can manage catalog
+and generate PDFs; user management is owner-only until an explicit per-member user-management
+permission is added.
