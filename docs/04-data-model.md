@@ -127,3 +127,11 @@ Tenant-owned data access must call server-side tenant-context helpers before que
 Dealer/restricted users do not see internal costs by default. Owner/admin roles can manage catalog
 and generate PDFs; user management is owner-only until an explicit per-member user-management
 permission is added.
+
+## COD-006 tenant-scoped data access notes
+
+Core customer, project, quote, and quote-version reads are exposed through tenant-scoped repository
+helpers. These helpers require a tenant scope (`tenantId`) or a verified tenant context before any
+tenant-owned record id is accepted, and every query adds `tenantId` to its `where` clause. Future
+CRUD work should use these helpers instead of calling Prisma delegates directly for tenant-owned
+commercial records.
