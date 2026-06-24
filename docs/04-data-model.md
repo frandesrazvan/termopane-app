@@ -142,3 +142,13 @@ Customer and project create/update flows use the tenant-scoped repository helper
 Prisma calls from routes. Project creation and updates verify the parent customer through the same
 tenant scope, so a project cannot be created under or moved to a customer from another tenant.
 Customer search is server-side and limited to the active tenant across name and contact fields.
+
+## COD-008 catalog base schema notes
+
+The catalog foundation adds tenant-owned supplier, profile, glass, hardware, color, accessory,
+service, tax, price-list, price-list-item, and pricing-rule records. Conceptual `Profile`,
+`GlassUnit`, `Hardware`, and `CommercialRuleSet` are implemented as `ProfileItem`, `GlassPackage`,
+`HardwareKit`, and `PricingRule` so future admin screens can model configurable item prices and
+rules without encoding production formulas. Catalog and pricing records include `deletedAt` for soft
+deletes where admin removal is expected, and seeded rule/configuration JSON is marked as requiring
+business validation.

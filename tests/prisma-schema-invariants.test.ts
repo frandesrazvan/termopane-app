@@ -11,6 +11,18 @@ const seed = readFileSync(seedPath, "utf8");
 const tenantOwnedModels = [
   "TenantMember",
   "CompanySettings",
+  "Supplier",
+  "ProfileSystem",
+  "ProfileItem",
+  "GlassPackage",
+  "HardwareKit",
+  "ColorFinish",
+  "Accessory",
+  "ServiceItem",
+  "TaxRate",
+  "PriceList",
+  "PriceListItem",
+  "PricingRule",
   "Customer",
   "Project",
   "Quote",
@@ -20,6 +32,21 @@ const tenantOwnedModels = [
   "Document",
   "AuditLog",
   "SavedFilter",
+];
+
+const softDeleteCatalogModels = [
+  "Supplier",
+  "ProfileSystem",
+  "ProfileItem",
+  "GlassPackage",
+  "HardwareKit",
+  "ColorFinish",
+  "Accessory",
+  "ServiceItem",
+  "TaxRate",
+  "PriceList",
+  "PriceListItem",
+  "PricingRule",
 ];
 
 const requiredUniqueConstraints = [
@@ -35,6 +62,18 @@ const requiredSeedOperations = [
   "user",
   "tenantMember",
   "companySettings",
+  "supplier",
+  "profileSystem",
+  "profileItem",
+  "glassPackage",
+  "hardwareKit",
+  "colorFinish",
+  "accessory",
+  "serviceItem",
+  "taxRate",
+  "priceList",
+  "priceListItem",
+  "pricingRule",
   "customer",
   "project",
   "quote",
@@ -58,6 +97,11 @@ try {
   for (const modelName of tenantOwnedModels) {
     const block = modelBlock(modelName);
     assert.match(block, /^\s*tenantId\s+String\b/m, `${modelName} must include tenantId String.`);
+  }
+
+  for (const modelName of softDeleteCatalogModels) {
+    const block = modelBlock(modelName);
+    assert.match(block, /^\s*deletedAt\s+DateTime\?/m, `${modelName} should support soft deletes.`);
   }
 
   for (const { modelName, constraint, field } of requiredUniqueConstraints) {

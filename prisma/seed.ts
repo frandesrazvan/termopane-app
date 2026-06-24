@@ -1,7 +1,13 @@
 import {
   AuditAction,
+  CatalogMaterialType,
+  CatalogUnit,
   DocumentType,
   PrismaClient,
+  PriceListItemType,
+  PriceListStatus,
+  PricingRuleType,
+  ProfileItemType,
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
@@ -18,6 +24,17 @@ const ownerUserId = "seed_user_owner";
 const adminUserId = "seed_user_admin";
 const estimatorUserId = "seed_user_estimator";
 const dealerUserId = "seed_user_dealer";
+const supplierId = "seed_supplier_catalog";
+const profileSystemId = "seed_profile_system_pvc";
+const frameProfileId = "seed_profile_item_frame";
+const glassPackageId = "seed_glass_package_double";
+const hardwareKitId = "seed_hardware_kit_placeholder";
+const colorFinishId = "seed_color_finish_white";
+const accessoryId = "seed_accessory_sill";
+const serviceItemId = "seed_service_installation";
+const taxRateId = "seed_tax_rate_vat_standard";
+const priceListId = "seed_price_list_active";
+const pricingRuleId = "seed_pricing_rule_placeholder";
 const quoteId = "seed_quote_001";
 const quoteVersionId = "seed_quote_001_v1";
 
@@ -271,6 +288,429 @@ async function main() {
     },
   });
 
+  const supplier = await prisma.supplier.upsert({
+    where: { id: supplierId },
+    update: {
+      tenantId: tenant.id,
+      name: "Synthetic Catalog Supplier",
+      code: "SYN-SUP",
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: supplierId,
+      tenantId: tenant.id,
+      name: "Synthetic Catalog Supplier",
+      code: "SYN-SUP",
+      website: "https://example.test/supplier",
+      notes: "Synthetic supplier used only for local catalog seed data.",
+    },
+  });
+
+  const profileSystem = await prisma.profileSystem.upsert({
+    where: { id: profileSystemId },
+    update: {
+      tenantId: tenant.id,
+      supplierId: supplier.id,
+      name: "Synthetic PVC 70",
+      code: "SYN-PVC-70",
+      materialType: CatalogMaterialType.PVC,
+      configuration: {
+        validationStatus: "requires business validation",
+        note: "Synthetic profile system only; no supplier formula is encoded.",
+      },
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: profileSystemId,
+      tenantId: tenant.id,
+      supplierId: supplier.id,
+      name: "Synthetic PVC 70",
+      code: "SYN-PVC-70",
+      materialType: CatalogMaterialType.PVC,
+      description: "Synthetic PVC profile system for catalog admin development.",
+      configuration: {
+        validationStatus: "requires business validation",
+        note: "Synthetic profile system only; no supplier formula is encoded.",
+      },
+    },
+  });
+
+  const frameProfile = await prisma.profileItem.upsert({
+    where: { id: frameProfileId },
+    update: {
+      tenantId: tenant.id,
+      profileSystemId: profileSystem.id,
+      supplierId: supplier.id,
+      name: "Synthetic frame profile",
+      code: "SYN-FRAME-70",
+      type: ProfileItemType.FRAME,
+      unit: CatalogUnit.LINEAR_METER,
+      deductionRule: {
+        validationStatus: "requires business validation",
+        ruleSource: "tenant configuration",
+      },
+      wasteRule: {
+        validationStatus: "requires business validation",
+      },
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: frameProfileId,
+      tenantId: tenant.id,
+      profileSystemId: profileSystem.id,
+      supplierId: supplier.id,
+      name: "Synthetic frame profile",
+      code: "SYN-FRAME-70",
+      type: ProfileItemType.FRAME,
+      unit: CatalogUnit.LINEAR_METER,
+      description: "Synthetic frame profile item. Values are placeholders only.",
+      deductionRule: {
+        validationStatus: "requires business validation",
+        ruleSource: "tenant configuration",
+      },
+      wasteRule: {
+        validationStatus: "requires business validation",
+      },
+      configuration: {
+        note: "No production profile deduction or reinforcement rule is seeded.",
+      },
+    },
+  });
+
+  const glassPackage = await prisma.glassPackage.upsert({
+    where: { id: glassPackageId },
+    update: {
+      tenantId: tenant.id,
+      supplierId: supplier.id,
+      name: "Synthetic double glass package",
+      code: "SYN-GLASS-24",
+      compositionLabel: "4 / 16 / 4 synthetic",
+      unit: CatalogUnit.SQUARE_METER,
+      minBillableAreaSquareMm: 300000,
+      deductionRule: {
+        validationStatus: "requires business validation",
+      },
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: glassPackageId,
+      tenantId: tenant.id,
+      supplierId: supplier.id,
+      name: "Synthetic double glass package",
+      code: "SYN-GLASS-24",
+      compositionLabel: "4 / 16 / 4 synthetic",
+      unit: CatalogUnit.SQUARE_METER,
+      minBillableAreaSquareMm: 300000,
+      deductionRule: {
+        validationStatus: "requires business validation",
+      },
+      configuration: {
+        note: "Synthetic glass package only. Deduction values must be configured later.",
+      },
+    },
+  });
+
+  const colorFinish = await prisma.colorFinish.upsert({
+    where: { id: colorFinishId },
+    update: {
+      tenantId: tenant.id,
+      profileSystemId: profileSystem.id,
+      supplierId: supplier.id,
+      name: "Synthetic white finish",
+      code: "SYN-WHITE",
+      surface: "both sides",
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: colorFinishId,
+      tenantId: tenant.id,
+      profileSystemId: profileSystem.id,
+      supplierId: supplier.id,
+      name: "Synthetic white finish",
+      code: "SYN-WHITE",
+      surface: "both sides",
+      configuration: {
+        note: "Synthetic color finish for catalog admin development.",
+      },
+    },
+  });
+
+  const hardwareKit = await prisma.hardwareKit.upsert({
+    where: { id: hardwareKitId },
+    update: {
+      tenantId: tenant.id,
+      supplierId: supplier.id,
+      name: "Synthetic fixed-window hardware placeholder",
+      code: "SYN-HW-FIXED",
+      category: "fixed-window",
+      openingType: "fixed",
+      unit: CatalogUnit.EACH,
+      quantityRule: {
+        validationStatus: "requires business validation",
+      },
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: hardwareKitId,
+      tenantId: tenant.id,
+      supplierId: supplier.id,
+      name: "Synthetic fixed-window hardware placeholder",
+      code: "SYN-HW-FIXED",
+      category: "fixed-window",
+      openingType: "fixed",
+      unit: CatalogUnit.EACH,
+      quantityRule: {
+        validationStatus: "requires business validation",
+      },
+      configuration: {
+        note: "Hardware quantities are configurable placeholders only.",
+      },
+    },
+  });
+
+  const accessory = await prisma.accessory.upsert({
+    where: { id: accessoryId },
+    update: {
+      tenantId: tenant.id,
+      supplierId: supplier.id,
+      name: "Synthetic interior sill",
+      code: "SYN-SILL",
+      category: "sill",
+      unit: CatalogUnit.LINEAR_METER,
+      quantityRule: {
+        validationStatus: "requires business validation",
+      },
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: accessoryId,
+      tenantId: tenant.id,
+      supplierId: supplier.id,
+      name: "Synthetic interior sill",
+      code: "SYN-SILL",
+      category: "sill",
+      unit: CatalogUnit.LINEAR_METER,
+      quantityRule: {
+        validationStatus: "requires business validation",
+      },
+      configuration: {
+        note: "Synthetic accessory. Quantity behavior is not production validated.",
+      },
+    },
+  });
+
+  const serviceItem = await prisma.serviceItem.upsert({
+    where: { id: serviceItemId },
+    update: {
+      tenantId: tenant.id,
+      name: "Synthetic installation service",
+      code: "SYN-INSTALL",
+      category: "installation",
+      unit: CatalogUnit.FIXED,
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: serviceItemId,
+      tenantId: tenant.id,
+      name: "Synthetic installation service",
+      code: "SYN-INSTALL",
+      category: "installation",
+      unit: CatalogUnit.FIXED,
+      configuration: {
+        validationStatus: "requires business validation",
+        note: "Service pricing is configurable and not a production formula.",
+      },
+    },
+  });
+
+  const taxRate = await prisma.taxRate.upsert({
+    where: { id: taxRateId },
+    update: {
+      tenantId: tenant.id,
+      name: "Synthetic standard VAT",
+      code: "SYN-VAT-19",
+      rateBasisPoints: 1900,
+      isDefault: true,
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: taxRateId,
+      tenantId: tenant.id,
+      name: "Synthetic standard VAT",
+      code: "SYN-VAT-19",
+      rateBasisPoints: 1900,
+      isDefault: true,
+      validFrom: new Date("2026-01-01T00:00:00.000Z"),
+      configuration: {
+        note: "Synthetic tax rate for development only.",
+      },
+    },
+  });
+
+  const priceList = await prisma.priceList.upsert({
+    where: { id: priceListId },
+    update: {
+      tenantId: tenant.id,
+      name: "Synthetic active catalog price list",
+      version: "2026-synthetic-v1",
+      currency: "RON",
+      status: PriceListStatus.ACTIVE,
+      createdById: owner.id,
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: priceListId,
+      tenantId: tenant.id,
+      name: "Synthetic active catalog price list",
+      version: "2026-synthetic-v1",
+      currency: "RON",
+      status: PriceListStatus.ACTIVE,
+      effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+      notes: "Synthetic active price list. Do not use as production pricing guidance.",
+      createdById: owner.id,
+    },
+  });
+
+  const syntheticPriceListItems = [
+    {
+      id: "seed_price_item_frame",
+      itemType: PriceListItemType.PROFILE_ITEM,
+      catalogItemId: frameProfile.id,
+      unit: CatalogUnit.LINEAR_METER,
+      costMinor: 2400,
+      saleMinor: 3600,
+      description: "Synthetic frame profile price",
+    },
+    {
+      id: "seed_price_item_glass",
+      itemType: PriceListItemType.GLASS_PACKAGE,
+      catalogItemId: glassPackage.id,
+      unit: CatalogUnit.SQUARE_METER,
+      costMinor: 9000,
+      saleMinor: 13500,
+      description: "Synthetic glass package price",
+    },
+    {
+      id: "seed_price_item_color",
+      itemType: PriceListItemType.COLOR_FINISH,
+      catalogItemId: colorFinish.id,
+      unit: CatalogUnit.SQUARE_METER,
+      costMinor: 0,
+      saleMinor: 0,
+      description: "Synthetic included color finish",
+    },
+    {
+      id: "seed_price_item_hardware",
+      itemType: PriceListItemType.HARDWARE_KIT,
+      catalogItemId: hardwareKit.id,
+      unit: CatalogUnit.EACH,
+      costMinor: 2500,
+      saleMinor: 4000,
+      description: "Synthetic hardware placeholder price",
+    },
+    {
+      id: "seed_price_item_accessory",
+      itemType: PriceListItemType.ACCESSORY,
+      catalogItemId: accessory.id,
+      unit: CatalogUnit.LINEAR_METER,
+      costMinor: 1500,
+      saleMinor: 2400,
+      description: "Synthetic accessory price",
+    },
+    {
+      id: "seed_price_item_service",
+      itemType: PriceListItemType.SERVICE_ITEM,
+      catalogItemId: serviceItem.id,
+      unit: CatalogUnit.FIXED,
+      costMinor: 10000,
+      saleMinor: 15000,
+      description: "Synthetic service price",
+    },
+  ];
+
+  for (const item of syntheticPriceListItems) {
+    await prisma.priceListItem.upsert({
+      where: { id: item.id },
+      update: {
+        tenantId: tenant.id,
+        priceListId: priceList.id,
+        itemType: item.itemType,
+        catalogItemId: item.catalogItemId,
+        description: item.description,
+        unit: item.unit,
+        costMinor: item.costMinor,
+        saleMinor: item.saleMinor,
+        currency: priceList.currency,
+        metadata: {
+          validationStatus: "requires business validation",
+        },
+        isActive: true,
+        deletedAt: null,
+      },
+      create: {
+        id: item.id,
+        tenantId: tenant.id,
+        priceListId: priceList.id,
+        itemType: item.itemType,
+        catalogItemId: item.catalogItemId,
+        description: item.description,
+        unit: item.unit,
+        costMinor: item.costMinor,
+        saleMinor: item.saleMinor,
+        currency: priceList.currency,
+        metadata: {
+          validationStatus: "requires business validation",
+        },
+      },
+    });
+  }
+
+  await prisma.pricingRule.upsert({
+    where: { id: pricingRuleId },
+    update: {
+      tenantId: tenant.id,
+      priceListId: priceList.id,
+      name: "Synthetic markup placeholder",
+      code: "SYN-MARKUP",
+      ruleType: PricingRuleType.MARKUP,
+      appliesTo: null,
+      priority: 10,
+      configuration: {
+        validationStatus: "requires business validation",
+        markupBasisPoints: null,
+        note: "Future catalog admin can configure commercial additions here.",
+      },
+      requiresBusinessValidation: true,
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: pricingRuleId,
+      tenantId: tenant.id,
+      priceListId: priceList.id,
+      name: "Synthetic markup placeholder",
+      code: "SYN-MARKUP",
+      ruleType: PricingRuleType.MARKUP,
+      priority: 10,
+      configuration: {
+        validationStatus: "requires business validation",
+        markupBasisPoints: null,
+        note: "Future catalog admin can configure commercial additions here.",
+      },
+      requiresBusinessValidation: true,
+    },
+  });
+
   const customer = await prisma.customer.upsert({
     where: { id: "seed_customer_demo" },
     update: {
@@ -360,7 +800,9 @@ async function main() {
         vatRateBasisPoints: companySettings.vatRateBasisPoints,
       },
       priceSnapshot: {
-        note: "Synthetic placeholder. Real price lists are outside this task.",
+        priceListId: priceList.id,
+        priceListVersion: priceList.version,
+        note: "Synthetic catalog price list snapshot. Quote builder wiring is outside this task.",
       },
       totalsSnapshot: {
         materialCostMinor: 0,
@@ -387,7 +829,9 @@ async function main() {
         vatRateBasisPoints: companySettings.vatRateBasisPoints,
       },
       priceSnapshot: {
-        note: "Synthetic placeholder. Real price lists are outside this task.",
+        priceListId: priceList.id,
+        priceListVersion: priceList.version,
+        note: "Synthetic catalog price list snapshot. Quote builder wiring is outside this task.",
       },
       itemSnapshot: {
         note: "Quote item snapshots are stored on each QuoteItem.",
@@ -427,7 +871,12 @@ async function main() {
         note: "Synthetic configuration only.",
       },
       catalogSnapshot: {
-        note: "No catalog model is implemented in COD-004.",
+        profileSystemId: profileSystem.id,
+        frameProfileId: frameProfile.id,
+        glassPackageId: glassPackage.id,
+        colorFinishId: colorFinish.id,
+        hardwareKitId: hardwareKit.id,
+        note: "Synthetic catalog snapshot only. Live catalog is not wired to quote builder yet.",
       },
       calculationSnapshot: {
         note: "No pricing formula is seeded.",
@@ -452,7 +901,12 @@ async function main() {
         note: "Synthetic configuration only.",
       },
       catalogSnapshot: {
-        note: "No catalog model is implemented in COD-004.",
+        profileSystemId: profileSystem.id,
+        frameProfileId: frameProfile.id,
+        glassPackageId: glassPackage.id,
+        colorFinishId: colorFinish.id,
+        hardwareKitId: hardwareKit.id,
+        note: "Synthetic catalog snapshot only. Live catalog is not wired to quote builder yet.",
       },
       calculationSnapshot: {
         note: "No pricing formula is seeded.",
@@ -603,7 +1057,7 @@ async function main() {
   });
 
   console.info(
-    "Seeded synthetic tenants, owner/admin/estimator/dealer users, quote, quote version, item, calculation, document, saved filter, and audit log.",
+    "Seeded synthetic tenants, users, catalog, active price list, quote, quote version, item, calculation, document, saved filter, and audit log.",
   );
 }
 

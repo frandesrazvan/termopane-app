@@ -72,6 +72,57 @@ enum AuditAction {
   DOCUMENT_DELETED
 }
 
+enum CatalogMaterialType {
+  PVC
+  ALUMINIUM
+  OTHER
+}
+
+enum ProfileItemType {
+  FRAME
+  SASH
+  MULLION
+  TRANSOM
+  THRESHOLD
+  REINFORCEMENT
+  OTHER
+}
+
+enum CatalogUnit {
+  EACH
+  LINEAR_METER
+  SQUARE_METER
+  HOUR
+  FIXED
+}
+
+enum PriceListStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum PriceListItemType {
+  PROFILE_ITEM
+  GLASS_PACKAGE
+  HARDWARE_KIT
+  COLOR_FINISH
+  ACCESSORY
+  SERVICE_ITEM
+  TAX_RATE
+  CUSTOM
+}
+
+enum PricingRuleType {
+  MARKUP
+  DISCOUNT
+  ROUNDING
+  SERVICE_ADDITION
+  TAX
+  OVERRIDE
+  OTHER
+}
+
 model Tenant {
   id              String                   @id @default(cuid())
   name            String
@@ -79,17 +130,29 @@ model Tenant {
   status          TenantStatus             @default(ACTIVE)
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
+  accessories     Accessory[]
   auditLogs       AuditLog[]
+  colorFinishes   ColorFinish[]
   companySettings CompanySettings?
   customers       Customer[]
   documents       Document[]
+  glassPackages   GlassPackage[]
+  hardwareKits    HardwareKit[]
   members         TenantMember[]
+  priceListItems  PriceListItem[]
+  priceLists      PriceList[]
+  pricingRules    PricingRule[]
+  profileItems    ProfileItem[]
+  profileSystems  ProfileSystem[]
   projects        Project[]
   quoteItems      QuoteItem[]
   quoteResults    QuoteCalculationResult[]
   quoteVersions   QuoteVersion[]
   quotes          Quote[]
   savedFilters    SavedFilter[]
+  serviceItems    ServiceItem[]
+  suppliers       Supplier[]
+  taxRates        TaxRate[]
 
   @@index([status])
 }
@@ -104,6 +167,7 @@ model User {
   updatedAt            DateTime       @updatedAt
   assignedQuotes       Quote[]        @relation("QuoteAssignedTo")
   auditLogs            AuditLog[]     @relation("AuditActor")
+  createdPriceLists    PriceList[]    @relation("PriceListCreatedBy")
   createdQuotes        Quote[]        @relation("QuoteCreatedBy")
   createdQuoteVersions QuoteVersion[] @relation("QuoteVersionCreatedBy")
   generatedDocuments   Document[]     @relation("DocumentGeneratedBy")
@@ -163,6 +227,301 @@ model CompanySettings {
   tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+}
+
+model Supplier {
+  id             String          @id @default(cuid())
+  tenantId       String
+  name           String
+  code           String?
+  contactName    String?
+  email          String?
+  phone          String?
+  website        String?
+  notes          String?
+  isActive       Boolean         @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  accessories    Accessory[]
+  colorFinishes  ColorFinish[]
+  glassPackages  GlassPackage[]
+  hardwareKits   HardwareKit[]
+  profileItems   ProfileItem[]
+  profileSystems ProfileSystem[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
+}
+
+model ProfileSystem {
+  id            String              @id @default(cuid())
+  tenantId      String
+  supplierId    String?
+  name          String
+  code          String?
+  materialType  CatalogMaterialType
+  description   String?
+  configuration Json?
+  isActive      Boolean             @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  colorFinishes ColorFinish[]
+  profileItems  ProfileItem[]
+  supplier      Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, materialType, isActive])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, deletedAt])
+}
+
+model ProfileItem {
+  id              String          @id @default(cuid())
+  tenantId        String
+  profileSystemId String
+  supplierId      String?
+  name            String
+  code            String?
+  type            ProfileItemType
+  unit            CatalogUnit     @default(LINEAR_METER)
+  description     String?
+  deductionRule   Json?
+  wasteRule       Json?
+  configuration   Json?
+  isActive        Boolean         @default(true)
+  deletedAt       DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  profileSystem   ProfileSystem   @relation(fields: [profileSystemId], references: [id], onDelete: Restrict)
+  supplier        Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, profileSystemId])
+  @@index([tenantId, type])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
+}
+
+model GlassPackage {
+  id                      String      @id @default(cuid())
+  tenantId                String
+  supplierId              String?
+  name                    String
+  code                    String?
+  compositionLabel        String?
+  unit                    CatalogUnit @default(SQUARE_METER)
+  minBillableAreaSquareMm Int?
+  deductionRule           Json?
+  configuration           Json?
+  isActive                Boolean     @default(true)
+  deletedAt               DateTime?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  supplier                Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tenant                  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, deletedAt])
+}
+
+model HardwareKit {
+  id            String      @id @default(cuid())
+  tenantId      String
+  supplierId    String?
+  name          String
+  code          String?
+  category      String?
+  openingType   String?
+  unit          CatalogUnit @default(EACH)
+  quantityRule  Json?
+  configuration Json?
+  isActive      Boolean     @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  supplier      Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, category])
+  @@index([tenantId, isActive])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, deletedAt])
+}
+
+model ColorFinish {
+  id              String         @id @default(cuid())
+  tenantId        String
+  profileSystemId String?
+  supplierId      String?
+  name            String
+  code            String?
+  surface         String?
+  configuration   Json?
+  isActive        Boolean        @default(true)
+  deletedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  profileSystem   ProfileSystem? @relation(fields: [profileSystemId], references: [id], onDelete: SetNull)
+  supplier        Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, profileSystemId])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
+}
+
+model Accessory {
+  id            String      @id @default(cuid())
+  tenantId      String
+  supplierId    String?
+  name          String
+  code          String?
+  category      String?
+  unit          CatalogUnit @default(EACH)
+  quantityRule  Json?
+  configuration Json?
+  isActive      Boolean     @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  supplier      Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, category])
+  @@index([tenantId, isActive])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, deletedAt])
+}
+
+model ServiceItem {
+  id            String      @id @default(cuid())
+  tenantId      String
+  name          String
+  code          String?
+  category      String?
+  unit          CatalogUnit @default(FIXED)
+  configuration Json?
+  isActive      Boolean     @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, category])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
+}
+
+model TaxRate {
+  id              String    @id @default(cuid())
+  tenantId        String
+  name            String
+  code            String?
+  rateBasisPoints Int
+  isDefault       Boolean   @default(false)
+  validFrom       DateTime?
+  validTo         DateTime?
+  configuration   Json?
+  isActive        Boolean   @default(true)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isDefault])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
+}
+
+model PriceList {
+  id            String          @id @default(cuid())
+  tenantId      String
+  name          String
+  version       String
+  currency      String          @default("RON")
+  status        PriceListStatus @default(DRAFT)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  notes         String?
+  createdById   String?
+  isActive      Boolean         @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  createdBy     User?           @relation("PriceListCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  items         PriceListItem[]
+  pricingRules  PricingRule[]
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name, version])
+  @@index([tenantId, status])
+  @@index([tenantId, effectiveFrom])
+  @@index([tenantId, deletedAt])
+}
+
+model PriceListItem {
+  id            String            @id @default(cuid())
+  tenantId      String
+  priceListId   String
+  itemType      PriceListItemType
+  catalogItemId String
+  sku           String?
+  description   String?
+  unit          CatalogUnit
+  costMinor     BigInt?
+  saleMinor     BigInt?
+  currency      String            @default("RON")
+  metadata      Json?
+  isActive      Boolean           @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  priceList     PriceList         @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([priceListId, itemType, catalogItemId])
+  @@index([tenantId, itemType, catalogItemId])
+  @@index([priceListId, itemType])
+  @@index([tenantId, deletedAt])
+}
+
+model PricingRule {
+  id                         String             @id @default(cuid())
+  tenantId                   String
+  priceListId                String?
+  name                       String
+  code                       String?
+  ruleType                   PricingRuleType
+  appliesTo                  PriceListItemType?
+  priority                   Int                @default(0)
+  configuration              Json
+  requiresBusinessValidation Boolean            @default(true)
+  isActive                   Boolean            @default(true)
+  deletedAt                  DateTime?
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
+  priceList                  PriceList?         @relation(fields: [priceListId], references: [id], onDelete: SetNull)
+  tenant                     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, priceListId])
+  @@index([tenantId, ruleType])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
 }
 
 model Customer {
