@@ -6,6 +6,7 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
+  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -20,10 +21,11 @@ import { logoutAction } from "../logout/actions";
 import { switchTenantAction } from "./actions";
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
-  { label: "Quotes", icon: FileText },
-  { label: "Catalog", icon: Archive },
-  { label: "Settings", icon: Settings },
+  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard", active: true },
+  { label: "Customers", icon: UsersRound, href: "/dashboard/customers" },
+  { label: "Quotes", icon: FileText, href: "#" },
+  { label: "Catalog", icon: Archive, href: "#" },
+  { label: "Settings", icon: Settings, href: "#" },
 ];
 
 export const dynamic = "force-dynamic";
@@ -94,7 +96,7 @@ export default async function DashboardPage() {
               {navItems.map((item) => (
                 <Link
                   key={item.label}
-                  href="#"
+                  href={item.href}
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${
                     item.active
                       ? "bg-zinc-950 text-white"

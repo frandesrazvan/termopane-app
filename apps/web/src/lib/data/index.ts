@@ -1,5 +1,7 @@
 export {
+  createTenantCustomer,
   createTenantDataAccess,
+  createTenantProject,
   getTenantCustomer,
   getTenantProject,
   getTenantQuote,
@@ -8,5 +10,16 @@ export {
   listTenantProjects,
   listTenantQuotes,
   tenantIdFromScope,
+  updateTenantCustomer,
+  updateTenantProject,
 } from "./tenant-repositories";
-export type { ExplicitTenantScope, TenantDataClient, TenantDataScope } from "./tenant-repositories";
+export type {
+  ExplicitTenantScope,
+  ListTenantCustomersOptions,
+  ListTenantProjectsOptions,
+  TenantCustomerWriteInput,
+  TenantDataClient,
+  TenantDataScope,
+  TenantProjectUpdateInput,
+  TenantProjectWriteInput,
+} from "./tenant-repositories";
