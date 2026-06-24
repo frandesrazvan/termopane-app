@@ -1,4 +1,12 @@
-import type { Customer, Project, Quote, QuoteVersion } from "@prisma/client";
+import {
+  QuoteStatus,
+  QuoteVersionStatus,
+  type CompanySettings,
+  type Customer,
+  type Project,
+  type Quote,
+  type QuoteVersion,
+} from "@prisma/client";
 import type { TenantContext } from "../auth/tenant-context";
 import { prisma } from "../prisma";
 
@@ -41,8 +49,9 @@ type TenantWritableModelDelegate<TRecord> = TenantModelDelegate<TRecord> & {
 export type TenantDataClient = {
   customer: TenantWritableModelDelegate<Customer>;
   project: TenantWritableModelDelegate<Project>;
-  quote: TenantModelDelegate<Quote>;
-  quoteVersion: TenantModelDelegate<QuoteVersion>;
+  quote: TenantWritableModelDelegate<Quote>;
+  quoteVersion: TenantWritableModelDelegate<QuoteVersion>;
+  companySettings: TenantModelDelegate<CompanySettings>;
 };
 
 export type TenantCustomerWriteInput = {
@@ -81,6 +90,29 @@ export type ListTenantProjectsOptions = {
   customerId?: string;
 };
 
+export type ListTenantQuotesOptions = {
+  customerId?: string | null;
+  status?: QuoteStatus | null;
+  createdById?: string | null;
+  createdFrom?: Date | null;
+  createdTo?: Date | null;
+};
+
+export type TenantQuoteDraftInput = {
+  customerId: string;
+  projectId?: string | null;
+  title?: string | null;
+  currency?: string;
+  quoteNumber?: string;
+  createdById?: string | null;
+  assignedToId?: string | null;
+};
+
+export type TenantQuoteDraftResult = {
+  quote: Quote;
+  currentVersion: QuoteVersion;
+};
+
 export function tenantIdFromScope(scope: TenantDataScope) {
   const tenantId = "tenantId" in scope ? scope.tenantId : scope.tenant.id;
 
@@ -96,6 +128,31 @@ function tenantWhere(scope: TenantDataScope, where: Record<string, unknown> = {}
     ...where,
     tenantId: tenantIdFromScope(scope),
   };
+}
+
+function quoteFilterWhere(options: ListTenantQuotesOptions = {}) {
+  const where: Record<string, unknown> = {};
+
+  if (options.customerId) {
+    where.customerId = options.customerId;
+  }
+
+  if (options.status) {
+    where.status = options.status;
+  }
+
+  if (options.createdById) {
+    where.createdById = options.createdById;
+  }
+
+  if (options.createdFrom || options.createdTo) {
+    where.createdAt = {
+      ...(options.createdFrom ? { gte: options.createdFrom } : {}),
+      ...(options.createdTo ? { lte: options.createdTo } : {}),
+    };
+  }
+
+  return where;
 }
 
 function customerSearchWhere(search: string) {
@@ -213,16 +270,107 @@ export function createTenantDataAccess(
       });
     },
 
-    listTenantQuotes(scope: TenantDataScope) {
+    listTenantQuotes(scope: TenantDataScope, options: ListTenantQuotesOptions = {}) {
       return client.quote.findMany({
-        where: tenantWhere(scope),
+        where: tenantWhere(scope, quoteFilterWhere(options)),
         orderBy: [{ createdAt: "desc" }],
       });
+    },
+
+    async createTenantQuoteDraft(
+      scope: TenantDataScope,
+      data: TenantQuoteDraftInput,
+    ): Promise<TenantQuoteDraftResult | null> {
+      const tenantId = tenantIdFromScope(scope);
+      const customer = await access.getTenantCustomer(scope, data.customerId);
+
+      if (!customer) {
+        return null;
+      }
+
+      if (data.projectId) {
+        const project = await access.getTenantProject(scope, data.projectId);
+
+        if (!project || project.customerId !== customer.id) {
+          return null;
+        }
+      }
+
+      const currency = data.currency ?? "RON";
+      const quote = await client.quote.create({
+        data: {
+          tenantId,
+          customerId: customer.id,
+          projectId: data.projectId ?? null,
+          quoteNumber: data.quoteNumber ?? generateQuoteNumber(),
+          status: QuoteStatus.DRAFT,
+          title: data.title ?? null,
+          currency,
+          createdById: data.createdById ?? null,
+          assignedToId: data.assignedToId ?? null,
+          tags: ["draft"],
+        },
+      });
+      const companySettings = await client.companySettings.findFirst({
+        where: tenantWhere(scope),
+      });
+      const currentVersion = await client.quoteVersion.create({
+        data: {
+          tenantId,
+          quoteId: quote.id,
+          versionNumber: 1,
+          status: QuoteVersionStatus.DRAFT,
+          isLocked: false,
+          currency,
+          customerSnapshot: customerSnapshot(customer),
+          companySettingsSnapshot: companySettingsSnapshot(companySettings),
+          itemSnapshot: {
+            items: [],
+          },
+          totalsSnapshot: {
+            subtotalMinor: 0,
+            vatMinor: 0,
+            totalMinor: 0,
+          },
+          warningsSnapshot: [],
+          traceSummary: {
+            source: "quote-shell",
+          },
+          subtotalMinor: 0,
+          vatMinor: 0,
+          totalMinor: 0,
+          createdById: data.createdById ?? null,
+        },
+      });
+      const updatedQuote = await client.quote.update({
+        where: { id: quote.id },
+        data: {
+          currentVersionId: currentVersion.id,
+        },
+      });
+
+      return {
+        quote: updatedQuote,
+        currentVersion,
+      };
     },
 
     getTenantQuoteVersion(scope: TenantDataScope, quoteVersionId: string) {
       return client.quoteVersion.findFirst({
         where: tenantWhere(scope, { id: quoteVersionId }),
+      });
+    },
+
+    async listTenantQuoteVersions(scope: TenantDataScope, quoteId: string) {
+      const quote = await access.getTenantQuote(scope, quoteId);
+
+      if (!quote) {
+        return [];
+      }
+
+      return client.quoteVersion.findMany({
+        where: tenantWhere(scope, { quoteId }),
+        orderBy: [{ versionNumber: "desc" }],
       });
     },
   };
@@ -279,10 +427,63 @@ export function getTenantQuote(scope: TenantDataScope, quoteId: string) {
   return tenantDataAccess.getTenantQuote(scope, quoteId);
 }
 
-export function listTenantQuotes(scope: TenantDataScope) {
-  return tenantDataAccess.listTenantQuotes(scope);
+export function listTenantQuotes(scope: TenantDataScope, options?: ListTenantQuotesOptions) {
+  return tenantDataAccess.listTenantQuotes(scope, options);
+}
+
+export function createTenantQuoteDraft(scope: TenantDataScope, data: TenantQuoteDraftInput) {
+  return tenantDataAccess.createTenantQuoteDraft(scope, data);
 }
 
 export function getTenantQuoteVersion(scope: TenantDataScope, quoteVersionId: string) {
   return tenantDataAccess.getTenantQuoteVersion(scope, quoteVersionId);
+}
+
+export function listTenantQuoteVersions(scope: TenantDataScope, quoteId: string) {
+  return tenantDataAccess.listTenantQuoteVersions(scope, quoteId);
+}
+
+function customerSnapshot(customer: Customer) {
+  return {
+    id: customer.id,
+    displayName: customer.displayName,
+    companyName: customer.companyName,
+    contactName: customer.contactName,
+    email: customer.email,
+    phone: customer.phone,
+    addressLine1: customer.addressLine1,
+    addressLine2: customer.addressLine2,
+    city: customer.city,
+    country: customer.country,
+  };
+}
+
+function companySettingsSnapshot(companySettings: CompanySettings | null) {
+  if (!companySettings) {
+    return {
+      missing: true,
+      note: "Company settings were not configured when the draft quote was created.",
+    };
+  }
+
+  return {
+    id: companySettings.id,
+    displayName: companySettings.displayName,
+    legalName: companySettings.legalName,
+    defaultCurrency: companySettings.defaultCurrency,
+    vatRateBasisPoints: companySettings.vatRateBasisPoints,
+    offerValidityDays: companySettings.offerValidityDays,
+    paymentTermsText: companySettings.paymentTermsText,
+    warrantyText: companySettings.warrantyText,
+    deliveryText: companySettings.deliveryText,
+    advancePaymentText: companySettings.advancePaymentText,
+    pdfFooterText: companySettings.pdfFooterText,
+  };
+}
+
+function generateQuoteNumber() {
+  const datePart = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
+
+  return `Q-${datePart}-${randomPart}`;
 }
