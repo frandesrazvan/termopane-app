@@ -1,0 +1,29 @@
+{
+  "name": "termopane-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm typecheck",
+    "db:seed": "prisma db seed",
+    "lint": "eslint .",
+    "prisma": "prisma",
+    "test": "node tests/schema-invariants.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@types/node": "20.19.43",
+    "eslint": "9.39.4",
+    "prisma": "6.19.0",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.62.0"
+  }
+}
