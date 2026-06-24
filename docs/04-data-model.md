@@ -152,3 +152,10 @@ service, tax, price-list, price-list-item, and pricing-rule records. Conceptual 
 rules without encoding production formulas. Catalog and pricing records include `deletedAt` for soft
 deletes where admin removal is expected, and seeded rule/configuration JSON is marked as requiring
 business validation.
+
+## COD-010 quote draft shell notes
+
+Draft quote creation now creates a tenant-owned `Quote` plus an initial draft `QuoteVersion` with
+empty item and totals snapshots. The saved-offers list filters quote shells by tenant-scoped
+customer, status, date range, author, and current-version totals where present. Quote builder items,
+PDF generation, production formulas, and locked-version mutation remain outside this task.

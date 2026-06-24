@@ -1,4 +1,4 @@
-import type { Customer, Project, Quote, QuoteVersion } from "@prisma/client";
+import { QuoteStatus, type CompanySettings, type Customer, type Project, type Quote, type QuoteVersion } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   createTenantDataAccess,
@@ -65,12 +65,32 @@ function matchesWhere<TRecord extends TenantRecord>(
         .includes(String(value.contains).toLowerCase());
     }
 
+    if (isRangeFilter(value)) {
+      const comparableValue = recordValue instanceof Date ? recordValue.getTime() : Number(recordValue);
+      const gte = value.gte instanceof Date ? value.gte.getTime() : value.gte;
+      const lte = value.lte instanceof Date ? value.lte.getTime() : value.lte;
+
+      return (
+        (gte === undefined || comparableValue >= Number(gte)) &&
+        (lte === undefined || comparableValue <= Number(lte))
+      );
+    }
+
     return recordValue === value;
   });
 }
 
 function isContainsFilter(value: unknown): value is { contains: string } {
   return Boolean(value && typeof value === "object" && "contains" in value);
+}
+
+function isRangeFilter(value: unknown): value is { gte?: Date | number; lte?: Date | number } {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      ("gte" in value || "lte" in value) &&
+      !("contains" in value),
+  );
 }
 
 function testClient(): TenantDataClient {
@@ -94,13 +114,42 @@ function testClient(): TenantDataClient {
       { id: "project-b", tenantId: "tenant-b", customerId: "customer-b", name: "B Project" },
     ] as Project[]),
     quote: delegate([
-      { id: "quote-a", tenantId: "tenant-a", quoteNumber: "A-001" },
-      { id: "quote-b", tenantId: "tenant-b", quoteNumber: "B-001" },
+      {
+        id: "quote-a",
+        tenantId: "tenant-a",
+        customerId: "customer-a",
+        projectId: "project-a",
+        quoteNumber: "A-001",
+        status: QuoteStatus.DRAFT,
+        createdById: "user-a",
+        currentVersionId: "version-a",
+        createdAt: new Date("2026-01-10T00:00:00.000Z"),
+      },
+      {
+        id: "quote-b",
+        tenantId: "tenant-b",
+        customerId: "customer-b",
+        projectId: "project-b",
+        quoteNumber: "B-001",
+        status: QuoteStatus.SENT,
+        createdById: "user-b",
+        currentVersionId: "version-b",
+        createdAt: new Date("2026-01-11T00:00:00.000Z"),
+      },
     ] as Quote[]),
     quoteVersion: delegate([
       { id: "version-a", tenantId: "tenant-a", quoteId: "quote-a", versionNumber: 1 },
       { id: "version-b", tenantId: "tenant-b", quoteId: "quote-b", versionNumber: 1 },
     ] as QuoteVersion[]),
+    companySettings: delegate([
+      {
+        id: "settings-a",
+        tenantId: "tenant-a",
+        legalName: "Tenant A SRL",
+        displayName: "Tenant A",
+        defaultCurrency: "RON",
+      },
+    ] as CompanySettings[]),
   };
 }
 
@@ -240,6 +289,77 @@ describe("tenant repositories", () => {
     ]);
   });
 
+  it("filters saved quote lists inside the tenant boundary", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(
+      data.listTenantQuotes({ tenantId: "tenant-a" }, { customerId: "customer-a" }),
+    ).resolves.toMatchObject([{ id: "quote-a", tenantId: "tenant-a" }]);
+    await expect(
+      data.listTenantQuotes({ tenantId: "tenant-a" }, { status: QuoteStatus.SENT }),
+    ).resolves.toEqual([]);
+    await expect(
+      data.listTenantQuotes({ tenantId: "tenant-a" }, { createdById: "user-a" }),
+    ).resolves.toMatchObject([{ id: "quote-a", tenantId: "tenant-a" }]);
+    await expect(
+      data.listTenantQuotes(
+        { tenantId: "tenant-a" },
+        {
+          createdFrom: new Date("2026-01-09T00:00:00.000Z"),
+          createdTo: new Date("2026-01-10T23:59:59.999Z"),
+        },
+      ),
+    ).resolves.toMatchObject([{ id: "quote-a", tenantId: "tenant-a" }]);
+  });
+
+  it("creates a draft quote shell with an initial tenant-scoped quote version", async () => {
+    const data = createTenantDataAccess(testClient());
+    const result = await data.createTenantQuoteDraft(
+      { tenantId: "tenant-a" },
+      {
+        customerId: "customer-a",
+        projectId: "project-a",
+        quoteNumber: "A-002",
+        title: "Synthetic draft shell",
+        createdById: "user-a",
+      },
+    );
+
+    expect(result?.quote).toMatchObject({
+      tenantId: "tenant-a",
+      customerId: "customer-a",
+      projectId: "project-a",
+      quoteNumber: "A-002",
+      status: QuoteStatus.DRAFT,
+      currentVersionId: result?.currentVersion.id,
+    });
+    expect(result?.currentVersion).toMatchObject({
+      tenantId: "tenant-a",
+      quoteId: result?.quote.id,
+      versionNumber: 1,
+      status: "DRAFT",
+      isLocked: false,
+      totalMinor: 0,
+    });
+  });
+
+  it("does not create quotes for customers or projects outside the tenant boundary", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(
+      data.createTenantQuoteDraft(
+        { tenantId: "tenant-a" },
+        { customerId: "customer-b", quoteNumber: "A-003" },
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantQuoteDraft(
+        { tenantId: "tenant-a" },
+        { customerId: "customer-a", projectId: "project-b", quoteNumber: "A-004" },
+      ),
+    ).resolves.toBeNull();
+  });
+
   it("does not return quote versions across tenant boundaries", async () => {
     const data = createTenantDataAccess(testClient());
 
@@ -249,5 +369,14 @@ describe("tenant repositories", () => {
     await expect(
       data.getTenantQuoteVersion({ tenantId: "tenant-a" }, "version-a"),
     ).resolves.toMatchObject({ id: "version-a", tenantId: "tenant-a" });
+  });
+
+  it("lists quote versions only after the parent quote is tenant-scoped", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(data.listTenantQuoteVersions({ tenantId: "tenant-a" }, "quote-a")).resolves.toMatchObject([
+      { id: "version-a", tenantId: "tenant-a", quoteId: "quote-a" },
+    ]);
+    await expect(data.listTenantQuoteVersions({ tenantId: "tenant-a" }, "quote-b")).resolves.toEqual([]);
   });
 });

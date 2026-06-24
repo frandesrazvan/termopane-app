@@ -23,7 +23,7 @@ import { switchTenantAction } from "./actions";
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard", active: true },
   { label: "Customers", icon: UsersRound, href: "/dashboard/customers" },
-  { label: "Quotes", icon: FileText, href: "#" },
+  { label: "Quotes", icon: FileText, href: "/dashboard/quotes" },
   { label: "Catalog", icon: Archive, href: "#" },
   { label: "Settings", icon: Settings, href: "#" },
 ];

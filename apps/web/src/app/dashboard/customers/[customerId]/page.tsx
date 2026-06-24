@@ -1,4 +1,4 @@
-import { ArrowLeft, Building2, Edit3, FolderKanban, Mail, Phone, Plus } from "lucide-react";
+import { ArrowLeft, Building2, Edit3, FileText, FolderKanban, Mail, Phone, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/auth";
@@ -48,6 +48,13 @@ export default async function CustomerDetailPage({
             >
               <Edit3 aria-hidden="true" size={17} />
               Edit
+            </Link>
+            <Link
+              href={`/dashboard/quotes/new?customerId=${customer.id}`}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"
+            >
+              <FileText aria-hidden="true" size={17} />
+              New quote
             </Link>
             <Link
               href={`/dashboard/customers/${customer.id}/projects/new`}
