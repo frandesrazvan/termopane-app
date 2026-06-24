@@ -100,3 +100,18 @@ JSON snapshots and does not encode production pricing formulas.
 - Price list and company setting changes must not silently alter locked historical versions.
 - Snapshots should include enough catalog, settings, and price data to explain past totals.
 - Internal material costs and trace data must be separately authorized from customer-facing totals.
+
+## COD-004 Prisma implementation notes
+
+The initial committed Prisma schema implements the core commercial quote loop without catalog or
+pricing-formula models. A few conceptual records above are represented with implementation names:
+
+- `CalculationOutput` is implemented as `QuoteCalculationResult` with JSON input/output snapshots,
+  warnings, and trace data.
+- `GeneratedPdf` is implemented as `Document`, which is tenant-owned and can optionally point to a
+  `QuoteVersion`.
+- `ManualOverrideAudit` is covered by the general tenant-owned `AuditLog`, with `OVERRIDE_APPLIED`
+  and pricing/catalog/quote/auth/document action values.
+
+Catalog and price-list relations remain JSON snapshots on quote versions and items until dedicated
+catalog/pricing tasks add those models.
