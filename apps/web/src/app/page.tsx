@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, active: true },
@@ -97,10 +98,13 @@ export default function Home() {
                   Mobile dashboard foundation
                 </h1>
               </div>
-              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800">
+              <Link
+                href="/dashboard"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
+              >
                 <Sparkles aria-hidden="true" size={17} />
-                New quote
-              </button>
+                Open app
+              </Link>
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -159,8 +163,8 @@ export default function Home() {
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <p className="rounded-md bg-stone-100 p-3 text-sm leading-6 text-zinc-700">
-                  No authentication, pricing logic, quote versioning, or PDF generation is wired in
-                  this scaffold.
+                  Authentication now uses server-side signed sessions and tenant memberships before
+                  protected workspace access.
                 </p>
                 <p className="rounded-md bg-stone-100 p-3 text-sm leading-6 text-zinc-700">
                   Placeholder packages exist so future work can add tested domain behavior in small

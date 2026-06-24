@@ -13,7 +13,11 @@ import {
 const prisma = new PrismaClient();
 
 const tenantId = "seed_tenant_synthetic_termopane";
+const secondTenantId = "seed_tenant_secondary_termopane";
 const ownerUserId = "seed_user_owner";
+const adminUserId = "seed_user_admin";
+const estimatorUserId = "seed_user_estimator";
+const dealerUserId = "seed_user_dealer";
 const quoteId = "seed_quote_001";
 const quoteVersionId = "seed_quote_001_v1";
 
@@ -32,6 +36,20 @@ async function main() {
     },
   });
 
+  const secondTenant = await prisma.tenant.upsert({
+    where: { slug: "synthetic-termopane-secondary" },
+    update: {
+      name: "Synthetic Secondary Tenant",
+      status: TenantStatus.ACTIVE,
+    },
+    create: {
+      id: secondTenantId,
+      name: "Synthetic Secondary Tenant",
+      slug: "synthetic-termopane-secondary",
+      status: TenantStatus.ACTIVE,
+    },
+  });
+
   const owner = await prisma.user.upsert({
     where: { email: "owner@example.test" },
     update: {
@@ -43,6 +61,48 @@ async function main() {
       displayName: "Synthetic Owner",
       authProvider: "seed",
       authProviderSubject: "synthetic-owner",
+    },
+  });
+
+  const admin = await prisma.user.upsert({
+    where: { email: "admin@example.test" },
+    update: {
+      displayName: "Synthetic Admin",
+    },
+    create: {
+      id: adminUserId,
+      email: "admin@example.test",
+      displayName: "Synthetic Admin",
+      authProvider: "seed",
+      authProviderSubject: "synthetic-admin",
+    },
+  });
+
+  const estimator = await prisma.user.upsert({
+    where: { email: "estimator@example.test" },
+    update: {
+      displayName: "Synthetic Estimator",
+    },
+    create: {
+      id: estimatorUserId,
+      email: "estimator@example.test",
+      displayName: "Synthetic Estimator",
+      authProvider: "seed",
+      authProviderSubject: "synthetic-estimator",
+    },
+  });
+
+  const dealer = await prisma.user.upsert({
+    where: { email: "dealer@example.test" },
+    update: {
+      displayName: "Synthetic Dealer",
+    },
+    create: {
+      id: dealerUserId,
+      email: "dealer@example.test",
+      displayName: "Synthetic Dealer",
+      authProvider: "seed",
+      authProviderSubject: "synthetic-dealer",
     },
   });
 
@@ -67,6 +127,102 @@ async function main() {
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: true,
       joinedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+  });
+
+  await prisma.tenantMember.upsert({
+    where: {
+      tenantId_userId: {
+        tenantId: secondTenant.id,
+        userId: owner.id,
+      },
+    },
+    update: {
+      role: TenantRole.OWNER,
+      status: TenantMemberStatus.ACTIVE,
+      canViewInternalCosts: true,
+      joinedAt: new Date("2026-01-02T00:00:00.000Z"),
+    },
+    create: {
+      id: "seed_member_owner_secondary",
+      tenantId: secondTenant.id,
+      userId: owner.id,
+      role: TenantRole.OWNER,
+      status: TenantMemberStatus.ACTIVE,
+      canViewInternalCosts: true,
+      joinedAt: new Date("2026-01-02T00:00:00.000Z"),
+    },
+  });
+
+  await prisma.tenantMember.upsert({
+    where: {
+      tenantId_userId: {
+        tenantId: tenant.id,
+        userId: admin.id,
+      },
+    },
+    update: {
+      role: TenantRole.ADMIN,
+      status: TenantMemberStatus.ACTIVE,
+      canViewInternalCosts: true,
+      joinedAt: new Date("2026-01-03T00:00:00.000Z"),
+    },
+    create: {
+      id: "seed_member_admin",
+      tenantId: tenant.id,
+      userId: admin.id,
+      role: TenantRole.ADMIN,
+      status: TenantMemberStatus.ACTIVE,
+      canViewInternalCosts: true,
+      joinedAt: new Date("2026-01-03T00:00:00.000Z"),
+    },
+  });
+
+  await prisma.tenantMember.upsert({
+    where: {
+      tenantId_userId: {
+        tenantId: tenant.id,
+        userId: estimator.id,
+      },
+    },
+    update: {
+      role: TenantRole.ESTIMATOR,
+      status: TenantMemberStatus.ACTIVE,
+      canViewInternalCosts: false,
+      joinedAt: new Date("2026-01-04T00:00:00.000Z"),
+    },
+    create: {
+      id: "seed_member_estimator",
+      tenantId: tenant.id,
+      userId: estimator.id,
+      role: TenantRole.ESTIMATOR,
+      status: TenantMemberStatus.ACTIVE,
+      canViewInternalCosts: false,
+      joinedAt: new Date("2026-01-04T00:00:00.000Z"),
+    },
+  });
+
+  await prisma.tenantMember.upsert({
+    where: {
+      tenantId_userId: {
+        tenantId: tenant.id,
+        userId: dealer.id,
+      },
+    },
+    update: {
+      role: TenantRole.DEALER,
+      status: TenantMemberStatus.ACTIVE,
+      canViewInternalCosts: false,
+      joinedAt: new Date("2026-01-05T00:00:00.000Z"),
+    },
+    create: {
+      id: "seed_member_dealer",
+      tenantId: tenant.id,
+      userId: dealer.id,
+      role: TenantRole.DEALER,
+      status: TenantMemberStatus.ACTIVE,
+      canViewInternalCosts: false,
+      joinedAt: new Date("2026-01-05T00:00:00.000Z"),
     },
   });
 
@@ -446,7 +602,9 @@ async function main() {
     },
   });
 
-  console.info("Seeded synthetic tenant, owner, quote, quote version, item, calculation, document, saved filter, and audit log.");
+  console.info(
+    "Seeded synthetic tenants, owner/admin/estimator/dealer users, quote, quote version, item, calculation, document, saved filter, and audit log.",
+  );
 }
 
 main()
