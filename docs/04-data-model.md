@@ -174,3 +174,19 @@ catalog selection and COD-012 calculation wiring are added. Custom-line unit pri
 manual snapshot data and are not treated as formulas. `totalsSnapshot` stays zero/pending for all
 draft items in this task, and locked or sent quote versions reject item create, update, and delete
 operations.
+
+## COD-012 quote calculation wiring notes
+
+Draft quote recalculation now runs through a web-app adapter that reads the current tenant-scoped
+`QuoteVersion` plus its `QuoteItem` snapshots, freezes a calculation input snapshot, calls the pure
+`@termopane/calculation` package, and persists the result back to tenant-owned quote records. The
+adapter updates `QuoteVersion` subtotal/VAT/total fields, `totalsSnapshot`, `warningsSnapshot`,
+`traceSummary`, each relevant `QuoteItem.calculationSnapshot` and `QuoteItem.totalsSnapshot`, and a
+single `QuoteCalculationResult` row keyed by `quoteVersionId`.
+
+The calculation package remains database-independent. Missing fixed-window catalog values such as
+glass deductions, glass price, or profile price produce stored warnings and zero/incomplete values
+instead of invented formulas. Recalculation is allowed only for the current mutable draft version;
+locked or sent versions must be revised rather than mutated. Internal calculation traces are stored
+for authorized support/admin inspection, while quote detail UI hides trace details unless the active
+membership can view internal costs.
