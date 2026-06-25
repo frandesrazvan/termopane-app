@@ -164,3 +164,13 @@ tenant-scoped unique collisions until tenant-configurable numbering is implement
 list filters quote shells by tenant-scoped customer, status, date range, author, and current-version
 totals where present. Quote builder items, PDF generation, production formulas, and locked-version
 mutation remain outside this task.
+
+## COD-011 quote item draft editor notes
+
+Draft quote items are tenant-owned `QuoteItem` records attached only to the current mutable draft
+`QuoteVersion`. Fixed-window and custom-line draft forms store user-entered item data in
+`configurationSnapshot`, with catalog/pricing fields represented as explicit placeholders until live
+catalog selection and COD-012 calculation wiring are added. Custom-line unit prices are stored only as
+manual snapshot data and are not treated as formulas. `totalsSnapshot` stays zero/pending for all
+draft items in this task, and locked or sent quote versions reject item create, update, and delete
+operations.
