@@ -6,10 +6,12 @@ import { z } from "zod";
 import { requireTenant } from "@/lib/auth";
 import { recalculateTenantCurrentQuoteVersion } from "@/lib/calculation/quote-calculation-adapter";
 import {
+  createTenantQuoteRevision,
   createTenantQuoteItem,
   deleteTenantQuoteItem,
   getTenantQuoteItem,
   getTenantQuoteWithCurrentVersion,
+  lockTenantQuoteVersion,
   updateTenantQuoteItem,
   type TenantQuoteItemUpdateInput,
   type TenantQuoteItemWriteInput,
@@ -182,6 +184,42 @@ export async function recalculateCurrentQuoteVersionAction(
   }
 
   redirectToCalculation(quoteId);
+}
+
+export async function lockCurrentQuoteVersionAction(
+  quoteId: string,
+  formData: FormData,
+) {
+  void formData;
+
+  const context = await requireTenant();
+  const result = await lockTenantQuoteVersion(context, quoteId, {
+    actorUserId: context.user.id,
+  });
+
+  if (!result) {
+    redirectWithVersionError(quoteId, "lock");
+  }
+
+  redirectWithVersionEvent(quoteId, "locked");
+}
+
+export async function createQuoteRevisionAction(
+  quoteId: string,
+  formData: FormData,
+) {
+  void formData;
+
+  const context = await requireTenant();
+  const result = await createTenantQuoteRevision(context, quoteId, {
+    actorUserId: context.user.id,
+  });
+
+  if (!result) {
+    redirectWithVersionError(quoteId, "revision");
+  }
+
+  redirectWithVersionEvent(quoteId, "revision");
 }
 
 function parseItemUpdateInput(
@@ -367,4 +405,12 @@ function redirectWithItemError(quoteId: string, error: "locked" | "validation"):
 
 function redirectWithCalculationError(quoteId: string, error: "locked"): never {
   redirect(`${quotePath(quoteId)}?calculationError=${error}#calculation`);
+}
+
+function redirectWithVersionEvent(quoteId: string, event: "locked" | "revision"): never {
+  redirect(`${quotePath(quoteId)}?versionEvent=${event}#versions`);
+}
+
+function redirectWithVersionError(quoteId: string, error: "lock" | "revision"): never {
+  redirect(`${quotePath(quoteId)}?versionError=${error}#versions`);
 }
