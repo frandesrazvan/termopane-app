@@ -23,6 +23,7 @@ goal is to keep future work aligned with the MVP and avoid invented business log
 - Mobile/UI task:
   - all feature-task docs;
   - `docs/07-mobile-ux-spec.md`;
+  - `docs/10-localization.md`;
   - relevant existing UI components before editing.
 - Auth, RBAC, or data task:
   - all feature-task docs;
@@ -49,11 +50,17 @@ goal is to keep future work aligned with the MVP and avoid invented business log
 - Dealer/restricted users must not see internal material costs unless explicitly permitted.
 - Do not expose customer PII in logs, test output, seed data, screenshots, or examples.
 - Use synthetic demo data unless a task explicitly authorizes private fixtures.
+- User-facing UI and customer-facing documents are Romanian-first. Use the lightweight helpers in
+  `apps/web/src/lib/i18n` for shared labels and formatting, and do not translate enum/database/API
+  constants.
 
 ## Documentation and tests
 
 - Update relevant docs when behavior, data shape, calculation assumptions, PDF output, or role
   behavior changes.
+- Update Romanian translations when user-facing behavior changes.
+- Update `README.md` when local setup, storage, authentication, commands, or implemented behavior
+  changes.
 - Add or update tests for business logic, tenant isolation, authorization, quote versioning,
   calculation warnings, and PDF generation when those areas are touched.
 - For documentation-only tasks, do not add runtime scaffolding just to make checks pass.

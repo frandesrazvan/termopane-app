@@ -328,7 +328,9 @@ function fixedWindowInput(
       source: "quote-item-draft-editor",
       requiresCalculation: true,
     },
-    catalogSnapshot: draftCatalogPlaceholder("Catalog selection is deferred for this fixed-window draft item."),
+    catalogSnapshot: draftCatalogPlaceholder(
+      "Selecția de catalog este amânată pentru această fereastră fixă în ciornă.",
+    ),
     totalsSnapshot: emptyTotalsSnapshot(),
   };
 }
@@ -360,7 +362,9 @@ function customLineInput(
       }),
     },
     catalogSnapshot: {
-      ...draftCatalogPlaceholder("Custom-line price is an explicit manual snapshot, not a formula."),
+      ...draftCatalogPlaceholder(
+        "Prețul poziției personalizate este un snapshot manual explicit, nu o formulă.",
+      ),
       manualPricing: {
         unitPriceMinor: data.unitPriceMinor,
         currency,

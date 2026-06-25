@@ -3,9 +3,9 @@ import Link from "next/link";
 import { loginAction } from "./actions";
 
 const errors: Record<string, string> = {
-  disabled: "Development login is disabled in this environment.",
-  invalid: "Use a synthetic development user ending in @example.test.",
-  membership: "No active tenant membership was found for that user.",
+  disabled: "Autentificarea de dezvoltare este dezactivată în acest mediu.",
+  invalid: "Folosește un utilizator sintetic de dezvoltare cu @example.test.",
+  membership: "Nu există apartenență activă la tenant pentru acest utilizator.",
 };
 
 export default async function LoginPage({
@@ -25,8 +25,8 @@ export default async function LoginPage({
               <ShieldCheck aria-hidden="true" size={20} />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-zinc-950">Sign in</h1>
-              <p className="text-sm text-zinc-600">Synthetic development access</p>
+              <h1 className="text-lg font-semibold text-zinc-950">Autentificare</h1>
+              <p className="text-sm text-zinc-600">Acces sintetic de dezvoltare</p>
             </div>
           </div>
 
@@ -51,18 +51,18 @@ export default async function LoginPage({
 
             <button className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white hover:bg-zinc-800">
               <LogIn aria-hidden="true" size={17} />
-              Continue
+                Continuă
             </button>
           </form>
 
           <p className="mt-4 text-xs leading-5 text-zinc-500">
-            Seed users: owner@example.test, admin@example.test, estimator@example.test,
+            Utilizatori seed: owner@example.test, admin@example.test, estimator@example.test,
             dealer@example.test.
           </p>
         </div>
 
         <Link href="/" className="mt-4 text-center text-sm font-medium text-zinc-700">
-          Back to public overview
+          Înapoi la prezentarea publică
         </Link>
       </div>
     </main>

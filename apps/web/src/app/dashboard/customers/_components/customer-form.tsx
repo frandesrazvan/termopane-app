@@ -41,13 +41,13 @@ export function CustomerForm({
     <form action={action} className="space-y-5">
       {error ? (
         <p className="rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
-          Check the highlighted fields and try again.
+          Verifică câmpurile marcate și încearcă din nou.
         </p>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
-          <span className="text-sm font-medium text-zinc-800">Customer name</span>
+          <span className="text-sm font-medium text-zinc-800">Nume client</span>
           <input
             name="displayName"
             required
@@ -58,7 +58,7 @@ export function CustomerForm({
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium text-zinc-800">Company</span>
+          <span className="text-sm font-medium text-zinc-800">Companie</span>
           <input
             name="companyName"
             maxLength={160}
@@ -68,7 +68,7 @@ export function CustomerForm({
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium text-zinc-800">Contact person</span>
+          <span className="text-sm font-medium text-zinc-800">Persoană de contact</span>
           <input
             name="contactName"
             maxLength={160}
@@ -89,7 +89,7 @@ export function CustomerForm({
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium text-zinc-800">Phone</span>
+          <span className="text-sm font-medium text-zinc-800">Telefon</span>
           <input
             name="phone"
             type="tel"
@@ -100,7 +100,7 @@ export function CustomerForm({
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium text-zinc-800">Tax identifier</span>
+          <span className="text-sm font-medium text-zinc-800">Cod fiscal</span>
           <input
             name="taxIdentifier"
             maxLength={80}
@@ -110,7 +110,7 @@ export function CustomerForm({
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium text-zinc-800">City</span>
+          <span className="text-sm font-medium text-zinc-800">Oraș</span>
           <input
             name="city"
             maxLength={120}
@@ -120,7 +120,7 @@ export function CustomerForm({
         </label>
 
         <label className="block sm:col-span-2">
-          <span className="text-sm font-medium text-zinc-800">Address line 1</span>
+          <span className="text-sm font-medium text-zinc-800">Adresă 1</span>
           <input
             name="addressLine1"
             maxLength={200}
@@ -130,7 +130,7 @@ export function CustomerForm({
         </label>
 
         <label className="block sm:col-span-2">
-          <span className="text-sm font-medium text-zinc-800">Address line 2</span>
+          <span className="text-sm font-medium text-zinc-800">Adresă 2</span>
           <input
             name="addressLine2"
             maxLength={200}
@@ -140,7 +140,7 @@ export function CustomerForm({
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium text-zinc-800">Country</span>
+          <span className="text-sm font-medium text-zinc-800">Țară</span>
           <input
             name="country"
             maxLength={120}
@@ -150,7 +150,7 @@ export function CustomerForm({
         </label>
 
         <label className="block sm:col-span-2">
-          <span className="text-sm font-medium text-zinc-800">Notes</span>
+          <span className="text-sm font-medium text-zinc-800">Note</span>
           <textarea
             name="notes"
             maxLength={1000}
@@ -166,7 +166,7 @@ export function CustomerForm({
           className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"
         >
           <ArrowLeft aria-hidden="true" size={17} />
-          Cancel
+          Anulează
         </Link>
         <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800">
           <Save aria-hidden="true" size={17} />

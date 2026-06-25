@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/auth";
 import { getTenantCustomer, getTenantProject } from "@/lib/data";
+import { commonLabel, formatDateRo } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function ProjectDetailPage({
               className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
             >
               <ArrowLeft aria-hidden="true" size={16} />
-              Customer
+              Client
             </Link>
             <h1 className="mt-3 text-2xl font-semibold text-zinc-950 sm:text-3xl">
               {project.name}
@@ -45,7 +46,7 @@ export default async function ProjectDetailPage({
             className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"
           >
             <Edit3 aria-hidden="true" size={17} />
-            Edit project
+            Editează proiect
           </Link>
         </div>
 
@@ -55,17 +56,17 @@ export default async function ProjectDetailPage({
               <div className="flex size-10 items-center justify-center rounded-md bg-sky-50 text-sky-800">
                 <FolderKanban aria-hidden="true" size={19} />
               </div>
-              <h2 className="text-base font-semibold text-zinc-950">Project details</h2>
+              <h2 className="text-base font-semibold text-zinc-950">Detalii proiect</h2>
             </div>
 
             <dl className="mt-4 grid gap-3">
-              <Detail label="Site address" value={project.siteAddress} />
-              <Detail label="Notes" value={project.notes} />
+              <Detail label="Adresă șantier" value={project.siteAddress} />
+              <Detail label="Note" value={project.notes} />
             </dl>
           </section>
 
           <aside className="rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-zinc-950">Customer</h2>
+            <h2 className="text-base font-semibold text-zinc-950">Client</h2>
             <Link
               href={`/dashboard/customers/${customer.id}`}
               className="mt-4 flex items-center gap-3 rounded-md bg-stone-100 p-3 text-sm font-semibold text-zinc-800 hover:bg-stone-200"
@@ -75,10 +76,10 @@ export default async function ProjectDetailPage({
             </Link>
             <div className="mt-4 space-y-3 text-sm text-zinc-700">
               <p className="rounded-md bg-stone-100 p-3">
-                Created {project.createdAt.toLocaleDateString("ro-RO")}
+                Creat {formatDateRo(project.createdAt)}
               </p>
               <p className="rounded-md bg-stone-100 p-3">
-                Updated {project.updatedAt.toLocaleDateString("ro-RO")}
+                Actualizat {formatDateRo(project.updatedAt)}
               </p>
             </div>
           </aside>
@@ -93,7 +94,7 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
     <div className="rounded-md bg-stone-100 p-3">
       <dt className="text-xs font-medium uppercase text-zinc-500">{label}</dt>
       <dd className="mt-2 whitespace-pre-wrap break-words text-sm font-medium text-zinc-800">
-        {value || "Not set"}
+        {value || commonLabel("notSet")}
       </dd>
     </div>
   );

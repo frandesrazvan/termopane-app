@@ -2,6 +2,7 @@ import { ArrowLeft, Mail, Phone, Plus, Search, UserRound } from "lucide-react";
 import Link from "next/link";
 import { requireTenant } from "@/lib/auth";
 import { listTenantCustomers } from "@/lib/data";
+import { formatDateRo } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,10 @@ export default async function CustomersPage({
               className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
             >
               <ArrowLeft aria-hidden="true" size={16} />
-              Dashboard
+              Panou
             </Link>
             <h1 className="mt-3 text-2xl font-semibold text-zinc-950 sm:text-3xl">
-              Customers
+              Clienți
             </h1>
             <p className="mt-1 text-sm text-zinc-600">{context.tenant.name}</p>
           </div>
@@ -38,23 +39,23 @@ export default async function CustomersPage({
             className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
           >
             <Plus aria-hidden="true" size={17} />
-            New customer
+            Client nou
           </Link>
         </div>
 
         <form action="/dashboard/customers" className="mt-6 flex flex-col gap-3 sm:flex-row">
           <label className="block flex-1">
-            <span className="sr-only">Search customers</span>
+            <span className="sr-only">Caută clienți</span>
             <input
               name="q"
               defaultValue={query}
-              placeholder="Search by name, contact, email, or phone"
+              placeholder="Caută după nume, contact, email sau telefon"
               className="h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
             />
           </label>
           <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50">
             <Search aria-hidden="true" size={17} />
-            Search
+            Caută
           </button>
         </form>
 
@@ -77,7 +78,7 @@ export default async function CustomersPage({
                           {customer.displayName}
                         </h2>
                         <span className="text-xs font-medium text-zinc-500">
-                          Updated {customer.updatedAt.toLocaleDateString("ro-RO")}
+                          Actualizat {formatDateRo(customer.updatedAt)}
                         </span>
                       </div>
                       {customer.companyName ? (
@@ -110,12 +111,12 @@ export default async function CustomersPage({
                 <UserRound aria-hidden="true" size={20} />
               </div>
               <h2 className="mt-4 text-base font-semibold text-zinc-950">
-                {hasSearch ? "No matching customers" : "No customers yet"}
+                {hasSearch ? "Nu există clienți potriviți" : "Nu există clienți încă"}
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
                 {hasSearch
-                  ? "Try a different name or contact field."
-                  : "Create the first customer before adding projects or quotes."}
+                  ? "Încearcă alt nume sau alt câmp de contact."
+                  : "Creează primul client înainte de a adăuga proiecte sau oferte."}
               </p>
               {!hasSearch ? (
                 <Link
@@ -123,7 +124,7 @@ export default async function CustomersPage({
                   className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
                 >
                   <Plus aria-hidden="true" size={17} />
-                  New customer
+                  Client nou
                 </Link>
               ) : null}
             </div>

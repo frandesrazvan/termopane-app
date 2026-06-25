@@ -26,7 +26,7 @@ export default async function NewQuotePage({
           className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
         >
           <ArrowLeft aria-hidden="true" size={16} />
-          Saved offers
+          Oferte salvate
         </Link>
 
         <section className="mt-5 rounded-md border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
@@ -35,29 +35,29 @@ export default async function NewQuotePage({
               <FileText aria-hidden="true" size={19} />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-zinc-950">New draft quote</h1>
-              <p className="mt-1 text-sm text-zinc-600">Quote shell for a saved offer</p>
+              <h1 className="text-xl font-semibold text-zinc-950">Ciornă ofertă nouă</h1>
+              <p className="mt-1 text-sm text-zinc-600">Structură de ofertă salvată</p>
             </div>
           </div>
 
           {params.error ? (
             <p className="mt-5 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
               {params.error === "quote-number"
-                ? "A draft quote number could not be reserved. Try creating the draft again."
-                : "Select a customer and check the project selection."}
+                ? "Numărul de ofertă nu a putut fi rezervat. Încearcă să creezi din nou ciorna."
+                : "Selectează un client și verifică proiectul ales."}
             </p>
           ) : null}
 
           <form action={createQuoteAction} className="mt-6 space-y-5">
             <label className="block">
-              <span className="text-sm font-medium text-zinc-800">Customer</span>
+              <span className="text-sm font-medium text-zinc-800">Client</span>
               <select
                 name="customerId"
                 required
                 defaultValue={params.customerId ?? ""}
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               >
-                <option value="">Select customer</option>
+                <option value="">Selectează client</option>
                 {customers.map((customer) => (
                   <option key={customer.id} value={customer.id}>
                     {customer.displayName}
@@ -67,13 +67,13 @@ export default async function NewQuotePage({
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-zinc-800">Project</span>
+              <span className="text-sm font-medium text-zinc-800">Proiect</span>
               <select
                 name="projectId"
                 defaultValue={params.projectId ?? ""}
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               >
-                <option value="">No project</option>
+                <option value="">Fără proiect</option>
                 {projects.map((project) => {
                   const customer = customers.find((candidate) => candidate.id === project.customerId);
 
@@ -88,11 +88,11 @@ export default async function NewQuotePage({
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-zinc-800">Title</span>
+              <span className="text-sm font-medium text-zinc-800">Titlu</span>
               <input
                 name="title"
                 maxLength={160}
-                placeholder="Optional quote title"
+                placeholder="Titlu opțional pentru ofertă"
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               />
             </label>
@@ -103,11 +103,11 @@ export default async function NewQuotePage({
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"
               >
                 <ArrowLeft aria-hidden="true" size={17} />
-                Cancel
+                Anulează
               </Link>
               <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800">
                 <Save aria-hidden="true" size={17} />
-                Create draft
+                Creează ciornă
               </button>
             </div>
           </form>

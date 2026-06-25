@@ -9,6 +9,7 @@ import {
   listTenantProjects,
   listTenantQuotes,
 } from "@/lib/data";
+import { formatMoneyMinorRo, quoteStatusLabel } from "@/lib/i18n";
 
 const quoteStatuses = Object.values(QuoteStatus);
 
@@ -69,10 +70,10 @@ export default async function QuotesPage({
               className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
             >
               <ArrowLeft aria-hidden="true" size={16} />
-              Dashboard
+              Panou
             </Link>
             <h1 className="mt-3 text-2xl font-semibold text-zinc-950 sm:text-3xl">
-              Saved offers
+              Oferte salvate
             </h1>
             <p className="mt-1 text-sm text-zinc-600">{context.tenant.name}</p>
           </div>
@@ -81,20 +82,20 @@ export default async function QuotesPage({
             className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
           >
             <Plus aria-hidden="true" size={17} />
-            New quote
+            Ofertă nouă
           </Link>
         </div>
 
         <form action="/dashboard/quotes" className="mt-6 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="block">
-              <span className="text-sm font-medium text-zinc-800">Customer</span>
+              <span className="text-sm font-medium text-zinc-800">Client</span>
               <select
                 name="customerId"
                 defaultValue={customerId ?? ""}
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               >
-                <option value="">All customers</option>
+                <option value="">Toți clienții</option>
                 {customers.map((customer) => (
                   <option key={customer.id} value={customer.id}>
                     {customer.displayName}
@@ -110,27 +111,27 @@ export default async function QuotesPage({
                 defaultValue={status ?? ""}
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               >
-                <option value="">All statuses</option>
+                <option value="">Toate statusurile</option>
                 {quoteStatuses.map((quoteStatus) => (
                   <option key={quoteStatus} value={quoteStatus}>
-                    {formatStatus(quoteStatus)}
+                    {quoteStatusLabel(quoteStatus)}
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-zinc-800">Author</span>
+              <span className="text-sm font-medium text-zinc-800">Autor</span>
               <input
                 name="authorId"
                 defaultValue={authorId ?? ""}
-                placeholder="User id"
+                placeholder="ID utilizator"
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               />
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-zinc-800">From</span>
+              <span className="text-sm font-medium text-zinc-800">De la</span>
               <input
                 name="createdFrom"
                 type="date"
@@ -140,7 +141,7 @@ export default async function QuotesPage({
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-zinc-800">To</span>
+              <span className="text-sm font-medium text-zinc-800">Până la</span>
               <input
                 name="createdTo"
                 type="date"
@@ -151,26 +152,26 @@ export default async function QuotesPage({
 
             <div className="grid grid-cols-2 gap-2">
               <label className="block">
-                <span className="text-sm font-medium text-zinc-800">Total min</span>
+                <span className="text-sm font-medium text-zinc-800">Total minim</span>
                 <input
                   name="totalMinMinor"
                   type="number"
                   min="0"
                   step="1"
                   defaultValue={params.totalMinMinor ?? ""}
-                  placeholder="minor"
+                  placeholder="bani"
                   className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
                 />
               </label>
               <label className="block">
-                <span className="text-sm font-medium text-zinc-800">Total max</span>
+                <span className="text-sm font-medium text-zinc-800">Total maxim</span>
                 <input
                   name="totalMaxMinor"
                   type="number"
                   min="0"
                   step="1"
                   defaultValue={params.totalMaxMinor ?? ""}
-                  placeholder="minor"
+                  placeholder="bani"
                   className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
                 />
               </label>
@@ -183,12 +184,12 @@ export default async function QuotesPage({
                 href="/dashboard/quotes"
                 className="inline-flex h-11 items-center justify-center rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"
               >
-                Clear
+                Șterge filtrele
               </Link>
             ) : null}
             <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800">
               <Search aria-hidden="true" size={17} />
-              Filter offers
+              Filtrează ofertele
             </button>
           </div>
         </form>
@@ -198,7 +199,7 @@ export default async function QuotesPage({
             <div className="grid gap-3">
               {filteredRows.map(({ quote, currentVersion, project }) => {
                 const projectLabel = quote.projectId
-                  ? (project?.name ?? projectNames.get(quote.projectId) ?? "Project")
+                  ? (project?.name ?? projectNames.get(quote.projectId) ?? "Proiect")
                   : null;
 
                 return (
@@ -219,7 +220,7 @@ export default async function QuotesPage({
                               {quote.title ? ` · ${quote.title}` : ""}
                             </h2>
                             <p className="mt-1 truncate text-sm text-zinc-600">
-                              {customerNames.get(quote.customerId) ?? "Unknown customer"}
+                              {customerNames.get(quote.customerId) ?? "Client necunoscut"}
                               {projectLabel ? ` · ${projectLabel}` : ""}
                             </p>
                           </div>
@@ -231,7 +232,7 @@ export default async function QuotesPage({
                             {quote.createdAt.toLocaleDateString("ro-RO")}
                           </span>
                           <span className="rounded-md bg-stone-100 px-2 py-1">
-                            Version {currentVersion?.versionNumber ?? "-"}
+                            Versiunea {currentVersion?.versionNumber ?? "-"}
                           </span>
                           <span className="rounded-md bg-stone-100 px-2 py-1">
                             {formatMinor(currentVersion?.totalMinor)}
@@ -249,12 +250,12 @@ export default async function QuotesPage({
                 <FileText aria-hidden="true" size={20} />
               </div>
               <h2 className="mt-4 text-base font-semibold text-zinc-950">
-                {hasFilters ? "No matching offers" : "No saved offers yet"}
+                {hasFilters ? "Nu există oferte potrivite" : "Nu există oferte salvate încă"}
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
                 {hasFilters
-                  ? "Try a different customer, status, date, total, or author filter."
-                  : "Create a draft quote shell for an existing customer."}
+                  ? "Încearcă alt client, status, interval, total sau autor."
+                  : "Creează o ciornă de ofertă pentru un client existent."}
               </p>
               {!hasFilters ? (
                 <Link
@@ -262,7 +263,7 @@ export default async function QuotesPage({
                   className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
                 >
                   <Plus aria-hidden="true" size={17} />
-                  New quote
+                  Ofertă nouă
                 </Link>
               ) : null}
             </div>
@@ -285,7 +286,7 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
 
   return (
     <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${tone}`}>
-      {formatStatus(status)}
+      {quoteStatusLabel(status)}
     </span>
   );
 }
@@ -336,21 +337,10 @@ function matchesTotalRange(value: bigint | number | null | undefined, min: numbe
 
 function formatMinor(value: bigint | number | null | undefined) {
   if (value === null || value === undefined) {
-    return "Total pending";
+    return "Total în așteptare";
   }
 
   const total = typeof value === "bigint" ? Number(value) : value;
 
-  return new Intl.NumberFormat("ro-RO", {
-    style: "currency",
-    currency: "RON",
-  }).format(total / 100);
-}
-
-function formatStatus(status: QuoteStatus) {
-  return status
-    .toLowerCase()
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return formatMoneyMinorRo(total, "RON");
 }

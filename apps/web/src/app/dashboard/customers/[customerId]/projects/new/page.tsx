@@ -34,7 +34,7 @@ export default async function NewProjectPage({
           className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
         >
           <ArrowLeft aria-hidden="true" size={16} />
-          Customer
+          Client
         </Link>
 
         <section className="mt-5 rounded-md border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
@@ -43,7 +43,7 @@ export default async function NewProjectPage({
               <FolderKanban aria-hidden="true" size={19} />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-xl font-semibold text-zinc-950">New project</h1>
+              <h1 className="truncate text-xl font-semibold text-zinc-950">Proiect nou</h1>
               <p className="mt-1 truncate text-sm text-zinc-600">{customer.displayName}</p>
             </div>
           </div>
@@ -53,7 +53,7 @@ export default async function NewProjectPage({
               action={action}
               cancelHref={`/dashboard/customers/${customer.id}`}
               error={errorParams.error}
-              submitLabel="Create project"
+              submitLabel="Creează proiect"
             />
           </div>
         </section>
