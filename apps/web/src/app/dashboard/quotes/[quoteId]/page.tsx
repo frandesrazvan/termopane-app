@@ -115,7 +115,16 @@ export default async function QuoteDetailPage({
               {quote.title || "Draft quote"}
             </p>
           </div>
-          <StatusBadge status={quote.status} />
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <Link
+              href={`/dashboard/quotes/${quote.id}/preview`}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm ring-1 ring-zinc-200 hover:bg-stone-100"
+            >
+              <FileText aria-hidden="true" size={15} />
+              Preview offer
+            </Link>
+            <StatusBadge status={quote.status} />
+          </div>
         </div>
 
         <VersionLifecyclePanel

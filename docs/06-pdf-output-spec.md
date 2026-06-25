@@ -91,3 +91,12 @@ Use synthetic quote/customer/company data. Cover:
 - dealer/restricted output hiding internal costs;
 - Template A and Template B totals matching the calculation snapshot;
 - generated PDF bound to the expected quote version.
+
+## COD-015 Template A HTML preview notes
+
+The first customer-facing output is a Template A HTML preview, not a generated PDF binary. The web
+preview route renders only the current tenant-scoped `QuoteVersion` and its stored `QuoteItem`
+snapshots, labels draft or unlocked versions clearly, and hides internal calculation costs/traces.
+The pure `@termopane/pdf` package owns Template A HTML escaping, deterministic item ordering,
+customer-visible totals, terms, and safe drawing fallback behavior so the same snapshot boundary can
+be reused by future PDF generation.

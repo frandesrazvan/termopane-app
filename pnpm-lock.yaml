@@ -39,6 +39,9 @@ importers:
       '@termopane/drawing':
         specifier: workspace:*
         version: link:../../packages/drawing
+      '@termopane/pdf':
+        specifier: workspace:*
+        version: link:../../packages/pdf
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
