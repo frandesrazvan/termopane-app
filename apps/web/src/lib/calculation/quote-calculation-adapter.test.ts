@@ -228,6 +228,131 @@ describe("quote calculation adapter", () => {
     });
   });
 
+  it("uses selected catalog price and rule snapshots for fixed-window items", async () => {
+    const state = testState({
+      items: [
+        fixedWindowItem({
+          catalogSnapshot: {
+            source: "tenant-catalog",
+            priceList: {
+              id: "price-list-a",
+              name: "Lista sintetică",
+              version: "2026-test",
+              currency: "RON",
+            },
+            glassPackage: {
+              id: "glass-clear-24",
+              name: "Synthetic clear 24mm",
+              unit: "SQUARE_METER",
+              minBillableAreaSquareMm: 1_500_000,
+              deductionRule: {
+                deductionWidthMm: 80,
+                deductionHeightMm: 100,
+              },
+              priceListItem: {
+                id: "price-glass",
+                priceListId: "price-list-a",
+                unit: "SQUARE_METER",
+                saleMinor: 10_000,
+              },
+            },
+            frameProfile: {
+              id: "frame-a",
+              name: "Synthetic fixed frame",
+              unit: "LINEAR_METER",
+              priceListItem: {
+                id: "price-frame",
+                priceListId: "price-list-a",
+                unit: "LINEAR_METER",
+                saleMinor: 1_000,
+              },
+            },
+            colorFinish: {
+              id: "color-white",
+              name: "Synthetic white finish",
+              unit: "SQUARE_METER",
+              priceListItem: {
+                id: "price-color",
+                priceListId: "price-list-a",
+                unit: "SQUARE_METER",
+                saleMinor: 0,
+              },
+            },
+          },
+        }),
+      ],
+    });
+    const result = await recalculateTenantCurrentQuoteVersion(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      { client: state.client },
+    );
+
+    expectCalculationOk(result);
+    expect(result.quoteVersion).toMatchObject({
+      subtotalMinor: 20_200,
+      vatMinor: 3_838,
+      totalMinor: 24_038,
+    });
+    expect(result.quoteVersion.warningsSnapshot).toEqual([]);
+
+    const itemOutput = asRecord(asRecord(state.quoteItems[0]?.calculationSnapshot)?.output);
+
+    expect(itemOutput?.glass).toMatchObject({ widthMm: 1_120, heightMm: 1_300 });
+    expect(itemOutput?.totals).toMatchObject({
+      glassCostMinor: 15_000,
+      profileCostMinor: 5_200,
+    });
+  });
+
+  it("does not use catalog prices when selected price units are incompatible", async () => {
+    const state = testState({
+      items: [
+        fixedWindowItem({
+          catalogSnapshot: {
+            glassPackage: {
+              id: "glass-clear-24",
+              name: "Synthetic clear 24mm",
+              minBillableAreaSquareMm: 1_500_000,
+              deductionRule: {
+                deductionWidthMm: 80,
+                deductionHeightMm: 100,
+              },
+              priceListItem: {
+                id: "price-glass",
+                unit: "EACH",
+                saleMinor: 10_000,
+              },
+            },
+            frameProfile: {
+              id: "frame-a",
+              name: "Synthetic fixed frame",
+              priceListItem: {
+                id: "price-frame",
+                unit: "EACH",
+                saleMinor: 1_000,
+              },
+            },
+          },
+        }),
+      ],
+    });
+    const result = await recalculateTenantCurrentQuoteVersion(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      { client: state.client },
+    );
+
+    expectCalculationOk(result);
+    expect(result.quoteVersion.warningsSnapshot).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "MISSING_GLASS_PRICE" }),
+        expect.objectContaining({ code: "MISSING_PROFILE_PRICE" }),
+      ]),
+    );
+    expect(result.quoteVersion.subtotalMinor).toBe(0);
+  });
+
   it("stores warnings and incomplete values when fixed-window deduction and prices are missing", async () => {
     const state = testState({
       items: [

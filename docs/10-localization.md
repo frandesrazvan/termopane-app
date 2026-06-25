@@ -45,6 +45,20 @@ The catalog admin UI uses these Romanian section labels:
 Catalog record state labels are `activ`, `inactiv`, and `arhivat`. Records with unvalidated
 configuration or pricing-rule JSON show the badge `necesită validare business`.
 
+## COD-019 Quote Catalog Selection Labels
+
+Fixed-window quote item forms use these Romanian labels:
+
+- `Sistem de profil`
+- `Profil toc`
+- `Pachet sticlă`
+- `Culoare/finisaj`
+- `Feronerie`
+- `Listă de prețuri activă`
+- `Nu există listă de prețuri activă`
+
+The quote item catalog validation badge remains `necesită validare business`.
+
 ## Customer-Facing Output
 
 Template A HTML previews and generated PDFs must use Romanian labels, including:
