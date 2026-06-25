@@ -240,6 +240,9 @@ function fixedWindowInput(
     configuration.profile,
     configuration.profileSnapshot,
   );
+  const glassDeductionRule = firstRecord(glass?.deductionRule);
+  const glassPrice = firstRecord(glass?.priceListItem, glass?.price);
+  const frameProfilePrice = firstRecord(frameProfile?.priceListItem, frameProfile?.price);
 
   return {
     elementId: item.id,
@@ -252,10 +255,27 @@ function fixedWindowInput(
     glass: {
       id: stringFrom(glass?.id, glass?.catalogItemId) ?? `missing-glass-${item.id}`,
       label: stringFrom(glass?.label, glass?.name) ?? "Missing glass snapshot",
-      deductionWidthMm: numberFrom(glass?.deductionWidthMm, glass?.glassDeductionWidthMm),
-      deductionHeightMm: numberFrom(glass?.deductionHeightMm, glass?.glassDeductionHeightMm),
-      minBillableAreaM2: numberFrom(glass?.minBillableAreaM2, glass?.minimumBillableAreaM2) ?? 0,
-      unitPriceMinorPerM2: numberFrom(glass?.unitPriceMinorPerM2, glass?.unitPriceMinor),
+      deductionWidthMm: numberFrom(
+        glass?.deductionWidthMm,
+        glass?.glassDeductionWidthMm,
+        glassDeductionRule?.deductionWidthMm,
+        glassDeductionRule?.glassDeductionWidthMm,
+      ),
+      deductionHeightMm: numberFrom(
+        glass?.deductionHeightMm,
+        glass?.glassDeductionHeightMm,
+        glassDeductionRule?.deductionHeightMm,
+        glassDeductionRule?.glassDeductionHeightMm,
+      ),
+      minBillableAreaM2:
+        numberFrom(glass?.minBillableAreaM2, glass?.minimumBillableAreaM2) ??
+        squareMillimetersToSquareMeters(numberFrom(glass?.minBillableAreaSquareMm)) ??
+        0,
+      unitPriceMinorPerM2: numberFrom(
+        glass?.unitPriceMinorPerM2,
+        glass?.unitPriceMinor,
+        unitPriceMinorFromSnapshot(glassPrice, "SQUARE_METER", "square-meter"),
+      ),
     },
     frameProfile: {
       id: stringFrom(frameProfile?.id, frameProfile?.catalogItemId) ?? `missing-profile-${item.id}`,
@@ -263,6 +283,7 @@ function fixedWindowInput(
       unitPriceMinorPerMeter: numberFrom(
         frameProfile?.unitPriceMinorPerMeter,
         frameProfile?.unitPriceMinor,
+        unitPriceMinorFromSnapshot(frameProfilePrice, "LINEAR_METER", "linear-meter"),
       ),
     },
     commercialRules: commercialRulesFromSnapshot(configuration.commercialRules) ?? quoteRules,
@@ -556,6 +577,24 @@ function numberFrom(...values: unknown[]) {
   }
 
   return undefined;
+}
+
+function squareMillimetersToSquareMeters(value: number | undefined) {
+  return value === undefined ? undefined : value / 1_000_000;
+}
+
+function unitPriceMinorFromSnapshot(
+  priceSnapshot: JsonRecord | null,
+  expectedCatalogUnit: string,
+  expectedCalculationUnit: string,
+) {
+  const unit = stringFrom(priceSnapshot?.unit, priceSnapshot?.calculationUnit);
+
+  if (unit && unit !== expectedCatalogUnit && unit !== expectedCalculationUnit) {
+    return undefined;
+  }
+
+  return numberFrom(priceSnapshot?.saleMinor, priceSnapshot?.unitPriceMinor);
 }
 
 function calculationUnitFromSnapshot(value: unknown): CalculationUnit | undefined {

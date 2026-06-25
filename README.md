@@ -20,8 +20,11 @@ production formulas.
   edit, and archive catalog records; ESTIMATOR and DEALER memberships have read-only catalog access.
 - Catalog archive actions use `deletedAt` soft delete and mark records inactive. Unvalidated
   configuration/rule JSON is surfaced with the Romanian `necesită validare business` badge.
-- Catalog records are not wired into quote item selection or calculation yet; quote calculations
-  still use frozen snapshots and explicit placeholders.
+- Fixed-window quote items now select tenant catalog systems, frame profiles, glass packages,
+  colors, and optional hardware placeholders. The selected catalog names, IDs, units, active
+  price-list references, and sale-price snapshots are frozen on `QuoteItem.catalogSnapshot`.
+- Quote calculation uses selected fixed-window glass/profile price and deduction snapshots where
+  available. Missing prices or deduction values still produce warnings instead of invented formulas.
 
 ## Stack
 
@@ -147,7 +150,7 @@ pnpm verify
 
 - Production object storage.
 - Email sending or customer delivery workflow.
-- Catalog selection wiring into quote items and calculations.
+- Door, accessory, service, and advanced pricing-rule selection inside the quote builder.
 - Template B.
 - Real production formulas or supplier-specific pricing rules.
 - Invoicing, ERP, CNC export, stock, or accounting integrations.

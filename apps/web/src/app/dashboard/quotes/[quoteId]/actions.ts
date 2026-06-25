@@ -1,16 +1,28 @@
 "use server";
 
-import { QuoteItemType, QuoteVersionStatus } from "@prisma/client";
+import { ProfileItemType, QuoteItemType, QuoteVersionStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireTenant } from "@/lib/auth";
 import { recalculateTenantCurrentQuoteVersion } from "@/lib/calculation/quote-calculation-adapter";
 import {
+  buildFixedWindowCatalogSnapshot,
+  isSelectableCatalogRecord,
+  selectActiveCatalogPriceList,
+} from "@/lib/catalog/quote-item-catalog-snapshot";
+import {
   createTenantQuoteRevision,
   createTenantQuoteItem,
   deleteTenantQuoteItem,
+  getTenantColorFinish,
+  getTenantGlassPackage,
+  getTenantHardwareKit,
+  getTenantProfileItem,
+  getTenantProfileSystem,
   getTenantQuoteItem,
   getTenantQuoteWithCurrentVersion,
+  listTenantPriceListItems,
+  listTenantPriceLists,
   lockTenantQuoteVersion,
   updateTenantQuoteItem,
   type TenantQuoteItemUpdateInput,
@@ -32,6 +44,12 @@ const optionalText = (maxLength: number) =>
 const quantitySchema = z.coerce.number().int().min(1).max(999);
 const dimensionSchema = z.coerce.number().int().min(1).max(20_000);
 const descriptionSchema = z.string().trim().min(1).max(400);
+const catalogIdSchema = z.string().trim().min(1).max(191);
+const optionalCatalogIdSchema = z
+  .string()
+  .trim()
+  .max(191)
+  .transform((value) => (value.length > 0 ? value : null));
 
 const fixedWindowSchema = z.object({
   quantity: quantitySchema,
@@ -39,6 +57,11 @@ const fixedWindowSchema = z.object({
   heightMm: dimensionSchema,
   customerDescription: descriptionSchema,
   internalNotes: optionalText(1000),
+  profileSystemId: catalogIdSchema,
+  frameProfileId: catalogIdSchema,
+  glassPackageId: catalogIdSchema,
+  colorFinishId: catalogIdSchema,
+  hardwareKitId: optionalCatalogIdSchema,
 });
 
 const customLineSchema = z.object({
@@ -69,16 +92,27 @@ export async function addFixedWindowItemAction(quoteId: string, formData: FormDa
     heightMm: formText(formData, "heightMm"),
     customerDescription: formText(formData, "customerDescription"),
     internalNotes: formText(formData, "internalNotes"),
+    profileSystemId: formText(formData, "profileSystemId"),
+    frameProfileId: formText(formData, "frameProfileId"),
+    glassPackageId: formText(formData, "glassPackageId"),
+    colorFinishId: formText(formData, "colorFinishId"),
+    hardwareKitId: formText(formData, "hardwareKitId"),
   });
 
   if (!parsed.success) {
     redirectWithItemError(quoteId, "validation");
   }
 
+  const catalogSnapshot = await resolveFixedWindowCatalogSnapshot(
+    context,
+    parsed.data,
+    quoteState.quote.currency,
+    quoteId,
+  );
   const item = await createTenantQuoteItem(
     context,
     quoteId,
-    fixedWindowInput(parsed.data, quoteState.quote.currency),
+    fixedWindowInput(parsed.data, quoteState.quote.currency, catalogSnapshot),
   );
 
   if (!item) {
@@ -128,7 +162,8 @@ export async function updateQuoteItemAction(
     redirect("/forbidden");
   }
 
-  const updateInput = parseItemUpdateInput(
+  const updateInput = await parseItemUpdateInput(
+    context,
     formData,
     existingItem.type,
     quoteState.quote.currency,
@@ -246,12 +281,13 @@ export async function generateQuotePdfAction(
   redirectWithDocumentEvent(quoteId, "generated");
 }
 
-function parseItemUpdateInput(
+async function parseItemUpdateInput(
+  context: TenantActionContext,
   formData: FormData,
   itemType: string,
   currency: string,
   quoteId: string,
-): TenantQuoteItemUpdateInput {
+): Promise<TenantQuoteItemUpdateInput> {
   if (itemType === QuoteItemType.WINDOW) {
     const parsed = fixedWindowSchema.safeParse({
       quantity: formText(formData, "quantity"),
@@ -259,13 +295,25 @@ function parseItemUpdateInput(
       heightMm: formText(formData, "heightMm"),
       customerDescription: formText(formData, "customerDescription"),
       internalNotes: formText(formData, "internalNotes"),
+      profileSystemId: formText(formData, "profileSystemId"),
+      frameProfileId: formText(formData, "frameProfileId"),
+      glassPackageId: formText(formData, "glassPackageId"),
+      colorFinishId: formText(formData, "colorFinishId"),
+      hardwareKitId: formText(formData, "hardwareKitId"),
     });
 
     if (!parsed.success) {
       redirectWithItemError(quoteId, "validation");
     }
 
-    return fixedWindowInput(parsed.data, currency);
+    const catalogSnapshot = await resolveFixedWindowCatalogSnapshot(
+      context,
+      parsed.data,
+      currency,
+      quoteId,
+    );
+
+    return fixedWindowInput(parsed.data, currency, catalogSnapshot);
   }
 
   if (itemType === QuoteItemType.CUSTOM) {
@@ -303,10 +351,75 @@ async function requireMutableCurrentQuote(context: TenantActionContext, quoteId:
   };
 }
 
+async function resolveFixedWindowCatalogSnapshot(
+  context: TenantActionContext,
+  data: z.infer<typeof fixedWindowSchema>,
+  currency: string,
+  quoteId: string,
+) {
+  const [
+    profileSystem,
+    frameProfile,
+    glassPackage,
+    colorFinish,
+    hardwareKit,
+    priceLists,
+  ] = await Promise.all([
+    getTenantProfileSystem(context, data.profileSystemId),
+    getTenantProfileItem(context, data.frameProfileId),
+    getTenantGlassPackage(context, data.glassPackageId),
+    getTenantColorFinish(context, data.colorFinishId),
+    data.hardwareKitId ? getTenantHardwareKit(context, data.hardwareKitId) : Promise.resolve(null),
+    listTenantPriceLists(context),
+  ]);
+
+  if (
+    !profileSystem ||
+    !frameProfile ||
+    !glassPackage ||
+    !colorFinish ||
+    !isSelectableCatalogRecord(profileSystem) ||
+    !isSelectableCatalogRecord(frameProfile) ||
+    !isSelectableCatalogRecord(glassPackage) ||
+    !isSelectableCatalogRecord(colorFinish) ||
+    frameProfile.type !== ProfileItemType.FRAME ||
+    frameProfile.profileSystemId !== profileSystem.id ||
+    (colorFinish.profileSystemId && colorFinish.profileSystemId !== profileSystem.id)
+  ) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  if (data.hardwareKitId && (!hardwareKit || !isSelectableCatalogRecord(hardwareKit))) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  const priceList = selectActiveCatalogPriceList(priceLists, currency);
+  const priceListItems = priceList
+    ? await listTenantPriceListItems(context, { priceListId: priceList.id })
+    : [];
+
+  return buildFixedWindowCatalogSnapshot({
+    profileSystem,
+    frameProfile,
+    glassPackage,
+    colorFinish,
+    hardwareKit,
+    priceList,
+    priceListItems,
+  });
+}
+
 function fixedWindowInput(
   data: z.infer<typeof fixedWindowSchema>,
   currency: string,
+  catalogSnapshot: Record<string, unknown>,
 ): TenantQuoteItemWriteInput {
+  const selectedCatalogSnapshot = (legacyPlaceholderNote: string) => {
+    void legacyPlaceholderNote;
+
+    return catalogSnapshot;
+  };
+
   return {
     type: QuoteItemType.WINDOW,
     quantity: data.quantity,
@@ -320,6 +433,13 @@ function fixedWindowInput(
       widthMm: data.widthMm,
       heightMm: data.heightMm,
       currency,
+      catalogSelection: {
+        profileSystemId: data.profileSystemId,
+        frameProfileId: data.frameProfileId,
+        glassPackageId: data.glassPackageId,
+        colorFinishId: data.colorFinishId,
+        hardwareKitId: data.hardwareKitId,
+      },
       drawing: fixedWindowDrawingSnapshot({
         widthMm: data.widthMm,
         heightMm: data.heightMm,
@@ -328,7 +448,7 @@ function fixedWindowInput(
       source: "quote-item-draft-editor",
       requiresCalculation: true,
     },
-    catalogSnapshot: draftCatalogPlaceholder(
+    catalogSnapshot: selectedCatalogSnapshot(
       "Selecția de catalog este amânată pentru această fereastră fixă în ciornă.",
     ),
     totalsSnapshot: emptyTotalsSnapshot(),

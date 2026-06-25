@@ -237,5 +237,18 @@ pricing rules are listed for context, while price-list item create/update/archiv
 The first catalog admin UI lives under `/dashboard/catalog` with Romanian labels. OWNER and ADMIN
 memberships can create, edit, and archive catalog records; ESTIMATOR and DEALER memberships are
 read-only. Unvalidated configuration or rule JSON is shown with the `necesită validare business`
-badge. Catalog records are still not wired into quote item selection or calculation, so no production
-formula behavior is introduced by this UI.
+badge. Catalog admin remains separate from supplier integrations, CSV import/export, and production
+formula execution.
+
+## COD-019 catalog snapshot selection notes
+
+Fixed-window quote item creation and editing now resolve selected tenant catalog records server-side
+before writing `QuoteItem`. The frozen `catalogSnapshot` stores selected profile system, frame
+profile, glass package, color finish, optional hardware placeholder, catalog IDs, display names,
+units, the active price-list reference for the quote currency, and matching sale-price item
+references. Internal cost values are not copied into quote item snapshots.
+
+The calculation adapter remains database-independent and reads only the frozen snapshot. It consumes
+selected glass/profile deduction and sale-price values when they are explicitly present with
+compatible units. Missing price or deduction configuration continues to produce warnings instead of
+formula assumptions. Custom lines remain explicit manual-price snapshots.

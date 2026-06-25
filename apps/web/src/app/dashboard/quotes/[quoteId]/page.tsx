@@ -14,11 +14,17 @@ import {
   UserRound,
 } from "lucide-react";
 import {
+  ProfileItemType,
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
+  type ColorFinish,
   type QuoteCalculationResult,
   type Document,
+  type GlassPackage,
+  type HardwareKit,
+  type ProfileItem,
+  type ProfileSystem,
   type QuoteItem,
   type QuoteVersion,
 } from "@prisma/client";
@@ -26,10 +32,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { canViewInternalCosts, requireTenant } from "@/lib/auth";
 import {
+  isSelectableCatalogRecord,
+  selectActiveCatalogPriceList,
+} from "@/lib/catalog/quote-item-catalog-snapshot";
+import {
   getTenantCustomer,
   getTenantProject,
   getTenantQuoteCalculationResult,
   getTenantQuoteWithCurrentVersion,
+  listTenantColorFinishes,
+  listTenantGlassPackages,
+  listTenantHardwareKits,
+  listTenantPriceLists,
+  listTenantProfileItems,
+  listTenantProfileSystems,
   listTenantQuoteDocuments,
   listTenantQuoteItems,
   listTenantQuoteVersions,
@@ -53,6 +69,12 @@ import {
   recalculateCurrentQuoteVersionAction,
   updateQuoteItemAction,
 } from "./actions";
+import {
+  emptyFixedWindowCatalogFormOptions,
+  FixedWindowCatalogFields,
+  type FixedWindowCatalogFieldDefaults,
+  type FixedWindowCatalogFormOptions,
+} from "./quote-item-catalog-fields";
 import { QuoteItemDrawingPreview } from "./quote-item-drawing-preview";
 
 export const dynamic = "force-dynamic";
@@ -112,6 +134,9 @@ export default async function QuoteDetailPage({
   const canEditItems = currentVersion ? isDraftVersionMutable(currentVersion) : false;
   const canCreateRevision = currentVersion ? isLockedOrSentVersion(currentVersion) : false;
   const canViewInternalTrace = canViewInternalCosts(context.membership);
+  const catalogOptions = canEditItems
+    ? await loadFixedWindowCatalogOptions(context, quote.currency)
+    : emptyFixedWindowCatalogFormOptions();
 
   return (
     <main className="min-h-screen bg-stone-50 px-4 py-5 sm:px-6 lg:px-8">
@@ -225,7 +250,11 @@ export default async function QuoteDetailPage({
           ) : null}
 
           {canEditItems ? (
-            <AddItemForms quoteId={quote.id} currency={quote.currency} />
+            <AddItemForms
+              quoteId={quote.id}
+              currency={quote.currency}
+              catalogOptions={catalogOptions}
+            />
           ) : (
             <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
               Pozițiile sunt doar pentru citire deoarece versiunea curentă este blocată, trimisă sau lipsește.
@@ -241,6 +270,7 @@ export default async function QuoteDetailPage({
                   quoteId={quote.id}
                   currency={quote.currency}
                   canEdit={canEditItems}
+                  catalogOptions={catalogOptions}
                 />
               ))}
             </div>
@@ -331,7 +361,59 @@ export default async function QuoteDetailPage({
   );
 }
 
-function AddItemForms({ quoteId, currency }: { quoteId: string; currency: string }) {
+type TenantPageContext = Awaited<ReturnType<typeof requireTenant>>;
+
+async function loadFixedWindowCatalogOptions(
+  context: TenantPageContext,
+  currency: string,
+): Promise<FixedWindowCatalogFormOptions> {
+  const [
+    profileSystems,
+    profileItems,
+    glassPackages,
+    colorFinishes,
+    hardwareKits,
+    priceLists,
+  ] = await Promise.all([
+    listTenantProfileSystems(context),
+    listTenantProfileItems(context),
+    listTenantGlassPackages(context),
+    listTenantColorFinishes(context),
+    listTenantHardwareKits(context),
+    listTenantPriceLists(context),
+  ]);
+
+  const selectableProfileSystems = profileSystems.filter(isSelectableProfileSystem);
+
+  return {
+    profileSystems: selectableProfileSystems,
+    frameProfiles: profileItems.filter(
+      (profileItem): profileItem is ProfileItem =>
+        isSelectableCatalogRecord(profileItem) &&
+        profileItem.type === ProfileItemType.FRAME &&
+        selectableProfileSystems.some((profileSystem) => profileSystem.id === profileItem.profileSystemId),
+    ),
+    glassPackages: glassPackages.filter(isSelectableGlassPackage),
+    colorFinishes: colorFinishes.filter(
+      (colorFinish): colorFinish is ColorFinish =>
+        isSelectableCatalogRecord(colorFinish) &&
+        (!colorFinish.profileSystemId ||
+          selectableProfileSystems.some((profileSystem) => profileSystem.id === colorFinish.profileSystemId)),
+    ),
+    hardwareKits: hardwareKits.filter(isSelectableHardwareKit),
+    activePriceList: selectActiveCatalogPriceList(priceLists, currency),
+  };
+}
+
+function AddItemForms({
+  catalogOptions,
+  currency,
+  quoteId,
+}: {
+  catalogOptions: FixedWindowCatalogFormOptions;
+  currency: string;
+  quoteId: string;
+}) {
   return (
     <div className="mt-5 grid gap-3 lg:grid-cols-2">
       <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
@@ -352,6 +434,7 @@ function AddItemForms({ quoteId, currency }: { quoteId: string; currency: string
             required
           />
           <TextAreaField label="Note interne" name="internalNotes" />
+          <FixedWindowCatalogFields currency={currency} options={catalogOptions} />
           <SubmitButton label="Adaugă fereastră fixă" />
         </form>
       </details>
@@ -697,17 +780,21 @@ function Metric({
 
 function QuoteItemCard({
   canEdit,
+  catalogOptions,
   currency,
   item,
   quoteId,
 }: {
   canEdit: boolean;
+  catalogOptions: FixedWindowCatalogFormOptions;
   currency: string;
   item: QuoteItem;
   quoteId: string;
 }) {
   const manualUnitPriceMinor = manualUnitPriceFromItem(item);
   const itemTotals = totalsFromItem(item);
+  const catalogSummary = catalogSummaryFromItem(item);
+  const catalogNeedsValidation = catalogRequiresBusinessValidation(item);
 
   return (
     <article className="rounded-md border border-zinc-200 bg-white p-4">
@@ -745,6 +832,25 @@ function QuoteItemCard({
             </span>
           </div>
 
+          {catalogNeedsValidation ? (
+            <span className="mt-3 inline-flex w-fit rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
+              necesită validare business
+            </span>
+          ) : null}
+
+          {catalogSummary.length > 0 ? (
+            <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+              {catalogSummary.map((entry) => (
+                <div key={entry.label} className="rounded-md bg-stone-50 px-3 py-2">
+                  <dt className="text-xs font-semibold uppercase text-zinc-500">{entry.label}</dt>
+                  <dd className="mt-1 break-words text-sm font-medium text-zinc-800">
+                    {entry.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+
           {item.internalNotes ? (
             <p className="mt-3 break-words rounded-md bg-stone-50 px-3 py-2 text-sm text-zinc-700">
               {item.internalNotes}
@@ -759,6 +865,7 @@ function QuoteItemCard({
                   Editează poziția
                 </summary>
                 <QuoteItemEditForm
+                  catalogOptions={catalogOptions}
                   currency={currency}
                   item={item}
                   manualUnitPriceMinor={manualUnitPriceMinor}
@@ -780,16 +887,20 @@ function QuoteItemCard({
 }
 
 function QuoteItemEditForm({
+  catalogOptions,
   currency,
   item,
   manualUnitPriceMinor,
   quoteId,
 }: {
+  catalogOptions: FixedWindowCatalogFormOptions;
   currency: string;
   item: QuoteItem;
   manualUnitPriceMinor: number | null;
   quoteId: string;
 }) {
+  const catalogDefaults = catalogFieldDefaultsFromItem(item);
+
   return (
     <form action={updateQuoteItemAction.bind(null, quoteId, item.id)} className="mt-4 grid gap-3">
       <input type="hidden" name="itemType" value={item.type} />
@@ -827,6 +938,13 @@ function QuoteItemEditForm({
         required
       />
       <TextAreaField label="Note interne" name="internalNotes" defaultValue={item.internalNotes ?? ""} />
+      {item.type === QuoteItemType.WINDOW ? (
+        <FixedWindowCatalogFields
+          currency={currency}
+          defaults={catalogDefaults}
+          options={catalogOptions}
+        />
+      ) : null}
       <SubmitButton label="Salvează poziția" />
     </form>
   );
@@ -1004,6 +1122,68 @@ function isLockedOrSentVersion(quoteVersion: {
     Boolean(quoteVersion.lockedAt) ||
     Boolean(quoteVersion.sentAt)
   );
+}
+
+function isSelectableProfileSystem(record: ProfileSystem): record is ProfileSystem {
+  return isSelectableCatalogRecord(record);
+}
+
+function isSelectableGlassPackage(record: GlassPackage): record is GlassPackage {
+  return isSelectableCatalogRecord(record);
+}
+
+function isSelectableHardwareKit(record: HardwareKit): record is HardwareKit {
+  return isSelectableCatalogRecord(record);
+}
+
+function catalogFieldDefaultsFromItem(item: QuoteItem): FixedWindowCatalogFieldDefaults {
+  const catalog = asRecord(item.catalogSnapshot);
+
+  return {
+    profileSystemId: stringFrom(asRecord(catalog?.profileSystem)?.id),
+    frameProfileId: stringFrom(asRecord(catalog?.frameProfile)?.id),
+    glassPackageId: stringFrom(asRecord(catalog?.glassPackage)?.id),
+    colorFinishId: stringFrom(asRecord(catalog?.colorFinish)?.id),
+    hardwareKitId: stringFrom(asRecord(catalog?.hardwareKit)?.id),
+  };
+}
+
+function catalogSummaryFromItem(item: QuoteItem) {
+  const catalog = asRecord(item.catalogSnapshot);
+
+  if (!catalog) {
+    return [];
+  }
+
+  return [
+    catalogSummaryEntry("Sistem", catalog.profileSystem),
+    catalogSummaryEntry("Profil toc", catalog.frameProfile),
+    catalogSummaryEntry("Sticlă", catalog.glassPackage),
+    catalogSummaryEntry("Culoare", catalog.colorFinish),
+    catalogSummaryEntry("Feronerie", catalog.hardwareKit),
+  ].flatMap((entry) => (entry ? [entry] : []));
+}
+
+function catalogSummaryEntry(label: string, value: unknown) {
+  const record = asRecord(value);
+  const name = stringFrom(record?.name) ?? stringFrom(record?.label);
+
+  if (!name) {
+    return null;
+  }
+
+  const code = stringFrom(record?.code);
+
+  return {
+    label,
+    value: code ? `${name} (${code})` : name,
+  };
+}
+
+function catalogRequiresBusinessValidation(item: QuoteItem) {
+  const catalog = asRecord(item.catalogSnapshot);
+
+  return catalog?.requiresBusinessValidation === true;
 }
 
 function manualUnitPriceFromItem(item: QuoteItem) {
