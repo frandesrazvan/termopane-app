@@ -8,5 +8,6 @@ out
 dist
 coverage
 .turbo
+.local-storage
 
 *.tsbuildinfo

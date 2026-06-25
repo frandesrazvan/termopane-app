@@ -6,6 +6,7 @@ import {
   QuoteVersionStatus,
   type CompanySettings,
   type Customer,
+  type Document,
   type Project,
   type Quote,
   type QuoteCalculationResult,
@@ -341,6 +342,7 @@ function testClient(
       },
     ] as unknown as QuoteItem[]),
     quoteCalculationResult: delegate([] as QuoteCalculationResult[]),
+    document: delegate([] as Document[]),
     auditLog: delegate(options.auditLogs ?? ([] as AuditLog[])),
     companySettings: delegate([
       {
@@ -961,5 +963,58 @@ describe("tenant repositories", () => {
       }),
     ).resolves.toBeNull();
     await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-b")).resolves.toBeNull();
+  });
+
+  it("creates tenant-scoped quote PDF document metadata with an audit entry", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+    const document = await data.createTenantQuoteDocument({ tenantId: "tenant-a" }, "version-locked", {
+      actorUserId: "user-a",
+      templateKey: "template-a",
+      fileName: "A-locked-v1.pdf",
+      storageKey: "documents/tenant-a/version-locked/example.pdf",
+      mimeType: "application/pdf",
+      checksum: "abc123",
+      visibleTotalsSnapshot: {
+        subtotalMinor: 0,
+        vatMinor: 0,
+        totalMinor: 0,
+        currency: "RON",
+      },
+    });
+
+    expect(document).toMatchObject({
+      tenantId: "tenant-a",
+      quoteVersionId: "version-locked",
+      fileName: "A-locked-v1.pdf",
+      storageKey: "documents/tenant-a/version-locked/example.pdf",
+    });
+    await expect(
+      data.listTenantQuoteDocuments({ tenantId: "tenant-a" }, "version-locked"),
+    ).resolves.toMatchObject([
+      {
+        id: document?.id,
+        tenantId: "tenant-a",
+      },
+    ]);
+    await expect(
+      data.createTenantQuoteDocument({ tenantId: "tenant-a" }, "version-b", {
+        actorUserId: "user-a",
+        templateKey: "template-a",
+        fileName: "blocked.pdf",
+        storageKey: "documents/tenant-b/version-b/blocked.pdf",
+        mimeType: "application/pdf",
+        checksum: "blocked",
+        visibleTotalsSnapshot: {},
+      }),
+    ).resolves.toBeNull();
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0]).toMatchObject({
+      action: AuditAction.DOCUMENT_GENERATED,
+      entityType: "Document",
+      entityId: document?.id,
+      tenantId: "tenant-a",
+      actorUserId: "user-a",
+    });
   });
 });

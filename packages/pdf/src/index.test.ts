@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTemplateAPdf,
   buildTemplateAHtml,
   getPdfPackageInfo,
   type TemplateAOfferSnapshot,
@@ -106,6 +107,20 @@ describe("Template A HTML preview", () => {
 
     expect(info.bindsToQuoteVersion).toBe(true);
     expect(info.supportedTemplates).toEqual(["template-a"]);
+    expect(info.supportedOutputs).toEqual(["html", "pdf"]);
+  });
+
+  it("renders a deterministic customer-facing PDF byte stream", () => {
+    const pdf = buildTemplateAPdf(templateSnapshot());
+    const pdfText = new TextDecoder().decode(pdf);
+
+    expect(pdfText.startsWith("%PDF-1.4")).toBe(true);
+    expect(pdfText).toContain("Q-2026-001");
+    expect(pdfText).toContain("Termopane Demo");
+    expect(pdfText).toContain("Living room fixed window");
+    expect(pdfText).toContain("1.190,00 RON");
+    expect(pdfText).not.toContain("Supplier cost");
+    expect(pdfText).not.toContain("materialCostMinor");
   });
 });
 
