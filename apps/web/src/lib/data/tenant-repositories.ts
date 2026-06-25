@@ -52,6 +52,13 @@ export type TenantDataClient = {
   quote: TenantWritableModelDelegate<Quote>;
   quoteVersion: TenantWritableModelDelegate<QuoteVersion>;
   companySettings: TenantModelDelegate<CompanySettings>;
+  $transaction?: <TResult>(
+    operation: (transactionClient: TenantDataClient) => Promise<TResult>,
+  ) => Promise<TResult>;
+};
+
+export type CreateTenantDataAccessOptions = {
+  quoteNumberGenerator?: () => string;
 };
 
 export type TenantCustomerWriteInput = {
@@ -113,6 +120,16 @@ export type TenantQuoteDraftResult = {
   currentVersion: QuoteVersion;
 };
 
+export class QuoteNumberCollisionError extends Error {
+  constructor(message = "Could not create a unique quote number for this tenant.") {
+    super(message);
+    this.name = "QuoteNumberCollisionError";
+    Object.setPrototypeOf(this, QuoteNumberCollisionError.prototype);
+  }
+}
+
+const GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS = 3;
+
 export function tenantIdFromScope(scope: TenantDataScope) {
   const tenantId = "tenantId" in scope ? scope.tenantId : scope.tenant.id;
 
@@ -168,7 +185,10 @@ function customerSearchWhere(search: string) {
 
 export function createTenantDataAccess(
   client: TenantDataClient = prisma as unknown as TenantDataClient,
+  options: CreateTenantDataAccessOptions = {},
 ) {
+  const quoteNumberGenerator = options.quoteNumberGenerator ?? generateQuoteNumber;
+
   const access = {
     getTenantCustomer(scope: TenantDataScope, customerId: string) {
       return client.customer.findFirst({
@@ -297,62 +317,87 @@ export function createTenantDataAccess(
       }
 
       const currency = data.currency ?? "RON";
-      const quote = await client.quote.create({
-        data: {
-          tenantId,
-          customerId: customer.id,
-          projectId: data.projectId ?? null,
-          quoteNumber: data.quoteNumber ?? generateQuoteNumber(),
-          status: QuoteStatus.DRAFT,
-          title: data.title ?? null,
-          currency,
-          createdById: data.createdById ?? null,
-          assignedToId: data.assignedToId ?? null,
-          tags: ["draft"],
-        },
-      });
-      const companySettings = await client.companySettings.findFirst({
-        where: tenantWhere(scope),
-      });
-      const currentVersion = await client.quoteVersion.create({
-        data: {
-          tenantId,
-          quoteId: quote.id,
-          versionNumber: 1,
-          status: QuoteVersionStatus.DRAFT,
-          isLocked: false,
-          currency,
-          customerSnapshot: customerSnapshot(customer),
-          companySettingsSnapshot: companySettingsSnapshot(companySettings),
-          itemSnapshot: {
-            items: [],
-          },
-          totalsSnapshot: {
-            subtotalMinor: 0,
-            vatMinor: 0,
-            totalMinor: 0,
-          },
-          warningsSnapshot: [],
-          traceSummary: {
-            source: "quote-shell",
-          },
-          subtotalMinor: 0,
-          vatMinor: 0,
-          totalMinor: 0,
-          createdById: data.createdById ?? null,
-        },
-      });
-      const updatedQuote = await client.quote.update({
-        where: { id: quote.id },
-        data: {
-          currentVersionId: currentVersion.id,
-        },
-      });
+      const requestedQuoteNumber = data.quoteNumber?.trim() || null;
+      const attemptCount = requestedQuoteNumber ? 1 : GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS;
 
-      return {
-        quote: updatedQuote,
-        currentVersion,
-      };
+      for (let attempt = 0; attempt < attemptCount; attempt += 1) {
+        const quoteNumber = requestedQuoteNumber ?? quoteNumberGenerator();
+
+        try {
+          return await runTenantDataTransaction(client, async (transactionClient) => {
+            const companySettings = await transactionClient.companySettings.findFirst({
+              where: tenantWhere(scope),
+            });
+            const quote = await transactionClient.quote.create({
+              data: {
+                tenantId,
+                customerId: customer.id,
+                projectId: data.projectId ?? null,
+                quoteNumber,
+                status: QuoteStatus.DRAFT,
+                title: data.title ?? null,
+                currency,
+                createdById: data.createdById ?? null,
+                assignedToId: data.assignedToId ?? null,
+                tags: ["draft"],
+              },
+            });
+            const currentVersion = await transactionClient.quoteVersion.create({
+              data: {
+                tenantId,
+                quoteId: quote.id,
+                versionNumber: 1,
+                status: QuoteVersionStatus.DRAFT,
+                isLocked: false,
+                currency,
+                customerSnapshot: customerSnapshot(customer),
+                companySettingsSnapshot: companySettingsSnapshot(companySettings),
+                itemSnapshot: {
+                  items: [],
+                },
+                totalsSnapshot: {
+                  subtotalMinor: 0,
+                  vatMinor: 0,
+                  totalMinor: 0,
+                },
+                warningsSnapshot: [],
+                traceSummary: {
+                  source: "quote-shell",
+                },
+                subtotalMinor: 0,
+                vatMinor: 0,
+                totalMinor: 0,
+                createdById: data.createdById ?? null,
+              },
+            });
+            const updatedQuote = await transactionClient.quote.update({
+              where: { id: quote.id },
+              data: {
+                currentVersionId: currentVersion.id,
+              },
+            });
+
+            return {
+              quote: updatedQuote,
+              currentVersion,
+            };
+          });
+        } catch (error) {
+          if (!isQuoteNumberUniqueCollision(error)) {
+            throw error;
+          }
+
+          if (requestedQuoteNumber) {
+            throw new QuoteNumberCollisionError(
+              `Quote number "${requestedQuoteNumber}" already exists for this tenant.`,
+            );
+          }
+        }
+      }
+
+      throw new QuoteNumberCollisionError(
+        `Could not generate a unique quote number after ${GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS} attempts.`,
+      );
     },
 
     getTenantQuoteVersion(scope: TenantDataScope, quoteVersionId: string) {
@@ -481,7 +526,49 @@ function companySettingsSnapshot(companySettings: CompanySettings | null) {
   };
 }
 
+function runTenantDataTransaction<TResult>(
+  client: TenantDataClient,
+  operation: (transactionClient: TenantDataClient) => Promise<TResult>,
+) {
+  if (client.$transaction) {
+    return client.$transaction(operation);
+  }
+
+  return operation(client);
+}
+
+function isQuoteNumberUniqueCollision(error: unknown) {
+  if (!isPrismaUniqueConstraintError(error)) {
+    return false;
+  }
+
+  const target = error.meta?.target;
+
+  if (Array.isArray(target)) {
+    return target.includes("quoteNumber");
+  }
+
+  if (typeof target === "string") {
+    return target.includes("quoteNumber");
+  }
+
+  return true;
+}
+
+function isPrismaUniqueConstraintError(
+  error: unknown,
+): error is { code: "P2002"; meta?: { target?: unknown } } {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: unknown }).code === "P2002",
+  );
+}
+
 function generateQuoteNumber() {
+  // Temporary until tenant-configurable quote numbering exists. The database unique index remains
+  // the final guard and createTenantQuoteDraft retries generated collisions a few times.
   const datePart = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
 

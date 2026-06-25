@@ -156,6 +156,11 @@ business validation.
 ## COD-010 quote draft shell notes
 
 Draft quote creation now creates a tenant-owned `Quote` plus an initial draft `QuoteVersion` with
-empty item and totals snapshots. The saved-offers list filters quote shells by tenant-scoped
-customer, status, date range, author, and current-version totals where present. Quote builder items,
-PDF generation, production formulas, and locked-version mutation remain outside this task.
+empty item and totals snapshots, and the persisted `Quote.currentVersionId` points to that initial
+version. Real Prisma-backed draft creation wraps the quote create, version create, and current-version
+pointer update in one transaction after tenant-scoped customer/project validation passes. Generated
+quote numbers still use temporary app-side numbering, but creation retries a small number of
+tenant-scoped unique collisions until tenant-configurable numbering is implemented. The saved-offers
+list filters quote shells by tenant-scoped customer, status, date range, author, and current-version
+totals where present. Quote builder items, PDF generation, production formulas, and locked-version
+mutation remain outside this task.

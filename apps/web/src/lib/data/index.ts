@@ -11,11 +11,13 @@ export {
   listTenantProjects,
   listTenantQuoteVersions,
   listTenantQuotes,
+  QuoteNumberCollisionError,
   tenantIdFromScope,
   updateTenantCustomer,
   updateTenantProject,
 } from "./tenant-repositories";
 export type {
+  CreateTenantDataAccessOptions,
   ExplicitTenantScope,
   ListTenantCustomersOptions,
   ListTenantProjectsOptions,
