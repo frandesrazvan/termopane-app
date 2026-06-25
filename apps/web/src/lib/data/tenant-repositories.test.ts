@@ -1,9 +1,27 @@
 import {
+  Accessory,
   AuditAction,
+  CatalogMaterialType,
+  CatalogUnit,
+  ColorFinish,
+  GlassPackage,
+  HardwareKit,
+  PriceList,
+  PriceListItem,
+  PriceListItemType,
+  PriceListStatus,
+  PricingRule,
+  PricingRuleType,
+  ProfileItem,
+  ProfileItemType,
+  ProfileSystem,
   type AuditLog,
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
+  ServiceItem,
+  Supplier,
+  TaxRate,
   type CompanySettings,
   type Customer,
   type Project,
@@ -144,6 +162,311 @@ function testClient(
   options: { auditLogs?: AuditLog[]; onTransaction?: () => void } = {},
 ): TenantDataClient {
   const client: TenantDataClient = {
+    supplier: delegate([
+      {
+        id: "supplier-a",
+        tenantId: "tenant-a",
+        name: "Supplier A",
+        code: "SUP-A",
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "supplier-b",
+        tenantId: "tenant-b",
+        name: "Supplier B",
+        code: "SUP-B",
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as Supplier[]),
+    profileSystem: delegate([
+      {
+        id: "profile-system-a",
+        tenantId: "tenant-a",
+        supplierId: "supplier-a",
+        name: "PVC A",
+        code: "PVC-A",
+        materialType: CatalogMaterialType.PVC,
+        configuration: { validationStatus: "requires business validation" },
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "profile-system-b",
+        tenantId: "tenant-b",
+        supplierId: "supplier-b",
+        name: "PVC B",
+        code: "PVC-B",
+        materialType: CatalogMaterialType.PVC,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as ProfileSystem[]),
+    profileItem: delegate([
+      {
+        id: "profile-item-a",
+        tenantId: "tenant-a",
+        profileSystemId: "profile-system-a",
+        supplierId: "supplier-a",
+        name: "Frame A",
+        code: "FRAME-A",
+        type: ProfileItemType.FRAME,
+        unit: CatalogUnit.LINEAR_METER,
+        deductionRule: { validationStatus: "requires business validation" },
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "profile-item-b",
+        tenantId: "tenant-b",
+        profileSystemId: "profile-system-b",
+        supplierId: "supplier-b",
+        name: "Frame B",
+        code: "FRAME-B",
+        type: ProfileItemType.FRAME,
+        unit: CatalogUnit.LINEAR_METER,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as ProfileItem[]),
+    glassPackage: delegate([
+      {
+        id: "glass-a",
+        tenantId: "tenant-a",
+        supplierId: "supplier-a",
+        name: "Glass A",
+        code: "GL-A",
+        unit: CatalogUnit.SQUARE_METER,
+        deductionRule: { validationStatus: "requires business validation" },
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "glass-b",
+        tenantId: "tenant-b",
+        supplierId: "supplier-b",
+        name: "Glass B",
+        code: "GL-B",
+        unit: CatalogUnit.SQUARE_METER,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as GlassPackage[]),
+    hardwareKit: delegate([
+      {
+        id: "hardware-a",
+        tenantId: "tenant-a",
+        supplierId: "supplier-a",
+        name: "Hardware A",
+        code: "HW-A",
+        unit: CatalogUnit.EACH,
+        quantityRule: { validationStatus: "requires business validation" },
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "hardware-b",
+        tenantId: "tenant-b",
+        supplierId: "supplier-b",
+        name: "Hardware B",
+        code: "HW-B",
+        unit: CatalogUnit.EACH,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as HardwareKit[]),
+    colorFinish: delegate([
+      {
+        id: "color-a",
+        tenantId: "tenant-a",
+        profileSystemId: "profile-system-a",
+        supplierId: "supplier-a",
+        name: "White A",
+        code: "WHITE-A",
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "color-b",
+        tenantId: "tenant-b",
+        profileSystemId: "profile-system-b",
+        supplierId: "supplier-b",
+        name: "White B",
+        code: "WHITE-B",
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as ColorFinish[]),
+    accessory: delegate([
+      {
+        id: "accessory-a",
+        tenantId: "tenant-a",
+        supplierId: "supplier-a",
+        name: "Sill A",
+        code: "SILL-A",
+        unit: CatalogUnit.LINEAR_METER,
+        quantityRule: { validationStatus: "requires business validation" },
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "accessory-b",
+        tenantId: "tenant-b",
+        supplierId: "supplier-b",
+        name: "Sill B",
+        code: "SILL-B",
+        unit: CatalogUnit.LINEAR_METER,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as Accessory[]),
+    serviceItem: delegate([
+      {
+        id: "service-a",
+        tenantId: "tenant-a",
+        name: "Installation A",
+        code: "INSTALL-A",
+        unit: CatalogUnit.FIXED,
+        configuration: { validationStatus: "requires business validation" },
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "service-b",
+        tenantId: "tenant-b",
+        name: "Installation B",
+        code: "INSTALL-B",
+        unit: CatalogUnit.FIXED,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as ServiceItem[]),
+    taxRate: delegate([
+      {
+        id: "tax-a",
+        tenantId: "tenant-a",
+        name: "VAT A",
+        code: "VAT-A",
+        rateBasisPoints: 1900,
+        isDefault: true,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "tax-b",
+        tenantId: "tenant-b",
+        name: "VAT B",
+        code: "VAT-B",
+        rateBasisPoints: 1900,
+        isDefault: true,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as TaxRate[]),
+    priceList: delegate([
+      {
+        id: "price-list-a",
+        tenantId: "tenant-a",
+        name: "List A",
+        version: "2026-a",
+        currency: "RON",
+        status: PriceListStatus.ACTIVE,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "price-list-b",
+        tenantId: "tenant-b",
+        name: "List B",
+        version: "2026-b",
+        currency: "RON",
+        status: PriceListStatus.ACTIVE,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as PriceList[]),
+    priceListItem: delegate([
+      {
+        id: "price-item-a",
+        tenantId: "tenant-a",
+        priceListId: "price-list-a",
+        itemType: PriceListItemType.ACCESSORY,
+        catalogItemId: "accessory-a",
+        unit: CatalogUnit.LINEAR_METER,
+        costMinor: BigInt(100),
+        saleMinor: BigInt(150),
+        currency: "RON",
+        metadata: { validationStatus: "requires business validation" },
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "price-item-b",
+        tenantId: "tenant-b",
+        priceListId: "price-list-b",
+        itemType: PriceListItemType.ACCESSORY,
+        catalogItemId: "accessory-b",
+        unit: CatalogUnit.LINEAR_METER,
+        costMinor: BigInt(100),
+        saleMinor: BigInt(150),
+        currency: "RON",
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as PriceListItem[]),
+    pricingRule: delegate([
+      {
+        id: "pricing-rule-a",
+        tenantId: "tenant-a",
+        priceListId: "price-list-a",
+        name: "Markup A",
+        code: "RULE-A",
+        ruleType: PricingRuleType.MARKUP,
+        priority: 1,
+        configuration: { validationStatus: "requires business validation" },
+        requiresBusinessValidation: true,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "pricing-rule-b",
+        tenantId: "tenant-b",
+        priceListId: "price-list-b",
+        name: "Markup B",
+        code: "RULE-B",
+        ruleType: PricingRuleType.MARKUP,
+        priority: 1,
+        configuration: { validationStatus: "requires business validation" },
+        requiresBusinessValidation: true,
+        isActive: true,
+        deletedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as unknown as PricingRule[]),
     customer: delegate([
       {
         id: "customer-a",
@@ -377,6 +700,375 @@ describe("tenant repositories", () => {
         },
       }),
     ).toBe("tenant-b");
+  });
+
+  it("lists, reads, creates, updates, and archives suppliers inside one tenant", async () => {
+    const data = createTenantDataAccess(testClient());
+    const suppliers = await data.listTenantSuppliers({ tenantId: "tenant-a" });
+
+    expect(suppliers).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "supplier-a", tenantId: "tenant-a" })]),
+    );
+    expect(suppliers).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: "supplier-b" })]));
+    await expect(data.getTenantSupplier({ tenantId: "tenant-a" }, "supplier-b")).resolves.toBeNull();
+    await expect(
+      data.createTenantSupplier({ tenantId: "tenant-a" }, { name: "New Supplier", code: "SUP-NEW" }),
+    ).resolves.toMatchObject({
+      tenantId: "tenant-a",
+      name: "New Supplier",
+      code: "SUP-NEW",
+      isActive: true,
+      deletedAt: null,
+    });
+    await expect(
+      data.updateTenantSupplier({ tenantId: "tenant-a" }, "supplier-a", {
+        name: "Updated Supplier",
+        code: "SUP-A",
+      }),
+    ).resolves.toMatchObject({ id: "supplier-a", tenantId: "tenant-a", name: "Updated Supplier" });
+    await expect(
+      data.updateTenantSupplier({ tenantId: "tenant-a" }, "supplier-b", {
+        name: "Blocked Supplier",
+      }),
+    ).resolves.toBeNull();
+
+    const archived = await data.archiveTenantSupplier({ tenantId: "tenant-a" }, "supplier-a");
+
+    expect(archived).toMatchObject({ id: "supplier-a", tenantId: "tenant-a", isActive: false });
+    expect(archived?.deletedAt).toBeInstanceOf(Date);
+    await expect(data.getTenantSupplier({ tenantId: "tenant-a" }, "supplier-a")).resolves.toMatchObject({
+      id: "supplier-a",
+      isActive: false,
+      deletedAt: expect.any(Date),
+    });
+  });
+
+  it("manages profile systems and profile items with tenant-scoped parent validation", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(data.listTenantProfileSystems({ tenantId: "tenant-a" })).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "profile-system-a", tenantId: "tenant-a" })]),
+    );
+    await expect(
+      data.getTenantProfileSystem({ tenantId: "tenant-a" }, "profile-system-b"),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantProfileSystem(
+        { tenantId: "tenant-a" },
+        {
+          supplierId: "supplier-b",
+          name: "Blocked PVC",
+          code: "PVC-X",
+          materialType: CatalogMaterialType.PVC,
+        },
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantProfileSystem(
+        { tenantId: "tenant-a" },
+        {
+          supplierId: "supplier-a",
+          name: "Aluminium A",
+          code: "AL-A",
+          materialType: CatalogMaterialType.ALUMINIUM,
+        },
+      ),
+    ).resolves.toMatchObject({
+      tenantId: "tenant-a",
+      supplierId: "supplier-a",
+      materialType: CatalogMaterialType.ALUMINIUM,
+    });
+    await expect(
+      data.updateTenantProfileSystem(
+        { tenantId: "tenant-a" },
+        "profile-system-a",
+        {
+          supplierId: "supplier-a",
+          name: "PVC A Updated",
+          code: "PVC-A",
+          materialType: CatalogMaterialType.PVC,
+        },
+      ),
+    ).resolves.toMatchObject({ id: "profile-system-a", name: "PVC A Updated" });
+    await expect(
+      data.updateTenantProfileSystem(
+        { tenantId: "tenant-a" },
+        "profile-system-b",
+        {
+          supplierId: "supplier-a",
+          name: "Blocked",
+          code: "PVC-B",
+          materialType: CatalogMaterialType.PVC,
+        },
+      ),
+    ).resolves.toBeNull();
+
+    await expect(data.listTenantProfileItems({ tenantId: "tenant-a" })).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "profile-item-a", tenantId: "tenant-a" })]),
+    );
+    await expect(data.getTenantProfileItem({ tenantId: "tenant-a" }, "profile-item-b")).resolves.toBeNull();
+    await expect(
+      data.createTenantProfileItem(
+        { tenantId: "tenant-a" },
+        {
+          profileSystemId: "profile-system-b",
+          supplierId: "supplier-a",
+          name: "Blocked frame",
+          code: "FRAME-X",
+          type: ProfileItemType.FRAME,
+          unit: CatalogUnit.LINEAR_METER,
+        },
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantProfileItem(
+        { tenantId: "tenant-a" },
+        {
+          profileSystemId: "profile-system-a",
+          supplierId: "supplier-a",
+          name: "New sash",
+          code: "SASH-A",
+          type: ProfileItemType.SASH,
+          unit: CatalogUnit.LINEAR_METER,
+          deductionRule: { validationStatus: "requires business validation" },
+        },
+      ),
+    ).resolves.toMatchObject({
+      tenantId: "tenant-a",
+      profileSystemId: "profile-system-a",
+      type: ProfileItemType.SASH,
+    });
+    await expect(
+      data.updateTenantProfileItem(
+        { tenantId: "tenant-a" },
+        "profile-item-a",
+        {
+          profileSystemId: "profile-system-a",
+          supplierId: "supplier-a",
+          name: "Frame A Updated",
+          code: "FRAME-A",
+          type: ProfileItemType.FRAME,
+          unit: CatalogUnit.LINEAR_METER,
+        },
+      ),
+    ).resolves.toMatchObject({ id: "profile-item-a", name: "Frame A Updated" });
+
+    const archivedSystem = await data.archiveTenantProfileSystem(
+      { tenantId: "tenant-a" },
+      "profile-system-a",
+    );
+    const archivedItem = await data.archiveTenantProfileItem(
+      { tenantId: "tenant-a" },
+      "profile-item-a",
+    );
+
+    expect(archivedSystem?.deletedAt).toBeInstanceOf(Date);
+    expect(archivedItem?.deletedAt).toBeInstanceOf(Date);
+    await expect(
+      data.archiveTenantProfileItem({ tenantId: "tenant-a" }, "profile-item-b"),
+    ).resolves.toBeNull();
+  });
+
+  it("manages glass packages, accessories, services, and tax rates with soft archives", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(data.listTenantGlassPackages({ tenantId: "tenant-a" })).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "glass-a", tenantId: "tenant-a" })]),
+    );
+    await expect(data.getTenantGlassPackage({ tenantId: "tenant-a" }, "glass-b")).resolves.toBeNull();
+    await expect(
+      data.createTenantGlassPackage(
+        { tenantId: "tenant-a" },
+        {
+          supplierId: "supplier-b",
+          name: "Blocked glass",
+          code: "GL-X",
+          unit: CatalogUnit.SQUARE_METER,
+        },
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantGlassPackage(
+        { tenantId: "tenant-a" },
+        {
+          supplierId: "supplier-a",
+          name: "Triple glass",
+          code: "GL-TRI",
+          unit: CatalogUnit.SQUARE_METER,
+        },
+      ),
+    ).resolves.toMatchObject({ tenantId: "tenant-a", supplierId: "supplier-a" });
+    await expect(
+      data.updateTenantGlassPackage(
+        { tenantId: "tenant-a" },
+        "glass-a",
+        {
+          supplierId: "supplier-a",
+          name: "Glass A Updated",
+          code: "GL-A",
+          unit: CatalogUnit.SQUARE_METER,
+        },
+      ),
+    ).resolves.toMatchObject({ id: "glass-a", name: "Glass A Updated" });
+    expect((await data.archiveTenantGlassPackage({ tenantId: "tenant-a" }, "glass-a"))?.deletedAt).toBeInstanceOf(Date);
+
+    await expect(data.listTenantAccessories({ tenantId: "tenant-a" })).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "accessory-a", tenantId: "tenant-a" })]),
+    );
+    await expect(data.getTenantAccessory({ tenantId: "tenant-a" }, "accessory-b")).resolves.toBeNull();
+    await expect(
+      data.createTenantAccessory(
+        { tenantId: "tenant-a" },
+        {
+          supplierId: "supplier-a",
+          name: "Trim A",
+          code: "TRIM-A",
+          unit: CatalogUnit.LINEAR_METER,
+        },
+      ),
+    ).resolves.toMatchObject({ tenantId: "tenant-a", name: "Trim A" });
+    await expect(
+      data.updateTenantAccessory(
+        { tenantId: "tenant-a" },
+        "accessory-a",
+        {
+          supplierId: "supplier-a",
+          name: "Sill A Updated",
+          code: "SILL-A",
+          unit: CatalogUnit.LINEAR_METER,
+        },
+      ),
+    ).resolves.toMatchObject({ id: "accessory-a", name: "Sill A Updated" });
+    expect((await data.archiveTenantAccessory({ tenantId: "tenant-a" }, "accessory-a"))?.deletedAt).toBeInstanceOf(Date);
+
+    await expect(data.listTenantServiceItems({ tenantId: "tenant-a" })).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "service-a", tenantId: "tenant-a" })]),
+    );
+    await expect(data.getTenantServiceItem({ tenantId: "tenant-a" }, "service-b")).resolves.toBeNull();
+    await expect(
+      data.createTenantServiceItem(
+        { tenantId: "tenant-a" },
+        { name: "Transport A", code: "TRANSPORT-A", unit: CatalogUnit.FIXED },
+      ),
+    ).resolves.toMatchObject({ tenantId: "tenant-a", name: "Transport A" });
+    await expect(
+      data.updateTenantServiceItem(
+        { tenantId: "tenant-a" },
+        "service-a",
+        { name: "Installation A Updated", code: "INSTALL-A", unit: CatalogUnit.FIXED },
+      ),
+    ).resolves.toMatchObject({ id: "service-a", name: "Installation A Updated" });
+    expect((await data.archiveTenantServiceItem({ tenantId: "tenant-a" }, "service-a"))?.deletedAt).toBeInstanceOf(Date);
+
+    await expect(data.listTenantTaxRates({ tenantId: "tenant-a" })).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "tax-a", tenantId: "tenant-a" })]),
+    );
+    await expect(data.getTenantTaxRate({ tenantId: "tenant-a" }, "tax-b")).resolves.toBeNull();
+    await expect(
+      data.createTenantTaxRate(
+        { tenantId: "tenant-a" },
+        { name: "Reduced VAT", code: "VAT-RED", rateBasisPoints: 900 },
+      ),
+    ).resolves.toMatchObject({ tenantId: "tenant-a", rateBasisPoints: 900 });
+    await expect(
+      data.updateTenantTaxRate(
+        { tenantId: "tenant-a" },
+        "tax-a",
+        { name: "VAT A Updated", code: "VAT-A", rateBasisPoints: 1900, isDefault: true },
+      ),
+    ).resolves.toMatchObject({ id: "tax-a", name: "VAT A Updated", isDefault: true });
+    expect((await data.archiveTenantTaxRate({ tenantId: "tenant-a" }, "tax-a"))?.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it("manages price-list items and lists price lists and pricing rules inside the tenant", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(data.listTenantPriceLists({ tenantId: "tenant-a" })).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "price-list-a", tenantId: "tenant-a" })]),
+    );
+    await expect(data.listTenantPriceLists({ tenantId: "tenant-a" })).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "price-list-b" })]),
+    );
+    await expect(
+      data.listTenantPricingRules({ tenantId: "tenant-a" }, { priceListId: "price-list-a" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "pricing-rule-a", tenantId: "tenant-a" })]),
+    );
+    await expect(
+      data.listTenantPricingRules({ tenantId: "tenant-a" }, { priceListId: "price-list-b" }),
+    ).resolves.toEqual([]);
+    await expect(data.listTenantPriceListItems({ tenantId: "tenant-a" })).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "price-item-a", tenantId: "tenant-a" })]),
+    );
+    await expect(
+      data.getTenantPriceListItem({ tenantId: "tenant-a" }, "price-item-b"),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantPriceListItem(
+        { tenantId: "tenant-a" },
+        {
+          priceListId: "price-list-b",
+          itemType: PriceListItemType.ACCESSORY,
+          catalogItemId: "accessory-a",
+          unit: CatalogUnit.LINEAR_METER,
+        },
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantPriceListItem(
+        { tenantId: "tenant-a" },
+        {
+          priceListId: "price-list-a",
+          itemType: PriceListItemType.ACCESSORY,
+          catalogItemId: "accessory-b",
+          unit: CatalogUnit.LINEAR_METER,
+        },
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantPriceListItem(
+        { tenantId: "tenant-a" },
+        {
+          priceListId: "price-list-a",
+          itemType: PriceListItemType.ACCESSORY,
+          catalogItemId: "accessory-a",
+          unit: CatalogUnit.LINEAR_METER,
+          costMinor: 100,
+          saleMinor: 150,
+        },
+      ),
+    ).resolves.toMatchObject({
+      tenantId: "tenant-a",
+      priceListId: "price-list-a",
+      catalogItemId: "accessory-a",
+      currency: "RON",
+    });
+    await expect(
+      data.updateTenantPriceListItem(
+        { tenantId: "tenant-a" },
+        "price-item-a",
+        {
+          priceListId: "price-list-a",
+          itemType: PriceListItemType.ACCESSORY,
+          catalogItemId: "accessory-a",
+          unit: CatalogUnit.LINEAR_METER,
+          costMinor: 120,
+          saleMinor: 180,
+          currency: "RON",
+        },
+      ),
+    ).resolves.toMatchObject({ id: "price-item-a", saleMinor: 180 });
+
+    const archived = await data.archiveTenantPriceListItem(
+      { tenantId: "tenant-a" },
+      "price-item-a",
+    );
+
+    expect(archived).toMatchObject({ id: "price-item-a", isActive: false });
+    expect(archived?.deletedAt).toBeInstanceOf(Date);
+    await expect(
+      data.archiveTenantPriceListItem({ tenantId: "tenant-a" }, "price-item-b"),
+    ).resolves.toBeNull();
   });
 
   it("does not return customers across tenant boundaries", async () => {

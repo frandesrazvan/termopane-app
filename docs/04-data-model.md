@@ -210,3 +210,16 @@ Revisions are created from the current locked/sent version by inserting a new dr
 copying the source version snapshots and quote item snapshots into new rows, updating
 `Quote.currentVersionId` to the new version, and marking the quote as `REVISED`. The source version
 and its items remain unchanged so generated PDFs can stay bound to immutable snapshots.
+
+## COD-018 catalog admin UI foundation notes
+
+Tenant-scoped repository helpers now cover the catalog models added in COD-008. Reads and mutations
+filter by `tenantId`, validate tenant-owned parent references before writes, and archive catalog
+records by setting `deletedAt` plus `isActive: false` instead of deleting rows. Price lists and
+pricing rules are listed for context, while price-list item create/update/archive is available.
+
+The first catalog admin UI lives under `/dashboard/catalog` with Romanian labels. OWNER and ADMIN
+memberships can create, edit, and archive catalog records; ESTIMATOR and DEALER memberships are
+read-only. Unvalidated configuration or rule JSON is shown with the `necesită validare business`
+badge. Catalog records are still not wired into quote item selection or calculation, so no production
+formula behavior is introduced by this UI.

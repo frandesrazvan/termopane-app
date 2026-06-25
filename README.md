@@ -2,8 +2,24 @@
 
 Mobile-first SaaS/PWA foundation for Romanian termopane offer generation.
 
-This scaffold intentionally contains no authentication, quote business logic, production formulas,
-or PDF generation logic yet. Future work should follow `AGENTS.md` and the docs in `docs/`.
+Future work should follow `AGENTS.md` and the docs in `docs/`. The app intentionally avoids
+production ERP, CNC export, stock management, invoicing, supplier integrations, and unvalidated
+production formulas.
+
+## Current MVP status
+
+- Authentication, tenant context, role permissions, customer/project records, saved quote shells,
+  draft quote items, calculation wiring, quote lifecycle, and Template A HTML preview foundations
+  are present.
+- Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
+  glass packages, hardware kits, colors, accessories, services, tax rates, price lists, price-list
+  items, and pricing rules.
+- Catalog admin UI is available at `/dashboard/catalog`. OWNER and ADMIN memberships can create,
+  edit, and archive catalog records; ESTIMATOR and DEALER memberships have read-only catalog access.
+- Catalog archive actions use `deletedAt` soft delete and mark records inactive. Unvalidated
+  configuration/rule JSON is surfaced with the Romanian `necesită validare business` badge.
+- Catalog records are not wired into quote item selection or calculation yet; quote calculations
+  still use frozen snapshots and explicit placeholders.
 
 ## Stack
 
@@ -86,7 +102,6 @@ Tests should follow the conventions in `tests/README.md`.
 
 ## Scope guardrails
 
-- Do not implement auth in this scaffold.
 - Do not add fake formulas or pricing assumptions.
 - Do not add real customer/private data.
 - Keep future calculation work pure and snapshot-based.
