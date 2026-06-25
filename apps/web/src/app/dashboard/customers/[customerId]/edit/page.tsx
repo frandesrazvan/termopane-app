@@ -34,7 +34,7 @@ export default async function EditCustomerPage({
           className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
         >
           <ArrowLeft aria-hidden="true" size={16} />
-          Customer
+          Client
         </Link>
 
         <section className="mt-5 rounded-md border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
@@ -43,7 +43,7 @@ export default async function EditCustomerPage({
               <UserRound aria-hidden="true" size={19} />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-xl font-semibold text-zinc-950">Edit customer</h1>
+              <h1 className="truncate text-xl font-semibold text-zinc-950">Editează client</h1>
               <p className="mt-1 truncate text-sm text-zinc-600">{customer.displayName}</p>
             </div>
           </div>
@@ -54,7 +54,7 @@ export default async function EditCustomerPage({
               cancelHref={`/dashboard/customers/${customer.id}`}
               customer={customer}
               error={errorParams.error}
-              submitLabel="Save customer"
+              submitLabel="Salvează client"
             />
           </div>
         </section>

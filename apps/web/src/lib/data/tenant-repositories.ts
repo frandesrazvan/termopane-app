@@ -4,6 +4,7 @@ import {
   CatalogMaterialType,
   CatalogUnit,
   ColorFinish,
+  DocumentType,
   GlassPackage,
   HardwareKit,
   PriceList,
@@ -22,6 +23,7 @@ import {
   type AuditLog,
   type CompanySettings,
   type Customer,
+  type Document,
   type Project,
   type Quote,
   type QuoteCalculationResult,
@@ -93,6 +95,7 @@ export type TenantDataClient = {
   quoteVersion: TenantWritableModelDelegate<QuoteVersion>;
   quoteItem: TenantDeletableModelDelegate<QuoteItem>;
   quoteCalculationResult: TenantWritableModelDelegate<QuoteCalculationResult>;
+  document: TenantWritableModelDelegate<Document>;
   auditLog: TenantWritableModelDelegate<AuditLog>;
   companySettings: TenantModelDelegate<CompanySettings>;
   serviceItem: TenantWritableModelDelegate<ServiceItem>;
@@ -349,6 +352,16 @@ export type TenantQuoteLifecycleResult = {
 export type TenantQuoteRevisionResult = TenantQuoteLifecycleResult & {
   sourceVersion: QuoteVersion;
   items: QuoteItem[];
+};
+
+export type TenantQuoteDocumentWriteInput = {
+  actorUserId?: string | null;
+  templateKey: string;
+  fileName: string;
+  storageKey: string;
+  mimeType: string;
+  checksum: string;
+  visibleTotalsSnapshot: Record<string, unknown>;
 };
 
 export class QuoteNumberCollisionError extends Error {
@@ -1409,6 +1422,58 @@ export function createTenantDataAccess(
       });
     },
 
+    getTenantDocument(scope: TenantDataScope, documentId: string) {
+      return client.document.findFirst({
+        where: tenantWhere(scope, { id: documentId }),
+      });
+    },
+
+    async getTenantQuoteDocument(
+      scope: TenantDataScope,
+      quoteId: string,
+      documentId: string,
+    ) {
+      const document = await access.getTenantDocument(scope, documentId);
+
+      if (!document?.quoteVersionId) {
+        return null;
+      }
+
+      const quoteVersion = await access.getTenantQuoteVersion(scope, document.quoteVersionId);
+
+      if (!quoteVersion || quoteVersion.quoteId !== quoteId) {
+        return null;
+      }
+
+      const quote = await access.getTenantQuote(scope, quoteId);
+
+      if (!quote) {
+        return null;
+      }
+
+      return {
+        document,
+        quote,
+        quoteVersion,
+      };
+    },
+
+    async listTenantQuoteDocuments(scope: TenantDataScope, quoteVersionId: string) {
+      const quoteVersion = await access.getTenantQuoteVersion(scope, quoteVersionId);
+
+      if (!quoteVersion) {
+        return [];
+      }
+
+      return client.document.findMany({
+        where: tenantWhere(scope, {
+          quoteVersionId,
+          type: DocumentType.QUOTE_PDF,
+        }),
+        orderBy: [{ createdAt: "desc" }],
+      });
+    },
+
     async createTenantQuoteItem(
       scope: TenantDataScope,
       quoteId: string,
@@ -1579,6 +1644,57 @@ export function createTenantDataAccess(
           quoteVersionId,
           ...resultData,
         },
+      });
+    },
+
+    async createTenantQuoteDocument(
+      scope: TenantDataScope,
+      quoteVersionId: string,
+      data: TenantQuoteDocumentWriteInput,
+    ) {
+      return runTenantDataTransaction(client, async (transactionClient) => {
+        const transactionAccess = createTenantDataAccess(transactionClient, options);
+        const quoteVersion = await transactionAccess.getTenantQuoteVersion(scope, quoteVersionId);
+
+        if (!quoteVersion) {
+          return null;
+        }
+
+        const document = await transactionClient.document.create({
+          data: {
+            tenantId: tenantIdFromScope(scope),
+            quoteVersionId,
+            type: DocumentType.QUOTE_PDF,
+            templateKey: data.templateKey,
+            fileName: data.fileName,
+            storageKey: data.storageKey,
+            mimeType: data.mimeType,
+            checksum: data.checksum,
+            visibleTotalsSnapshot: data.visibleTotalsSnapshot,
+            generatedById: data.actorUserId ?? null,
+          },
+        });
+
+        await transactionClient.auditLog.create({
+          data: {
+            tenantId: tenantIdFromScope(scope),
+            actorUserId: data.actorUserId ?? null,
+            action: AuditAction.DOCUMENT_GENERATED,
+            entityType: "Document",
+            entityId: document.id,
+            afterSnapshot: documentAuditSnapshot(document),
+            metadata: {
+              quoteId: quoteVersion.quoteId,
+              quoteVersionId,
+              templateKey: data.templateKey,
+              fileName: data.fileName,
+              storageKey: data.storageKey,
+              checksum: data.checksum,
+            },
+          },
+        });
+
+        return document;
       });
     },
 
@@ -1918,6 +2034,22 @@ export function getTenantQuoteCalculationResult(
   return tenantDataAccess.getTenantQuoteCalculationResult(scope, quoteVersionId);
 }
 
+export function getTenantDocument(scope: TenantDataScope, documentId: string) {
+  return tenantDataAccess.getTenantDocument(scope, documentId);
+}
+
+export function getTenantQuoteDocument(
+  scope: TenantDataScope,
+  quoteId: string,
+  documentId: string,
+) {
+  return tenantDataAccess.getTenantQuoteDocument(scope, quoteId, documentId);
+}
+
+export function listTenantQuoteDocuments(scope: TenantDataScope, quoteVersionId: string) {
+  return tenantDataAccess.listTenantQuoteDocuments(scope, quoteVersionId);
+}
+
 export function createTenantQuoteItem(
   scope: TenantDataScope,
   quoteId: string,
@@ -1960,6 +2092,14 @@ export function upsertTenantQuoteCalculationResult(
   data: TenantQuoteCalculationResultWriteInput,
 ) {
   return tenantDataAccess.upsertTenantQuoteCalculationResult(scope, quoteVersionId, data);
+}
+
+export function createTenantQuoteDocument(
+  scope: TenantDataScope,
+  quoteVersionId: string,
+  data: TenantQuoteDocumentWriteInput,
+) {
+  return tenantDataAccess.createTenantQuoteDocument(scope, quoteVersionId, data);
 }
 
 export function lockTenantQuoteVersion(
@@ -2366,6 +2506,22 @@ function quoteVersionAuditSnapshot(quoteVersion: QuoteVersion) {
     subtotalMinor: minorValueAuditString(quoteVersion.subtotalMinor),
     vatMinor: minorValueAuditString(quoteVersion.vatMinor),
     totalMinor: minorValueAuditString(quoteVersion.totalMinor),
+  };
+}
+
+function documentAuditSnapshot(document: Document) {
+  return {
+    id: document.id,
+    tenantId: document.tenantId,
+    quoteVersionId: document.quoteVersionId,
+    type: document.type,
+    templateKey: document.templateKey,
+    fileName: document.fileName,
+    storageKey: document.storageKey,
+    mimeType: document.mimeType,
+    checksum: document.checksum,
+    generatedById: document.generatedById,
+    createdAt: document.createdAt?.toISOString() ?? null,
   };
 }
 

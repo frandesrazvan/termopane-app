@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/auth";
 import { getTenantCustomer, listTenantProjects } from "@/lib/data";
+import { commonLabel, formatDateRo } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function CustomerDetailPage({
               className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
             >
               <ArrowLeft aria-hidden="true" size={16} />
-              Customers
+              Clienți
             </Link>
             <h1 className="mt-3 text-2xl font-semibold text-zinc-950 sm:text-3xl">
               {customer.displayName}
@@ -47,72 +48,72 @@ export default async function CustomerDetailPage({
               className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"
             >
               <Edit3 aria-hidden="true" size={17} />
-              Edit
+              Editează
             </Link>
             <Link
               href={`/dashboard/quotes/new?customerId=${customer.id}`}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"
             >
               <FileText aria-hidden="true" size={17} />
-              New quote
+              Ofertă nouă
             </Link>
             <Link
               href={`/dashboard/customers/${customer.id}/projects/new`}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
             >
               <Plus aria-hidden="true" size={17} />
-              New project
+              Proiect nou
             </Link>
           </div>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-zinc-950">Customer details</h2>
+            <h2 className="text-base font-semibold text-zinc-950">Detalii client</h2>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               <Detail label="Contact" value={customer.contactName} />
-              <Detail label="Tax identifier" value={customer.taxIdentifier} />
+              <Detail label="Cod fiscal" value={customer.taxIdentifier} />
               <Detail icon={Mail} label="Email" value={customer.email} />
-              <Detail icon={Phone} label="Phone" value={customer.phone} />
-              <Detail label="City" value={customer.city} />
-              <Detail label="Country" value={customer.country} />
+              <Detail icon={Phone} label="Telefon" value={customer.phone} />
+              <Detail label="Oraș" value={customer.city} />
+              <Detail label="Țară" value={customer.country} />
               <Detail
                 className="sm:col-span-2"
-                label="Address line 1"
+                label="Adresă 1"
                 value={customer.addressLine1}
               />
               <Detail
                 className="sm:col-span-2"
-                label="Address line 2"
+                label="Adresă 2"
                 value={customer.addressLine2}
               />
-              <Detail className="sm:col-span-2" label="Notes" value={customer.notes} />
+              <Detail className="sm:col-span-2" label="Note" value={customer.notes} />
             </dl>
           </section>
 
           <aside className="rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-zinc-950">Record</h2>
+            <h2 className="text-base font-semibold text-zinc-950">Înregistrare</h2>
             <div className="mt-4 space-y-3 text-sm text-zinc-700">
               <p className="rounded-md bg-stone-100 p-3">
-                Created {customer.createdAt.toLocaleDateString("ro-RO")}
+                Creat {formatDateRo(customer.createdAt)}
               </p>
               <p className="rounded-md bg-stone-100 p-3">
-                Updated {customer.updatedAt.toLocaleDateString("ro-RO")}
+                Actualizat {formatDateRo(customer.updatedAt)}
               </p>
-              <p className="rounded-md bg-stone-100 p-3">Projects {projects.length}</p>
+              <p className="rounded-md bg-stone-100 p-3">Proiecte {projects.length}</p>
             </div>
           </aside>
         </div>
 
         <section className="mt-6">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-zinc-950">Projects</h2>
+            <h2 className="text-lg font-semibold text-zinc-950">Proiecte</h2>
             <Link
               href={`/dashboard/customers/${customer.id}/projects/new`}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"
             >
               <Plus aria-hidden="true" size={16} />
-              Add
+              Adaugă
             </Link>
           </div>
 
@@ -145,9 +146,9 @@ export default async function CustomerDetailPage({
               <div className="mx-auto flex size-11 items-center justify-center rounded-md bg-stone-100 text-zinc-700">
                 <Building2 aria-hidden="true" size={20} />
               </div>
-              <h3 className="mt-4 text-base font-semibold text-zinc-950">No projects yet</h3>
+              <h3 className="mt-4 text-base font-semibold text-zinc-950">Nu există proiecte încă</h3>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
-                Add a project for this customer before starting a future quote workflow.
+                Adaugă un proiect pentru acest client înainte de un flux viitor de ofertare.
               </p>
             </div>
           )}
@@ -175,7 +176,7 @@ function Detail({
         {label}
       </dt>
       <dd className="mt-2 whitespace-pre-wrap break-words text-sm font-medium text-zinc-800">
-        {value || "Not set"}
+        {value || commonLabel("notSet")}
       </dd>
     </div>
   );

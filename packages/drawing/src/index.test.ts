@@ -17,8 +17,8 @@ describe("drawing package MVP renderer", () => {
     expect(svg).toContain("<svg");
     expect(svg).toContain("1200 mm");
     expect(svg).toContain("1400 mm");
-    expect(svg).toContain("FIXED");
-    expect(svg).toContain("Schematic only");
+    expect(svg).toContain("FIXĂ");
+    expect(svg).toContain("Schemă orientativă");
   });
 
   it("escapes SVG text safely", () => {

@@ -100,3 +100,12 @@ snapshots, labels draft or unlocked versions clearly, and hides internal calcula
 The pure `@termopane/pdf` package owns Template A HTML escaping, deterministic item ordering,
 customer-visible totals, terms, and safe drawing fallback behavior so the same snapshot boundary can
 be reused by future PDF generation.
+
+## COD-016 PDF binary generation notes
+
+Template A can now be generated as a PDF binary from a locked or sent `QuoteVersion`. Generation
+uses the same customer-facing snapshot as the HTML preview, stores the PDF under ignored local
+development storage, creates a new immutable `Document` row for every generation, records visible
+totals and checksum metadata, and writes an `AuditLog` entry with `DOCUMENT_GENERATED`. Regeneration
+does not overwrite existing document records or files; production object storage remains a future
+deployment concern.

@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTemplateAPdf,
   buildTemplateAHtml,
   getPdfPackageInfo,
   type TemplateAOfferSnapshot,
 } from "./index.js";
+
+const coreEnglishLabels = ["Offer summary", "Final total", "Items", "Customer"];
+const coreRomanianLabels = ["Ofertă", "Client", "Total final", "Poziții ofertă"];
 
 describe("Template A HTML preview", () => {
   it("renders company, customer, and quote fields", () => {
@@ -12,20 +16,34 @@ describe("Template A HTML preview", () => {
     expect(html).toContain("Termopane Demo");
     expect(html).toContain("Ana Popescu");
     expect(html).toContain("Q-2026-001");
-    expect(html).toContain("Version 2");
+    expect(html).toContain("Versiunea 2");
+  });
+
+  it("uses Romanian customer-facing labels without core English labels", () => {
+    const html = buildTemplateAHtml(templateSnapshot());
+
+    for (const label of coreRomanianLabels) {
+      expect(html).toContain(label);
+    }
+
+    for (const label of coreEnglishLabels) {
+      expect(html).not.toContain(label);
+    }
   });
 
   it("renders multiple items in sort order", () => {
     const html = buildTemplateAHtml(
       templateSnapshot({
         items: [
-          itemSnapshot({ id: "custom", sortOrder: 2, customerDescription: "Custom service" }),
-          itemSnapshot({ id: "window", sortOrder: 1, customerDescription: "Living room window" }),
+          itemSnapshot({ id: "custom", sortOrder: 2, customerDescription: "Serviciu personalizat" }),
+          itemSnapshot({ id: "window", sortOrder: 1, customerDescription: "Fereastră living" }),
         ],
       }),
     );
 
-    expect(html.indexOf("Living room window")).toBeLessThan(html.indexOf("Custom service"));
+    expect(html.indexOf("Fereastră living")).toBeLessThan(
+      html.indexOf("Serviciu personalizat"),
+    );
   });
 
   it("hides internal costs and trace-like fields", () => {
@@ -72,14 +90,14 @@ describe("Template A HTML preview", () => {
         items: [
           itemSnapshot({
             customerDescription:
-              'Oversized fixed window <script>alert("x")</script> & reinforced description '.repeat(6),
+              'Fereastră fixă supradimensionată <script>alert("x")</script> & descriere armată '.repeat(6),
           }),
         ],
       }),
     );
 
     expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
-    expect(html).toContain("&amp; reinforced");
+    expect(html).toContain("&amp; descriere");
     expect(html).not.toContain("<script>");
   });
 
@@ -97,7 +115,7 @@ describe("Template A HTML preview", () => {
       }),
     );
 
-    expect(html.match(/No schematic available/g)).toHaveLength(2);
+    expect(html.match(/Schemă indisponibilă/g)).toHaveLength(2);
     expect(html).not.toContain("onload");
   });
 
@@ -106,6 +124,26 @@ describe("Template A HTML preview", () => {
 
     expect(info.bindsToQuoteVersion).toBe(true);
     expect(info.supportedTemplates).toEqual(["template-a"]);
+    expect(info.supportedOutputs).toEqual(["html", "pdf"]);
+  });
+
+  it("renders a deterministic customer-facing PDF byte stream with Romanian labels", () => {
+    const pdf = buildTemplateAPdf(templateSnapshot());
+    const pdfText = new TextDecoder().decode(pdf);
+
+    expect(pdfText.startsWith("%PDF-1.4")).toBe(true);
+    expect(pdfText).toContain(pdfHexText("Q-2026-001"));
+    expect(pdfText).toContain(pdfHexText("Termopane Demo"));
+    expect(pdfText).toContain(pdfHexText("Fereastră fixă living"));
+    expect(pdfText).toContain(pdfHexText("1.190,00 RON"));
+    expect(pdfText).toContain(pdfHexText("Ofertă Template A"));
+    expect(pdfText).toContain(pdfHexText("Total final"));
+    expect(pdfText).not.toContain("Supplier cost");
+    expect(pdfText).not.toContain("materialCostMinor");
+
+    for (const label of coreEnglishLabels) {
+      expect(pdfText).not.toContain(label);
+    }
   });
 });
 
@@ -118,7 +156,7 @@ function templateSnapshot(
       quoteNumber: "Q-2026-001",
       versionNumber: 2,
       versionStatus: "LOCKED",
-      quoteTitle: "Apartment windows",
+      quoteTitle: "Ferestre apartament",
       currency: "RON",
       issueDateIso: "2026-06-25T10:00:00.000Z",
     },
@@ -126,7 +164,7 @@ function templateSnapshot(
       displayName: "Termopane Demo",
       legalName: "Termopane Demo SRL",
       taxIdentifier: "RO123456",
-      addressLines: ["Strada Exemplu 1", "Bucuresti"],
+      addressLines: ["Strada Exemplu 1", "București"],
       phone: "+40 700 000 000",
       email: "office@example.test",
     },
@@ -144,10 +182,10 @@ function templateSnapshot(
       currency: "RON",
     },
     terms: {
-      deliveryText: "Delivery after measurement confirmation.",
-      paymentTermsText: "Payment by bank transfer.",
-      warrantyText: "Warranty per signed contract.",
-      validityText: "30 days",
+      deliveryText: "Livrare după confirmarea măsurătorilor.",
+      paymentTermsText: "Plată prin transfer bancar.",
+      warrantyText: "Garanție conform contractului semnat.",
+      validityText: "30 de zile",
     },
     ...overrides,
   };
@@ -159,21 +197,31 @@ function itemSnapshot(
   return {
     id: "item-1",
     sortOrder: 1,
-    itemTypeLabel: "Fixed window",
-    customerDescription: "Living room fixed window",
+    itemTypeLabel: "Fereastră fixă",
+    customerDescription: "Fereastră fixă living",
     quantity: 2,
     widthMm: 1_200,
     heightMm: 1_400,
     surfaceAreaSquareMeters: 3.36,
-    profileLabel: "Demo frame profile",
-    glassLabel: "Demo glass package",
-    hardwareLabel: "Fixed glazing",
+    profileLabel: "Profil demo toc",
+    glassLabel: "Pachet sticlă demo",
+    hardwareLabel: "Vitraj fix",
     unitPriceMinor: 500_00,
     subtotalMinor: 1_000_00,
     vatMinor: 190_00,
     totalMinor: 1_190_00,
     drawingSvg:
-      '<svg xmlns="http://www.w3.org/2000/svg" width="260" height="190" viewBox="0 0 260 190"><title>Safe drawing</title><rect width="260" height="190" fill="#fff"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="260" height="190" viewBox="0 0 260 190"><title>Desen sigur</title><rect width="260" height="190" fill="#fff"/></svg>',
     ...overrides,
   };
+}
+
+function pdfHexText(value: string) {
+  let hex = "FEFF";
+
+  for (let index = 0; index < value.length; index += 1) {
+    hex += value.charCodeAt(index).toString(16).padStart(4, "0").toUpperCase();
+  }
+
+  return `<${hex}>`;
 }

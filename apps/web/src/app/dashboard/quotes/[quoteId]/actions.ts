@@ -20,6 +20,7 @@ import {
   customLineDrawingSnapshot,
   fixedWindowDrawingSnapshot,
 } from "@/lib/drawing/quote-item-drawings";
+import { generateTenantQuotePdf } from "@/lib/pdf/quote-pdf-generator";
 
 const optionalText = (maxLength: number) =>
   z
@@ -222,6 +223,29 @@ export async function createQuoteRevisionAction(
   redirectWithVersionEvent(quoteId, "revision");
 }
 
+export async function generateQuotePdfAction(
+  quoteId: string,
+  quoteVersionId: string,
+  formData: FormData,
+) {
+  void formData;
+
+  const context = await requireTenant();
+  const result = await generateTenantQuotePdf(context, quoteId, quoteVersionId, {
+    actorUserId: context.user.id,
+  });
+
+  if (!result.ok) {
+    if (result.reason === "not_locked") {
+      redirectWithDocumentError(quoteId, "locked");
+    }
+
+    redirectWithDocumentError(quoteId, "generate");
+  }
+
+  redirectWithDocumentEvent(quoteId, "generated");
+}
+
 function parseItemUpdateInput(
   formData: FormData,
   itemType: string,
@@ -304,7 +328,9 @@ function fixedWindowInput(
       source: "quote-item-draft-editor",
       requiresCalculation: true,
     },
-    catalogSnapshot: draftCatalogPlaceholder("Catalog selection is deferred for this fixed-window draft item."),
+    catalogSnapshot: draftCatalogPlaceholder(
+      "Selecția de catalog este amânată pentru această fereastră fixă în ciornă.",
+    ),
     totalsSnapshot: emptyTotalsSnapshot(),
   };
 }
@@ -336,7 +362,9 @@ function customLineInput(
       }),
     },
     catalogSnapshot: {
-      ...draftCatalogPlaceholder("Custom-line price is an explicit manual snapshot, not a formula."),
+      ...draftCatalogPlaceholder(
+        "Prețul poziției personalizate este un snapshot manual explicit, nu o formulă.",
+      ),
       manualPricing: {
         unitPriceMinor: data.unitPriceMinor,
         currency,
@@ -413,4 +441,12 @@ function redirectWithVersionEvent(quoteId: string, event: "locked" | "revision")
 
 function redirectWithVersionError(quoteId: string, error: "lock" | "revision"): never {
   redirect(`${quotePath(quoteId)}?versionError=${error}#versions`);
+}
+
+function redirectWithDocumentEvent(quoteId: string, event: "generated"): never {
+  redirect(`${quotePath(quoteId)}?documentEvent=${event}#documents`);
+}
+
+function redirectWithDocumentError(quoteId: string, error: "locked" | "generate"): never {
+  redirect(`${quotePath(quoteId)}?documentError=${error}#documents`);
 }

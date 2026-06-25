@@ -1,6 +1,6 @@
 # Termopane App
 
-Mobile-first SaaS/PWA foundation for Romanian termopane offer generation.
+Romanian-first SaaS/PWA for creating customer offers for termopane businesses.
 
 Future work should follow `AGENTS.md` and the docs in `docs/`. The app intentionally avoids
 production ERP, CNC export, stock management, invoicing, supplier integrations, and unvalidated
@@ -11,6 +11,8 @@ production formulas.
 - Authentication, tenant context, role permissions, customer/project records, saved quote shells,
   draft quote items, calculation wiring, quote lifecycle, and Template A HTML preview foundations
   are present.
+- PDF generation, local document storage, immutable `Document` records, and audit logging are
+  present for generated quote documents.
 - Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
   glass packages, hardware kits, colors, accessories, services, tax rates, price lists, price-list
   items, and pricing rules.
@@ -23,20 +25,34 @@ production formulas.
 
 ## Stack
 
-- pnpm workspace
+- pnpm workspace pinned to `pnpm@9.15.4`
 - Next.js app with TypeScript and Tailwind
 - Prisma configured for PostgreSQL
-- Docker Compose PostgreSQL service
-- Placeholder packages for calculation, drawing, and PDF work
-- GitHub Actions CI for install, lint, typecheck, test, and build
+- Pure packages for calculation, drawing, and PDF rendering
+- Local development document storage under ignored `.local-storage`
+- GitHub Actions CI for install, Prisma generate, lint, typecheck, test, and build
 
-## Local setup
+## Local Setup
 
-1. Enable pnpm through Corepack:
+1. Install Node.js 20+ and enable pnpm through Corepack:
 
    ```powershell
-   corepack enable
    corepack prepare pnpm@9.15.4 --activate
+   corepack enable
+   ```
+
+   On Windows, if `corepack enable` fails with `EPERM` while writing into your Node install path,
+   use the npm fallback:
+
+   ```powershell
+   npm install -g pnpm@9.15.4
+   ```
+
+   If PowerShell blocks `pnpm.ps1`, run commands through `pnpm.cmd` or relax the current-user
+   execution policy:
+
+   ```powershell
+   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
    ```
 
 2. Install dependencies:
@@ -51,16 +67,21 @@ production formulas.
    Copy-Item .env.example .env
    ```
 
-4. Start PostgreSQL:
+4. Provide PostgreSQL. Local Docker works:
 
    ```powershell
    docker compose up -d postgres
    ```
 
-5. Generate Prisma client:
+   A cloud PostgreSQL database is also fine for development. Put its connection string in
+   `DATABASE_URL` in `.env`.
+
+5. Apply Prisma and seed synthetic demo data:
 
    ```powershell
    pnpm prisma generate
+   pnpm prisma migrate dev
+   pnpm db:seed
    ```
 
 6. Start the web app:
@@ -69,7 +90,30 @@ production formulas.
    pnpm dev
    ```
 
-The web app runs at `http://localhost:3000` by default.
+The web app runs at `http://localhost:3000` by default. Development login requires
+`AUTH_DEV_LOGIN_ENABLED="true"`.
+
+## Seed Users
+
+Synthetic users seeded for local testing:
+
+- `owner@example.test`
+- `admin@example.test`
+- `estimator@example.test`
+- `dealer@example.test`
+
+Use only synthetic data in fixtures, screenshots, and docs.
+
+## Documents And Storage
+
+Generated PDFs are written to ignored local storage. By default this is `.local-storage` at the repo
+root. Override it with:
+
+```powershell
+$env:DOCUMENT_STORAGE_ROOT="E:\path\to\storage"
+```
+
+Production object storage is not implemented yet.
 
 ## Validation
 
@@ -90,17 +134,25 @@ Or run the aggregate local check after dependencies are installed:
 pnpm verify
 ```
 
-Tests should follow the conventions in `tests/README.md`.
+## Workspace Layout
 
-## Workspace layout
+- `apps/web`: Next.js web app.
+- `packages/calculation`: pure quote calculation package.
+- `packages/drawing`: deterministic SVG schematic renderer.
+- `packages/pdf`: Template A HTML/PDF rendering package.
+- `prisma`: schema, migrations, and synthetic seed entrypoint.
+- `docs`: product, data, calculation, PDF, UX, and tasking docs.
 
-- `apps/web`: Next.js web app shell.
-- `packages/calculation`: placeholder for pure calculation logic.
-- `packages/drawing`: placeholder for future product drawing helpers.
-- `packages/pdf`: placeholder for future PDF generation helpers.
-- `prisma`: Prisma schema and seed entrypoint.
+## Not Done Yet
 
-## Scope guardrails
+- Production object storage.
+- Email sending or customer delivery workflow.
+- Catalog selection wiring into quote items and calculations.
+- Template B.
+- Real production formulas or supplier-specific pricing rules.
+- Invoicing, ERP, CNC export, stock, or accounting integrations.
+
+## Scope Guardrails
 
 - Do not add fake formulas or pricing assumptions.
 - Do not add real customer/private data.

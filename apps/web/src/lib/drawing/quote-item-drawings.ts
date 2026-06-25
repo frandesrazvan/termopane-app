@@ -27,8 +27,8 @@ export function customLineDrawingSnapshot(input: {
 }): QuoteItemDrawingSnapshot {
   return createQuoteItemDrawingSnapshot({
     type: "custom-placeholder",
-    label: input.label ?? "Custom line",
-    note: "Custom manual line",
+    label: input.label ?? "Poziție personalizată",
+    note: "Poziție manuală personalizată",
   });
 }
 
@@ -92,8 +92,8 @@ function fixedWindowDrawingInput(input: JsonRecord): FixedWindowDrawingJson | nu
 function customPlaceholderDrawingInput(input: JsonRecord): CustomPlaceholderDrawingJson {
   return {
     type: "custom-placeholder",
-    label: stringFrom(input.label) ?? "Custom line",
-    note: stringFrom(input.note) ?? "Custom manual line",
+    label: stringFrom(input.label) ?? "Poziție personalizată",
+    note: stringFrom(input.note) ?? "Poziție manuală personalizată",
   };
 }
 

@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   CalendarDays,
   Calculator,
+  Download,
   FileText,
   Lock,
   Pencil,
@@ -17,6 +18,7 @@ import {
   QuoteStatus,
   QuoteVersionStatus,
   type QuoteCalculationResult,
+  type Document,
   type QuoteItem,
   type QuoteVersion,
 } from "@prisma/client";
@@ -28,14 +30,25 @@ import {
   getTenantProject,
   getTenantQuoteCalculationResult,
   getTenantQuoteWithCurrentVersion,
+  listTenantQuoteDocuments,
   listTenantQuoteItems,
   listTenantQuoteVersions,
 } from "@/lib/data";
+import {
+  commonLabel,
+  formatDateRo,
+  formatDateTimeRo,
+  formatMoneyMinorRo,
+  quoteItemTypeLabel,
+  quoteStatusLabel,
+  quoteVersionStatusLabel,
+} from "@/lib/i18n";
 import {
   addCustomLineItemAction,
   addFixedWindowItemAction,
   createQuoteRevisionAction,
   deleteQuoteItemAction,
+  generateQuotePdfAction,
   lockCurrentQuoteVersionAction,
   recalculateCurrentQuoteVersionAction,
   updateQuoteItemAction,
@@ -53,6 +66,8 @@ export default async function QuoteDetailPage({
     calculated?: string;
     calculationError?: string;
     itemError?: string;
+    documentError?: string;
+    documentEvent?: string;
     versionError?: string;
     versionEvent?: string;
   }>;
@@ -84,11 +99,13 @@ export default async function QuoteDetailPage({
     null;
   let items: QuoteItem[] = [];
   let calculationResult: QuoteCalculationResult | null = null;
+  let documents: Document[] = [];
 
   if (currentVersion) {
-    [items, calculationResult] = await Promise.all([
+    [items, calculationResult, documents] = await Promise.all([
       listTenantQuoteItems(context, currentVersion.id),
       getTenantQuoteCalculationResult(context, currentVersion.id),
+      listTenantQuoteDocuments(context, currentVersion.id),
     ]);
   }
 
@@ -106,13 +123,13 @@ export default async function QuoteDetailPage({
               className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
             >
               <ArrowLeft aria-hidden="true" size={16} />
-              Saved offers
+              Oferte salvate
             </Link>
             <h1 className="mt-3 text-2xl font-semibold text-zinc-950 sm:text-3xl">
               {quote.quoteNumber}
             </h1>
             <p className="mt-1 text-sm text-zinc-600">
-              {quote.title || "Draft quote"}
+              {quote.title || "Ciornă ofertă"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -121,7 +138,7 @@ export default async function QuoteDetailPage({
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm ring-1 ring-zinc-200 hover:bg-stone-100"
             >
               <FileText aria-hidden="true" size={15} />
-              Preview offer
+              Previzualizare ofertă
             </Link>
             <StatusBadge status={quote.status} />
           </div>
@@ -142,32 +159,32 @@ export default async function QuoteDetailPage({
               <div className="flex size-10 items-center justify-center rounded-md bg-sky-50 text-sky-800">
                 <FileText aria-hidden="true" size={19} />
               </div>
-              <h2 className="text-base font-semibold text-zinc-950">Quote shell</h2>
+              <h2 className="text-base font-semibold text-zinc-950">Structură ofertă</h2>
             </div>
 
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Detail label="Customer" value={customer.displayName} />
-              <Detail label="Project" value={project?.name ?? "No project"} />
-              <Detail label="Currency" value={quote.currency} />
-              <Detail label="Author" value={quote.createdById ?? "Not set"} />
+              <Detail label="Client" value={customer.displayName} />
+              <Detail label="Proiect" value={project?.name ?? "Fără proiect"} />
+              <Detail label="Monedă" value={quote.currency} />
+              <Detail label="Autor" value={quote.createdById ?? commonLabel("notSet")} />
               <Detail
-                label="Created"
-                value={quote.createdAt.toLocaleDateString("ro-RO")}
+                label="Creată"
+                value={formatDateRo(quote.createdAt)}
               />
               <Detail
-                label="Updated"
-                value={quote.updatedAt.toLocaleDateString("ro-RO")}
+                label="Actualizată"
+                value={formatDateRo(quote.updatedAt)}
               />
               <Detail
                 className="sm:col-span-2"
-                label="Current total"
+                label="Total curent"
                 value={formatMinor(currentVersion?.totalMinor)}
               />
             </dl>
           </section>
 
           <aside className="rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-zinc-950">Customer</h2>
+            <h2 className="text-base font-semibold text-zinc-950">Client</h2>
             <Link
               href={`/dashboard/customers/${customer.id}`}
               className="mt-4 flex items-center gap-3 rounded-md bg-stone-100 p-3 text-sm font-semibold text-zinc-800 hover:bg-stone-200"
@@ -189,21 +206,21 @@ export default async function QuoteDetailPage({
         <section id="items" className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-zinc-950">Quote items</h2>
+              <h2 className="text-lg font-semibold text-zinc-950">Poziții ofertă</h2>
               <p className="mt-1 text-sm text-zinc-600">
-                Version {currentVersion?.versionNumber ?? "-"} draft contents
+                Conținutul ciornei pentru versiunea {currentVersion?.versionNumber ?? "-"}
               </p>
             </div>
             <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-sm font-medium text-zinc-600">
-              {items.length} {items.length === 1 ? "item" : "items"}
+              {items.length} {items.length === 1 ? "poziție" : "poziții"}
             </span>
           </div>
 
           {paramsValue.itemError ? (
             <p className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
               {paramsValue.itemError === "locked"
-                ? "This quote version is locked or sent, so items cannot be edited."
-                : "Check the item fields and try again."}
+                ? "Această versiune este blocată sau trimisă, deci pozițiile nu pot fi editate."
+                : "Verifică datele poziției și încearcă din nou."}
             </p>
           ) : null}
 
@@ -211,7 +228,7 @@ export default async function QuoteDetailPage({
             <AddItemForms quoteId={quote.id} currency={quote.currency} />
           ) : (
             <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
-              Items are read-only because the current quote version is locked, sent, or missing.
+              Pozițiile sunt doar pentru citire deoarece versiunea curentă este blocată, trimisă sau lipsește.
             </p>
           )}
 
@@ -232,9 +249,9 @@ export default async function QuoteDetailPage({
               <div className="mx-auto flex size-11 items-center justify-center rounded-md bg-white text-zinc-700">
                 <FileText aria-hidden="true" size={20} />
               </div>
-              <h3 className="mt-4 text-base font-semibold text-zinc-950">No quote items yet</h3>
+              <h3 className="mt-4 text-base font-semibold text-zinc-950">Nu există poziții încă</h3>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
-                Add a fixed-window draft item or a custom manual line to start building this quote.
+                Adaugă o fereastră fixă sau o poziție personalizată pentru a începe oferta.
               </p>
             </div>
           )}
@@ -251,9 +268,17 @@ export default async function QuoteDetailPage({
           wasCalculated={paramsValue.calculated === "1"}
         />
 
+        <QuoteDocumentsCard
+          currentVersion={currentVersion}
+          documentError={paramsValue.documentError}
+          documentEvent={paramsValue.documentEvent}
+          documents={documents}
+          quoteId={quote.id}
+        />
+
         <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-zinc-950">Versions</h2>
+            <h2 className="text-lg font-semibold text-zinc-950">Versiuni</h2>
             <span className="text-sm font-medium text-zinc-500">{versions.length}</span>
           </div>
 
@@ -264,11 +289,11 @@ export default async function QuoteDetailPage({
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <h3 className="text-sm font-semibold text-zinc-950">
-                        Version {version.versionNumber}
+                        Versiunea {version.versionNumber}
                       </h3>
                       <p className="mt-1 flex items-center gap-1 text-xs font-medium text-zinc-600">
                         <CalendarDays aria-hidden="true" size={13} />
-                        {version.createdAt.toLocaleDateString("ro-RO")}
+                        {formatDateRo(version.createdAt)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -276,7 +301,7 @@ export default async function QuoteDetailPage({
                       {version.isLocked ? (
                         <span className="inline-flex items-center gap-1 rounded-md bg-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-800">
                           <Lock aria-hidden="true" size={13} />
-                          Locked
+                          Blocată
                         </span>
                       ) : null}
                     </div>
@@ -286,7 +311,7 @@ export default async function QuoteDetailPage({
                       Subtotal {formatMinor(version.subtotalMinor)}
                     </p>
                     <p className="rounded-md bg-white px-3 py-2">
-                      VAT {formatMinor(version.vatMinor)}
+                      TVA {formatMinor(version.vatMinor)}
                     </p>
                     <p className="rounded-md bg-white px-3 py-2">
                       Total {formatMinor(version.totalMinor)}
@@ -297,7 +322,7 @@ export default async function QuoteDetailPage({
             </div>
           ) : (
             <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
-              No versions have been saved for this quote.
+              Nu există versiuni salvate pentru această ofertă.
             </p>
           )}
         </section>
@@ -312,35 +337,35 @@ function AddItemForms({ quoteId, currency }: { quoteId: string; currency: string
       <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
           <Plus aria-hidden="true" size={17} />
-          Fixed window
+          Fereastră fixă
         </summary>
         <form action={addFixedWindowItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
           <div className="grid gap-3 sm:grid-cols-3">
-            <NumberField label="Quantity" name="quantity" min={1} defaultValue="1" />
-            <NumberField label="Width mm" name="widthMm" min={1} />
-            <NumberField label="Height mm" name="heightMm" min={1} />
+            <NumberField label="Cantitate" name="quantity" min={1} defaultValue="1" />
+            <NumberField label="Lățime mm" name="widthMm" min={1} />
+            <NumberField label="Înălțime mm" name="heightMm" min={1} />
           </div>
           <TextField
-            label="Customer description"
+            label="Descriere pentru client"
             name="customerDescription"
-            placeholder="Fixed window 1200 x 1000"
+            placeholder="Fereastră fixă 1200 x 1000"
             required
           />
-          <TextAreaField label="Internal notes" name="internalNotes" />
-          <SubmitButton label="Add fixed window" />
+          <TextAreaField label="Note interne" name="internalNotes" />
+          <SubmitButton label="Adaugă fereastră fixă" />
         </form>
       </details>
 
       <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
           <Plus aria-hidden="true" size={17} />
-          Custom line
+          Poziție personalizată
         </summary>
         <form action={addCustomLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
           <div className="grid gap-3 sm:grid-cols-2">
-            <NumberField label="Quantity" name="quantity" min={1} defaultValue="1" />
+            <NumberField label="Cantitate" name="quantity" min={1} defaultValue="1" />
             <TextField
-              label={`Unit price (${currency})`}
+              label={`Preț unitar (${currency})`}
               name="unitPrice"
               inputMode="decimal"
               placeholder="0.00"
@@ -348,16 +373,105 @@ function AddItemForms({ quoteId, currency }: { quoteId: string; currency: string
             />
           </div>
           <TextField
-            label="Customer description"
+            label="Descriere pentru client"
             name="customerDescription"
-            placeholder="Manual service or custom product line"
+            placeholder="Serviciu manual sau produs personalizat"
             required
           />
-          <TextAreaField label="Internal notes" name="internalNotes" />
-          <SubmitButton label="Add custom line" />
+          <TextAreaField label="Note interne" name="internalNotes" />
+          <SubmitButton label="Adaugă poziție personalizată" />
         </form>
       </details>
     </div>
+  );
+}
+
+function QuoteDocumentsCard({
+  currentVersion,
+  documentError,
+  documentEvent,
+  documents,
+  quoteId,
+}: {
+  currentVersion: QuoteVersion | null;
+  documentError?: string;
+  documentEvent?: string;
+  documents: Document[];
+  quoteId: string;
+}) {
+  const canGeneratePdf = currentVersion ? isLockedOrSentVersion(currentVersion) : false;
+
+  return (
+    <section id="documents" className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">Documente</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            PDF-uri Template A imutabile pentru versiunea {currentVersion?.versionNumber ?? "-"}
+          </p>
+        </div>
+        {currentVersion && canGeneratePdf ? (
+          <form action={generateQuotePdfAction.bind(null, quoteId, currentVersion.id)}>
+            <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
+              <FileText aria-hidden="true" size={15} />
+              Generează PDF
+            </button>
+          </form>
+        ) : (
+          <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-sm font-medium text-zinc-600">
+            Blochează versiunea întâi
+          </span>
+        )}
+      </div>
+
+      {documentEvent ? (
+        <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+          Documentul PDF a fost generat și stocat pentru această versiune.
+        </p>
+      ) : null}
+      {documentError ? (
+        <p className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
+          {documentError === "locked"
+            ? "Blochează versiunea înainte de a genera un PDF pentru client."
+            : "PDF-ul nu a putut fi generat. Verifică versiunea ofertei și stocarea locală."}
+        </p>
+      ) : null}
+
+      {documents.length > 0 ? (
+        <div className="mt-5 grid gap-3">
+          {documents.map((document) => (
+            <div key={document.id} className="rounded-md border border-zinc-200 bg-stone-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h3 className="break-words text-sm font-semibold text-zinc-950">
+                    {document.fileName ?? "quote.pdf"}
+                  </h3>
+                  <p className="mt-1 text-xs font-medium text-zinc-600">
+                    {formatDateTimeRo(document.createdAt)}
+                  </p>
+                  {document.checksum ? (
+                    <p className="mt-2 break-all text-xs text-zinc-500">
+                      SHA-256 {document.checksum.slice(0, 16)}...
+                    </p>
+                  ) : null}
+                </div>
+                <Link
+                  href={`/dashboard/quotes/${quoteId}/documents/${document.id}`}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-stone-100 sm:w-auto"
+                >
+                  <Download aria-hidden="true" size={15} />
+                  Descarcă
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
+          Nu există PDF-uri generate pentru această versiune.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -385,15 +499,15 @@ function VersionLifecyclePanel({
       {versionEvent ? (
         <p className="mb-3 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
           {versionEvent === "locked"
-            ? "Current version was locked for document generation."
-            : "A new draft revision was created from the locked version."}
+            ? "Versiunea curentă a fost blocată pentru generarea documentelor."
+            : "O revizie nouă a fost creată din versiunea blocată."}
         </p>
       ) : null}
       {versionError ? (
         <p className="mb-3 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
           {versionError === "lock"
-            ? "This version could not be locked. Refresh and check whether it is still a draft."
-            : "A revision could not be created from this version."}
+            ? "Versiunea nu a putut fi blocată. Reîmprospătează pagina și verifică dacă este încă o ciornă."
+            : "Nu s-a putut crea o revizie din această versiune."}
         </p>
       ) : null}
 
@@ -401,16 +515,16 @@ function VersionLifecyclePanel({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-zinc-950">
-              Version {currentVersion.versionNumber} is editable
+              Versiunea {currentVersion.versionNumber} este editabilă
             </h2>
             <p className="mt-1 text-sm text-zinc-600">
-              Lock this draft before generating customer-facing documents.
+              Blochează ciorna înainte de generarea documentelor pentru client.
             </p>
           </div>
           <form action={lockCurrentQuoteVersionAction.bind(null, quoteId)}>
             <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
               <Lock aria-hidden="true" size={15} />
-              Lock version
+              Blochează versiunea
             </button>
           </form>
         </div>
@@ -420,16 +534,16 @@ function VersionLifecyclePanel({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-zinc-950">
-              Version {currentVersion.versionNumber} is locked
+              Versiunea {currentVersion.versionNumber} este blocată
             </h2>
             <p className="mt-1 text-sm text-zinc-600">
-              Create a revision before editing items, totals, or calculation snapshots.
+              Creează o revizie înainte de a edita poziții, totaluri sau snapshot-uri de calcul.
             </p>
           </div>
           <form action={createQuoteRevisionAction.bind(null, quoteId)}>
             <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
               <Plus aria-hidden="true" size={15} />
-              Create revision
+              Creează revizie
             </button>
           </form>
         </div>
@@ -472,9 +586,9 @@ function CalculationReviewCard({
             <Calculator aria-hidden="true" size={19} />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-zinc-950">Calculation review</h2>
+            <h2 className="text-lg font-semibold text-zinc-950">Verificare calcul</h2>
             <p className="mt-1 text-sm text-zinc-600">
-              Version {currentVersion?.versionNumber ?? "-"} stored totals and warnings
+              Totaluri și avertizări stocate pentru versiunea {currentVersion?.versionNumber ?? "-"}
             </p>
           </div>
         </div>
@@ -482,42 +596,42 @@ function CalculationReviewCard({
           <form action={recalculateCurrentQuoteVersionAction.bind(null, quoteId)}>
             <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
               <RefreshCw aria-hidden="true" size={15} />
-              Recalculate
+              Recalculează
             </button>
           </form>
         ) : (
           <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-sm font-medium text-zinc-600">
-            Read-only
+            Doar citire
           </span>
         )}
       </div>
 
       {calculationError ? (
         <p className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
-          This quote version is locked or sent, so it cannot be recalculated in place.
+          Această versiune este blocată sau trimisă, deci nu poate fi recalculată în loc.
         </p>
       ) : null}
       {wasCalculated ? (
         <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
-          Calculation snapshots were refreshed.
+          Snapshot-urile de calcul au fost actualizate.
         </p>
       ) : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <Metric label="Subtotal" value={formatMinor(currentVersion?.subtotalMinor, currency)} />
-        <Metric label="VAT" value={formatMinor(currentVersion?.vatMinor, currency)} />
+        <Metric label="TVA" value={formatMinor(currentVersion?.vatMinor, currency)} />
         <Metric label="Total" value={formatMinor(currentVersion?.totalMinor, currency)} emphasized />
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <Metric label="Material requirements" value={String(metrics.materialRequirementsCount)} />
-        <Metric label="Glass cuts" value={String(metrics.glassCutsCount)} />
-        <Metric label="Profile meters" value={`${formatMeasurement(metrics.profileMeters)} m`} />
+        <Metric label="Necesar materiale" value={String(metrics.materialRequirementsCount)} />
+        <Metric label="Cote sticlă" value={String(metrics.glassCutsCount)} />
+        <Metric label="Metri liniari profil" value={`${formatMeasurement(metrics.profileMeters)} m`} />
       </div>
 
       {!calculationResult ? (
         <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
-          No calculation has been stored for this version yet.
+          Nu există calcul stocat pentru această versiune.
         </p>
       ) : null}
 
@@ -525,7 +639,7 @@ function CalculationReviewCard({
         <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
             <AlertTriangle aria-hidden="true" size={16} />
-            Warnings
+            Avertizări
           </div>
           <ul className="mt-3 grid gap-2">
             {warnings.map((warning, index) => (
@@ -538,23 +652,23 @@ function CalculationReviewCard({
         </div>
       ) : calculationResult ? (
         <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
-          No calculation warnings are stored for this version.
+          Nu există avertizări de calcul stocate pentru această versiune.
         </p>
       ) : null}
 
       {traceCount > 0 ? (
         canViewInternalTrace ? (
           <div className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
-            <p className="font-semibold text-zinc-900">Trace entries: {traceCount}</p>
+            <p className="font-semibold text-zinc-900">Intrări urmă calcul: {traceCount}</p>
             {traceSteps.length > 0 ? (
               <p className="mt-2 break-words">
-                Steps: {traceSteps.slice(0, 8).join(", ")}
+                Pași: {traceSteps.slice(0, 8).join(", ")}
               </p>
             ) : null}
           </div>
         ) : (
           <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
-            Internal calculation trace is restricted for this role.
+            Urma internă de calcul este restricționată pentru acest rol.
           </p>
         )
       ) : null}
@@ -603,14 +717,14 @@ function QuoteItemCard({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase text-zinc-500">
-                {item.type === QuoteItemType.WINDOW ? "Fixed window" : "Custom line"}
+                {quoteItemTypeLabel(item.type)}
               </p>
               <h3 className="mt-1 break-words text-base font-semibold text-zinc-950">
-                {item.customerDescription || "Untitled item"}
+                {item.customerDescription || "Poziție fără titlu"}
               </h3>
             </div>
             <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-xs font-semibold text-zinc-700">
-              Qty {item.quantity}
+              Cant. {item.quantity}
             </span>
           </div>
 
@@ -623,11 +737,11 @@ function QuoteItemCard({
             ) : null}
             {manualUnitPriceMinor !== null ? (
               <span className="rounded-md bg-stone-100 px-2 py-1">
-                Manual unit {formatMinor(manualUnitPriceMinor, currency)}
+                Preț unitar manual {formatMinor(manualUnitPriceMinor, currency)}
               </span>
             ) : null}
             <span className="rounded-md bg-stone-100 px-2 py-1">
-              {itemTotals ? `Total ${formatMinor(itemTotals.totalMinor, currency)}` : "Totals pending"}
+              {itemTotals ? `Total ${formatMinor(itemTotals.totalMinor, currency)}` : "Total în așteptare"}
             </span>
           </div>
 
@@ -642,7 +756,7 @@ function QuoteItemCard({
               <details className="rounded-md bg-stone-50 p-3">
                 <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-900">
                   <Pencil aria-hidden="true" size={15} />
-                  Edit item
+                  Editează poziția
                 </summary>
                 <QuoteItemEditForm
                   currency={currency}
@@ -654,7 +768,7 @@ function QuoteItemCard({
               <form action={deleteQuoteItemAction.bind(null, quoteId, item.id)}>
                 <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-rose-200 bg-white px-3 text-sm font-semibold text-rose-800 shadow-sm hover:bg-rose-50 sm:w-auto">
                   <Trash2 aria-hidden="true" size={15} />
-                  Delete item
+                  Șterge poziția
                 </button>
               </form>
             </div>
@@ -680,17 +794,17 @@ function QuoteItemEditForm({
     <form action={updateQuoteItemAction.bind(null, quoteId, item.id)} className="mt-4 grid gap-3">
       <input type="hidden" name="itemType" value={item.type} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <NumberField label="Quantity" name="quantity" min={1} defaultValue={String(item.quantity)} />
+        <NumberField label="Cantitate" name="quantity" min={1} defaultValue={String(item.quantity)} />
         {item.type === QuoteItemType.WINDOW ? (
           <>
             <NumberField
-              label="Width mm"
+              label="Lățime mm"
               name="widthMm"
               min={1}
               defaultValue={item.widthMm ? String(item.widthMm) : ""}
             />
             <NumberField
-              label="Height mm"
+              label="Înălțime mm"
               name="heightMm"
               min={1}
               defaultValue={item.heightMm ? String(item.heightMm) : ""}
@@ -698,7 +812,7 @@ function QuoteItemEditForm({
           </>
         ) : (
           <TextField
-            label={`Unit price (${currency})`}
+            label={`Preț unitar (${currency})`}
             name="unitPrice"
             inputMode="decimal"
             defaultValue={manualUnitPriceMinor === null ? "" : minorInput(manualUnitPriceMinor)}
@@ -707,13 +821,13 @@ function QuoteItemEditForm({
         )}
       </div>
       <TextField
-        label="Customer description"
+        label="Descriere pentru client"
         name="customerDescription"
         defaultValue={item.customerDescription ?? ""}
         required
       />
-      <TextAreaField label="Internal notes" name="internalNotes" defaultValue={item.internalNotes ?? ""} />
-      <SubmitButton label="Save item" />
+      <TextAreaField label="Note interne" name="internalNotes" defaultValue={item.internalNotes ?? ""} />
+      <SubmitButton label="Salvează poziția" />
     </form>
   );
 }
@@ -819,7 +933,7 @@ function Detail({
     <div className={`rounded-md bg-stone-100 p-3 ${className}`}>
       <dt className="text-xs font-medium uppercase text-zinc-500">{label}</dt>
       <dd className="mt-2 break-words text-sm font-medium text-zinc-800">
-        {value || "Not set"}
+        {value || commonLabel("notSet")}
       </dd>
     </div>
   );
@@ -837,7 +951,7 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
 
   return (
     <span className={`inline-flex rounded-md px-3 py-2 text-sm font-semibold ${tone}`}>
-      {formatStatus(status)}
+      {quoteStatusLabel(status)}
     </span>
   );
 }
@@ -858,7 +972,7 @@ function VersionBadge({
 
   return (
     <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${tone}`}>
-      {formatStatus(status)}
+      {quoteVersionStatusLabel(status)}
     </span>
   );
 }
@@ -1030,21 +1144,10 @@ function formatMeasurement(value: number) {
 
 function formatMinor(value: bigint | number | null | undefined, currency = "RON") {
   if (value === null || value === undefined) {
-    return "Total pending";
+    return commonLabel("totalPending");
   }
 
   const total = typeof value === "bigint" ? Number(value) : value;
 
-  return new Intl.NumberFormat("ro-RO", {
-    style: "currency",
-    currency,
-  }).format(total / 100);
-}
-
-function formatStatus(status: string) {
-  return status
-    .toLowerCase()
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return formatMoneyMinorRo(total, currency);
 }

@@ -22,7 +22,7 @@ export default async function NewCustomerPage({
           className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
         >
           <ArrowLeft aria-hidden="true" size={16} />
-          Customers
+          Clienți
         </Link>
 
         <section className="mt-5 rounded-md border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
@@ -31,8 +31,8 @@ export default async function NewCustomerPage({
               <UserRound aria-hidden="true" size={19} />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-zinc-950">New customer</h1>
-              <p className="mt-1 text-sm text-zinc-600">Customer and contact record</p>
+              <h1 className="text-xl font-semibold text-zinc-950">Client nou</h1>
+              <p className="mt-1 text-sm text-zinc-600">Date client și contact</p>
             </div>
           </div>
 
@@ -41,7 +41,7 @@ export default async function NewCustomerPage({
               action={createCustomerAction}
               cancelHref="/dashboard/customers"
               error={params.error}
-              submitLabel="Create customer"
+              submitLabel="Creează client"
             />
           </div>
         </section>
