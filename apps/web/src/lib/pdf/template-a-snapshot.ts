@@ -14,6 +14,7 @@ import {
   type TemplateATotalsSnapshot,
 } from "@termopane/pdf";
 import { quoteItemDrawingSnapshot } from "../drawing/quote-item-drawings";
+import { quoteItemTypeLabel } from "../i18n";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -88,7 +89,7 @@ function previewDraftWarning(quoteVersion: QuoteVersion) {
     return null;
   }
 
-  return "Draft preview. Lock this quote version before sending or exporting it for a customer.";
+  return "Previzualizare ciornă. Blochează această versiune înainte de trimitere sau export pentru client.";
 }
 
 function companySnapshotFromVersion(quoteVersion: QuoteVersion): TemplateACompanySnapshot {
@@ -101,7 +102,7 @@ function companySnapshotFromVersion(quoteVersion: QuoteVersion): TemplateACompan
   return {
     displayName:
       stringFrom(settings?.displayName, settings?.legalName) ??
-      "Company details unavailable",
+      "Date companie indisponibile",
     legalName: stringFrom(settings?.legalName),
     taxIdentifier: stringFrom(settings?.taxIdentifier),
     registrationNumber: stringFrom(settings?.registrationNumber),
@@ -127,7 +128,7 @@ function customerSnapshotFromVersion(quoteVersion: QuoteVersion): TemplateACusto
   return {
     displayName:
       stringFrom(customer?.displayName, customer?.companyName, customer?.contactName) ??
-      "Customer",
+      "Client",
     companyName: stringFrom(customer?.companyName),
     contactName: stringFrom(customer?.contactName),
     email: stringFrom(customer?.email),
@@ -150,7 +151,7 @@ function termsSnapshotFromVersion(quoteVersion: QuoteVersion): TemplateATermsSna
     warrantyText: stringFrom(settings?.warrantyText),
     deliveryText: stringFrom(settings?.deliveryText),
     advancePaymentText: stringFrom(settings?.advancePaymentText),
-    validityText: offerValidityDays ? `${offerValidityDays} days` : stringFrom(settings?.validityText),
+    validityText: offerValidityDays ? `${offerValidityDays} zile` : stringFrom(settings?.validityText),
     footerText: stringFrom(settings?.pdfFooterText),
   };
 }
@@ -206,7 +207,7 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
     customerDescription:
       item.customerDescription ??
       stringFrom(configuration?.customerDescription, configuration?.description) ??
-      "Untitled item",
+      "Poziție fără titlu",
     quantity,
     widthMm,
     heightMm,
@@ -224,19 +225,7 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
 }
 
 function itemTypeLabel(itemType: QuoteItemType) {
-  if (itemType === QuoteItemType.WINDOW) {
-    return "Fixed window";
-  }
-
-  if (itemType === QuoteItemType.CUSTOM) {
-    return "Custom line";
-  }
-
-  if (itemType === QuoteItemType.DOOR) {
-    return "Door";
-  }
-
-  return "Quote item";
+  return quoteItemTypeLabel(itemType);
 }
 
 function surfaceAreaSquareMeters(

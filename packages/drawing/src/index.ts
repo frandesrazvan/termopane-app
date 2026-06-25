@@ -78,7 +78,7 @@ export function renderFixedWindowSvg(input: FixedWindowDrawingJson): string {
   const heightMm = safePositiveNumber(input.heightMm);
   const widthLabel = `${formatDimension(widthMm)} mm`;
   const heightLabel = `${formatDimension(heightMm)} mm`;
-  const title = input.label?.trim() || `Fixed window ${widthLabel} x ${heightLabel}`;
+  const title = input.label?.trim() || `Fereastră fixă ${widthLabel} x ${heightLabel}`;
   const marker = input.marker ?? "fixed";
   const paneInset = FRAME_STROKE;
   const paneX = DRAWING_LEFT + paneInset;
@@ -101,14 +101,14 @@ export function renderFixedWindowSvg(input: FixedWindowDrawingJson): string {
       <line x1="217" y1="${DRAWING_TOP}" x2="227" y2="${DRAWING_TOP}" stroke="#475569" stroke-width="1.5"/>
       <line x1="217" y1="${DRAWING_TOP + DRAWING_HEIGHT}" x2="227" y2="${DRAWING_TOP + DRAWING_HEIGHT}" stroke="#475569" stroke-width="1.5"/>
       <text x="245" y="${DRAWING_TOP + DRAWING_HEIGHT / 2}" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" transform="rotate(90 245 ${DRAWING_TOP + DRAWING_HEIGHT / 2})">${escapeXml(heightLabel)}</text>
-      <text x="${DRAWING_LEFT + DRAWING_WIDTH / 2}" y="18" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#334155">Schematic only</text>
+      <text x="${DRAWING_LEFT + DRAWING_WIDTH / 2}" y="18" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#334155">Schemă orientativă</text>
     </svg>
   `);
 }
 
 export function renderCustomPlaceholderSvg(input: CustomPlaceholderDrawingJson): string {
-  const label = input.label?.trim() || "Custom line";
-  const note = input.note?.trim() || "No geometry";
+  const label = input.label?.trim() || "Poziție personalizată";
+  const note = input.note?.trim() || "Fără geometrie";
 
   return compactSvg(`
     <svg xmlns="http://www.w3.org/2000/svg" width="${SVG_WIDTH}" height="${SVG_HEIGHT}" viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}" role="img" aria-label="${escapeXml(label)}">
@@ -127,7 +127,7 @@ function fixedMarker() {
   return `
     <line x1="${DRAWING_LEFT + 24}" y1="${DRAWING_TOP + 24}" x2="${DRAWING_LEFT + DRAWING_WIDTH - 24}" y2="${DRAWING_TOP + DRAWING_HEIGHT - 24}" stroke="#0f766e" stroke-width="2"/>
     <line x1="${DRAWING_LEFT + DRAWING_WIDTH - 24}" y1="${DRAWING_TOP + 24}" x2="${DRAWING_LEFT + 24}" y2="${DRAWING_TOP + DRAWING_HEIGHT - 24}" stroke="#0f766e" stroke-width="2"/>
-    <text x="${DRAWING_LEFT + DRAWING_WIDTH / 2}" y="${DRAWING_TOP + DRAWING_HEIGHT / 2 + 5}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="700" fill="#0f766e">FIXED</text>
+    <text x="${DRAWING_LEFT + DRAWING_WIDTH / 2}" y="${DRAWING_TOP + DRAWING_HEIGHT / 2 + 5}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="700" fill="#0f766e">FIXĂ</text>
   `;
 }
 

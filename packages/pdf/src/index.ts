@@ -106,6 +106,7 @@ export function getPdfPlaceholder(): PdfPackageInfo {
 
 export function buildTemplateAHtml(snapshot: TemplateAOfferSnapshot): string {
   const currency = safeCurrency(snapshot.totals.currency || snapshot.quote.currency);
+  const versionStatus = formatVersionStatus(snapshot.quote.versionStatus);
   const sortedItems = [...snapshot.items].sort((left, right) => {
     if (left.sortOrder !== right.sortOrder) {
       return left.sortOrder - right.sortOrder;
@@ -119,7 +120,7 @@ export function buildTemplateAHtml(snapshot: TemplateAOfferSnapshot): string {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${escapeHtml(snapshot.quote.quoteNumber)} Template A preview</title>
+    <title>${escapeHtml(snapshot.quote.quoteNumber)} previzualizare Template A</title>
     <style>
       :root {
         color: #18181b;
@@ -257,26 +258,26 @@ export function buildTemplateAHtml(snapshot: TemplateAOfferSnapshot): string {
       <header class="header">
         ${renderCompanyHeader(snapshot.company)}
         <div class="meta">
-          <p class="small muted">Template A offer</p>
+          <p class="small muted">Ofertă Template A</p>
           <h1>${escapeHtml(snapshot.quote.quoteNumber)}</h1>
-          <p class="small">Version ${escapeHtml(String(snapshot.quote.versionNumber))} - ${escapeHtml(snapshot.quote.versionStatus)}</p>
-          <p class="small">Date ${escapeHtml(formatDate(snapshot.quote.issueDateIso))}</p>
+          <p class="small">Versiunea ${escapeHtml(String(snapshot.quote.versionNumber))} - ${escapeHtml(versionStatus)}</p>
+          <p class="small">Data ${escapeHtml(formatDate(snapshot.quote.issueDateIso))}</p>
         </div>
       </header>
 
       <section class="section summary-grid">
         ${renderCustomerBlock(snapshot.customer)}
         <div class="box">
-          <h2>Offer summary</h2>
-          <p class="small muted">${escapeHtml(snapshot.quote.quoteTitle ?? "Customer offer")}</p>
-          <p class="small">Currency: ${escapeHtml(currency)}</p>
-          <p class="small">Items: ${escapeHtml(String(sortedItems.length))}</p>
+          <h2>Sumar ofertă</h2>
+          <p class="small muted">${escapeHtml(snapshot.quote.quoteTitle ?? "Ofertă client")}</p>
+          <p class="small">Monedă: ${escapeHtml(currency)}</p>
+          <p class="small">Poziții ofertă: ${escapeHtml(String(sortedItems.length))}</p>
           <p class="small total-value">${formatMoney(snapshot.totals.totalMinor, currency)}</p>
         </div>
       </section>
 
       <section class="section">
-        <h2>Items</h2>
+        <h2>Poziții ofertă</h2>
         ${sortedItems.length > 0 ? sortedItems.map((item, index) => renderItemBlock(item, index, currency)).join("") : emptyItemsBlock()}
       </section>
 
@@ -291,11 +292,11 @@ export function buildTemplateAHtml(snapshot: TemplateAOfferSnapshot): string {
           <strong>${formatMoney(snapshot.totals.subtotalMinor, currency)}</strong>
         </div>
         <div class="total-row">
-          <span>VAT</span>
+          <span>TVA</span>
           <strong>${formatMoney(snapshot.totals.vatMinor, currency)}</strong>
         </div>
         <div class="total-row final">
-          <span>Final total</span>
+          <span>Total final</span>
           <strong>${formatMoney(snapshot.totals.totalMinor, currency)}</strong>
         </div>
       </section>
@@ -352,7 +353,7 @@ class TemplateAPdfRenderer {
       this.currentPage.text(
         PDF_MARGIN + 8,
         this.cursorTop + 15,
-        this.snapshot.warning ?? "Draft/test PDF. Lock the quote version before sending.",
+        this.snapshot.warning ?? "PDF de test/ciornă. Blochează versiunea înainte de trimitere.",
         9,
         "bold",
       );
@@ -372,7 +373,7 @@ class TemplateAPdfRenderer {
     const companyLines = cleanTextList([
       this.snapshot.company.legalName,
       this.snapshot.company.taxIdentifier
-        ? `Tax ID: ${this.snapshot.company.taxIdentifier}`
+        ? `CUI: ${this.snapshot.company.taxIdentifier}`
         : null,
       this.snapshot.company.registrationNumber
         ? `Reg.: ${this.snapshot.company.registrationNumber}`
@@ -384,9 +385,9 @@ class TemplateAPdfRenderer {
     ]);
 
     const metaLines = [
-      "Template A offer",
-      `Version ${this.snapshot.quote.versionNumber} - ${this.snapshot.quote.versionStatus}`,
-      `Date ${formatDate(this.snapshot.quote.issueDateIso)}`,
+      "Ofertă Template A",
+      `Versiunea ${this.snapshot.quote.versionNumber} - ${formatVersionStatus(this.snapshot.quote.versionStatus)}`,
+      `Data ${formatDate(this.snapshot.quote.issueDateIso)}`,
     ];
 
     const lines = Math.max(companyLines.length, metaLines.length);
@@ -417,11 +418,11 @@ class TemplateAPdfRenderer {
     this.ensureSpace(boxHeight + 20);
     this.currentPage.strokeRect(PDF_MARGIN, this.cursorTop, boxWidth, boxHeight);
     this.currentPage.strokeRect(PDF_MARGIN + boxWidth + 16, this.cursorTop, boxWidth, boxHeight);
-    this.currentPage.text(PDF_MARGIN + 10, this.cursorTop + 16, "Customer", 12, "bold");
+    this.currentPage.text(PDF_MARGIN + 10, this.cursorTop + 16, "Client", 12, "bold");
     this.currentPage.text(
       PDF_MARGIN + boxWidth + 26,
       this.cursorTop + 16,
-      "Offer summary",
+      "Sumar ofertă",
       12,
       "bold",
     );
@@ -431,7 +432,7 @@ class TemplateAPdfRenderer {
       this.snapshot.customer.companyName,
       this.snapshot.customer.contactName,
       this.snapshot.customer.taxIdentifier
-        ? `Tax ID: ${this.snapshot.customer.taxIdentifier}`
+        ? `CUI: ${this.snapshot.customer.taxIdentifier}`
         : null,
       this.snapshot.customer.email,
       this.snapshot.customer.phone,
@@ -440,10 +441,10 @@ class TemplateAPdfRenderer {
     this.currentPage.textBlock(PDF_MARGIN + 10, this.cursorTop + 34, boxWidth - 20, customerLines, 9);
 
     const summaryLines = [
-      this.snapshot.quote.quoteTitle ?? "Customer offer",
-      `Currency: ${this.currency}`,
-      `Items: ${this.sortedItems.length}`,
-      `Final total: ${formatMoney(this.snapshot.totals.totalMinor, this.currency)}`,
+      this.snapshot.quote.quoteTitle ?? "Ofertă client",
+      `Monedă: ${this.currency}`,
+      `Poziții ofertă: ${this.sortedItems.length}`,
+      `Total final: ${formatMoney(this.snapshot.totals.totalMinor, this.currency)}`,
     ];
     this.currentPage.textBlock(
       PDF_MARGIN + boxWidth + 26,
@@ -457,7 +458,7 @@ class TemplateAPdfRenderer {
   }
 
   private renderItems() {
-    this.currentPage.text(PDF_MARGIN, this.cursorTop, "Items", 14, "bold");
+    this.currentPage.text(PDF_MARGIN, this.cursorTop, "Poziții ofertă", 14, "bold");
     this.cursorTop += 20;
 
     if (this.sortedItems.length === 0) {
@@ -466,7 +467,7 @@ class TemplateAPdfRenderer {
       this.currentPage.text(
         PDF_MARGIN + 10,
         this.cursorTop + 22,
-        "No customer-facing items are stored on this quote version.",
+        "Nu există poziții pentru client pe această versiune de ofertă.",
         9,
       );
       this.cursorTop += 54;
@@ -506,19 +507,19 @@ class TemplateAPdfRenderer {
     this.currentPage.text(textLeft, drawingTop, item.customerDescription, 11, "bold");
 
     const specs = cleanTextList([
-      `Quantity: ${item.quantity}`,
+      `Cantitate: ${item.quantity}`,
       item.widthMm && item.heightMm
-        ? `Dimensions: ${formatDimension(item.widthMm)} x ${formatDimension(item.heightMm)} mm`
-        : "Dimensions: Not specified",
+        ? `Dimensiuni: ${formatDimension(item.widthMm)} x ${formatDimension(item.heightMm)} mm`
+        : "Dimensiuni: Nespecificat",
       item.surfaceAreaSquareMeters
-        ? `Surface: ${item.surfaceAreaSquareMeters.toFixed(2)} sqm`
+        ? `Suprafață: ${item.surfaceAreaSquareMeters.toFixed(2)} mp`
         : null,
-      item.profileLabel ? `Profile: ${item.profileLabel}` : null,
-      item.glassLabel ? `Glass/panel: ${item.glassLabel}` : null,
-      item.hardwareLabel ? `Hardware: ${item.hardwareLabel}` : null,
-      `Unit price: ${formatMoneyOrPending(item.unitPriceMinor, this.currency, item.totalsPending)}`,
+      item.profileLabel ? `Profil: ${item.profileLabel}` : null,
+      item.glassLabel ? `Sticlă/panou: ${item.glassLabel}` : null,
+      item.hardwareLabel ? `Feronerie: ${item.hardwareLabel}` : null,
+      `Preț unitar: ${formatMoneyOrPending(item.unitPriceMinor, this.currency, item.totalsPending)}`,
       `Subtotal: ${formatMoneyOrPending(item.subtotalMinor, this.currency, item.totalsPending)}`,
-      `VAT: ${formatMoneyOrPending(item.vatMinor, this.currency, item.totalsPending)}`,
+      `TVA: ${formatMoneyOrPending(item.vatMinor, this.currency, item.totalsPending)}`,
     ]);
 
     this.currentPage.textBlock(textLeft, drawingTop + 18, textWidth, specs, 8.5);
@@ -550,7 +551,7 @@ class TemplateAPdfRenderer {
         7.5,
       );
     } else {
-      this.currentPage.textCenter(left + width / 2, top + height / 2, "Schematic placeholder", 8);
+      this.currentPage.textCenter(left + width / 2, top + height / 2, "Schemă indisponibilă", 8);
     }
   }
 
@@ -560,7 +561,7 @@ class TemplateAPdfRenderer {
     const totalsLeft = PDF_MARGIN + PDF_CONTENT_WIDTH - totalsWidth;
 
     this.currentPage.strokeRect(totalsLeft, this.cursorTop, totalsWidth, 88);
-    this.currentPage.text(totalsLeft + 10, this.cursorTop + 18, "Totals", 12, "bold");
+    this.currentPage.text(totalsLeft + 10, this.cursorTop + 18, "Totaluri", 12, "bold");
     this.currentPage.text(totalsLeft + 10, this.cursorTop + 38, "Subtotal", 9);
     this.currentPage.textRight(
       totalsLeft + totalsWidth - 10,
@@ -569,7 +570,7 @@ class TemplateAPdfRenderer {
       9,
       "bold",
     );
-    this.currentPage.text(totalsLeft + 10, this.cursorTop + 54, "VAT", 9);
+    this.currentPage.text(totalsLeft + 10, this.cursorTop + 54, "TVA", 9);
     this.currentPage.textRight(
       totalsLeft + totalsWidth - 10,
       this.cursorTop + 54,
@@ -578,7 +579,7 @@ class TemplateAPdfRenderer {
       "bold",
     );
     this.currentPage.line(totalsLeft + 10, this.cursorTop + 64, totalsLeft + totalsWidth - 10, this.cursorTop + 64);
-    this.currentPage.text(totalsLeft + 10, this.cursorTop + 78, "Final total", 11, "bold");
+    this.currentPage.text(totalsLeft + 10, this.cursorTop + 78, "Total final", 11, "bold");
     this.currentPage.textRight(
       totalsLeft + totalsWidth - 10,
       this.cursorTop + 78,
@@ -590,20 +591,20 @@ class TemplateAPdfRenderer {
     this.cursorTop += 112;
 
     const terms = cleanTextList([
-      this.snapshot.terms?.deliveryText ? `Delivery: ${this.snapshot.terms.deliveryText}` : null,
+      this.snapshot.terms?.deliveryText ? `Livrare: ${this.snapshot.terms.deliveryText}` : null,
       this.snapshot.terms?.advancePaymentText
-        ? `Advance payment: ${this.snapshot.terms.advancePaymentText}`
+        ? `Avans: ${this.snapshot.terms.advancePaymentText}`
         : null,
       this.snapshot.terms?.paymentTermsText
-        ? `Payment: ${this.snapshot.terms.paymentTermsText}`
+        ? `Plată: ${this.snapshot.terms.paymentTermsText}`
         : null,
-      this.snapshot.terms?.warrantyText ? `Warranty: ${this.snapshot.terms.warrantyText}` : null,
-      this.snapshot.terms?.validityText ? `Validity: ${this.snapshot.terms.validityText}` : null,
+      this.snapshot.terms?.warrantyText ? `Garanție: ${this.snapshot.terms.warrantyText}` : null,
+      this.snapshot.terms?.validityText ? `Valabilitate: ${this.snapshot.terms.validityText}` : null,
     ]);
 
     if (terms.length > 0) {
       this.ensureSpace(90);
-      this.currentPage.text(PDF_MARGIN, this.cursorTop, "Terms", 12, "bold");
+      this.currentPage.text(PDF_MARGIN, this.cursorTop, "Termeni", 12, "bold");
       this.currentPage.textBlock(PDF_MARGIN, this.cursorTop + 18, PDF_CONTENT_WIDTH, terms, 9);
       this.cursorTop += 28 + terms.length * 13;
     }
@@ -626,11 +627,11 @@ class TemplateAPdfRenderer {
 
     this.pages.forEach((page, index) => {
       page.line(PDF_MARGIN, PDF_PAGE_HEIGHT - 34, PDF_MARGIN + PDF_CONTENT_WIDTH, PDF_PAGE_HEIGHT - 34);
-      page.text(PDF_MARGIN, PDF_PAGE_HEIGHT - 20, "Generated from quote version snapshot", 7.5);
+      page.text(PDF_MARGIN, PDF_PAGE_HEIGHT - 20, "Generat din snapshot-ul versiunii ofertei", 7.5);
       page.textRight(
         PDF_MARGIN + PDF_CONTENT_WIDTH,
         PDF_PAGE_HEIGHT - 20,
-        `Page ${index + 1} of ${pageCount}`,
+        `Pagina ${index + 1} din ${pageCount}`,
         7.5,
       );
     });
@@ -658,7 +659,7 @@ class PdfPageCanvas {
     font: "regular" | "bold" = "regular",
   ) {
     this.operations.push(
-      `BT /${font === "bold" ? "F2" : "F1"} ${formatPdfNumber(size)} Tf 1 0 0 1 ${formatPdfNumber(x)} ${formatPdfNumber(topToPdfY(top))} Tm (${escapePdfText(value)}) Tj ET`,
+      `BT /${font === "bold" ? "F2" : "F1"} ${formatPdfNumber(size)} Tf 1 0 0 1 ${formatPdfNumber(x)} ${formatPdfNumber(topToPdfY(top))} Tm ${pdfTextHex(value)} Tj ET`,
     );
   }
 
@@ -859,12 +860,14 @@ function formatPdfNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function escapePdfText(value: string) {
-  return value
-    .replace(/[^\x20-\x7E]/g, "?")
-    .replaceAll("\\", "\\\\")
-    .replaceAll("(", "\\(")
-    .replaceAll(")", "\\)");
+function pdfTextHex(value: string) {
+  let hex = "FEFF";
+
+  for (let index = 0; index < value.length; index += 1) {
+    hex += value.charCodeAt(index).toString(16).padStart(4, "0").toUpperCase();
+  }
+
+  return `<${hex}>`;
 }
 
 function renderCompanyHeader(company: TemplateACompanySnapshot) {
@@ -873,11 +876,11 @@ function renderCompanyHeader(company: TemplateACompanySnapshot) {
   const contactLines = cleanTextList([company.phone, company.email, company.website]);
 
   return `<div class="brand">
-    ${logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(company.displayName)} logo">` : ""}
+      ${logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="Logo ${escapeHtml(company.displayName)}">` : ""}
     <div>
       <h2>${escapeHtml(company.displayName)}</h2>
       ${company.legalName ? `<p class="small muted">${escapeHtml(company.legalName)}</p>` : ""}
-      ${company.taxIdentifier ? `<p class="small">Tax ID: ${escapeHtml(company.taxIdentifier)}</p>` : ""}
+      ${company.taxIdentifier ? `<p class="small">CUI: ${escapeHtml(company.taxIdentifier)}</p>` : ""}
       ${company.registrationNumber ? `<p class="small">Reg.: ${escapeHtml(company.registrationNumber)}</p>` : ""}
       ${addressLines.map((line) => `<p class="small">${escapeHtml(line)}</p>`).join("")}
       ${contactLines.map((line) => `<p class="small">${escapeHtml(line)}</p>`).join("")}
@@ -890,29 +893,29 @@ function renderCustomerBlock(customer: TemplateACustomerSnapshot) {
   const contactLines = cleanTextList([customer.contactName, customer.email, customer.phone]);
 
   return `<div class="box">
-    <h2>Customer</h2>
+    <h2>Client</h2>
     <p><strong>${escapeHtml(customer.displayName)}</strong></p>
     ${customer.companyName ? `<p class="small muted">${escapeHtml(customer.companyName)}</p>` : ""}
-    ${customer.taxIdentifier ? `<p class="small">Tax ID: ${escapeHtml(customer.taxIdentifier)}</p>` : ""}
+    ${customer.taxIdentifier ? `<p class="small">CUI: ${escapeHtml(customer.taxIdentifier)}</p>` : ""}
     ${contactLines.map((line) => `<p class="small">${escapeHtml(line)}</p>`).join("")}
     ${addressLines.map((line) => `<p class="small">${escapeHtml(line)}</p>`).join("")}
   </div>`;
 }
 
 function renderItemBlock(item: TemplateAItemSnapshot, index: number, fallbackCurrency: string) {
-  const title = item.customerDescription || item.itemTypeLabel || `Item ${index + 1}`;
+  const title = item.customerDescription || item.itemTypeLabel || `Poziția ${index + 1}`;
   const drawing = safeDrawingSvg(item.drawingSvg, title);
   const dimensions = item.widthMm && item.heightMm
     ? `${formatDimension(item.widthMm)} x ${formatDimension(item.heightMm)} mm`
-    : "Not specified";
+    : "Nespecificat";
   const specs: Array<readonly [string, string]> = [];
 
-  addSpec(specs, "Quantity", String(item.quantity));
-  addSpec(specs, "Dimensions", dimensions);
-  addSpec(specs, "Surface", formatArea(item.surfaceAreaSquareMeters));
-  addSpec(specs, "Profile", item.profileLabel);
-  addSpec(specs, "Glass or panel", item.glassLabel);
-  addSpec(specs, "Hardware", item.hardwareLabel);
+  addSpec(specs, "Cantitate", String(item.quantity));
+  addSpec(specs, "Dimensiuni", dimensions);
+  addSpec(specs, "Suprafață", formatArea(item.surfaceAreaSquareMeters));
+  addSpec(specs, "Profil", item.profileLabel);
+  addSpec(specs, "Sticlă/panou", item.glassLabel);
+  addSpec(specs, "Feronerie", item.hardwareLabel);
 
   return `<article class="item">
     <div class="item-head">
@@ -930,10 +933,10 @@ function renderItemBlock(item: TemplateAItemSnapshot, index: number, fallbackCur
           ${specs.map(([label, value]) => renderRow(label, String(value))).join("")}
         </div>
         <div class="money">
-          ${renderMoneyRow("Unit price", item.unitPriceMinor, fallbackCurrency, item.totalsPending)}
+          ${renderMoneyRow("Preț unitar", item.unitPriceMinor, fallbackCurrency, item.totalsPending)}
           ${renderMoneyRow("Subtotal", item.subtotalMinor, fallbackCurrency, item.totalsPending)}
-          ${renderMoneyRow("VAT", item.vatMinor, fallbackCurrency, item.totalsPending)}
-          ${renderMoneyRow("Item total", item.totalMinor, fallbackCurrency, item.totalsPending)}
+          ${renderMoneyRow("TVA", item.vatMinor, fallbackCurrency, item.totalsPending)}
+          ${renderMoneyRow("Total poziție", item.totalMinor, fallbackCurrency, item.totalsPending)}
         </div>
       </div>
     </div>
@@ -946,11 +949,11 @@ function renderTerms(terms?: TemplateATermsSnapshot) {
   }
 
   const visibleTerms = [
-    ["Delivery", terms.deliveryText],
-    ["Advance payment", terms.advancePaymentText],
-    ["Payment", terms.paymentTermsText],
-    ["Warranty", terms.warrantyText],
-    ["Validity", terms.validityText],
+    ["Livrare", terms.deliveryText],
+    ["Avans", terms.advancePaymentText],
+    ["Plată", terms.paymentTermsText],
+    ["Garanție", terms.warrantyText],
+    ["Valabilitate", terms.validityText],
   ].filter(([, value]) => typeof value === "string" && value.trim().length > 0);
 
   if (visibleTerms.length === 0) {
@@ -958,7 +961,7 @@ function renderTerms(terms?: TemplateATermsSnapshot) {
   }
 
   return `<section class="section">
-    <h2>Terms</h2>
+    <h2>Termeni</h2>
     <div class="terms">
       ${visibleTerms.map(([label, value]) => `<div class="box"><h3>${escapeHtml(label ?? "")}</h3><p class="small">${escapeHtml(value ?? "")}</p></div>`).join("")}
     </div>
@@ -976,11 +979,11 @@ function addSpec(
 }
 
 function draftRibbon(warning?: string | null) {
-  return `<div class="draft-ribbon">${escapeHtml(warning ?? "Draft preview. Lock this quote version before sending it to a customer.")}</div>`;
+  return `<div class="draft-ribbon">${escapeHtml(warning ?? "Previzualizare ciornă. Blochează versiunea înainte de trimiterea către client.")}</div>`;
 }
 
 function emptyItemsBlock() {
-  return `<div class="box small muted">No customer-facing items are stored on this quote version.</div>`;
+  return `<div class="box small muted">Nu există poziții pentru client pe această versiune de ofertă.</div>`;
 }
 
 function renderRow(label: string, value: string) {
@@ -993,7 +996,7 @@ function renderMoneyRow(
   currency: string,
   pending?: boolean,
 ) {
-  const displayValue = pending ? "Pending" : value === null || value === undefined ? "Pending" : formatMoney(value, currency);
+  const displayValue = pending ? "În așteptare" : value === null || value === undefined ? "În așteptare" : formatMoney(value, currency);
 
   return `<div class="row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(displayValue)}</strong></div>`;
 }
@@ -1031,13 +1034,13 @@ function isAllowedInlineSvg(value: string) {
 }
 
 function drawingPlaceholderSvg(label: string) {
-  const safeLabel = escapeHtml(label || "Quote item");
+  const safeLabel = escapeHtml(label || "Poziție ofertă");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="260" height="190" viewBox="0 0 260 190" role="img" aria-label="${safeLabel}">
     <title>${safeLabel}</title>
     <rect x="0" y="0" width="260" height="190" rx="8" fill="#f8fafc"/>
     <rect x="38" y="44" width="184" height="86" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>
-    <text x="130" y="154" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a">No schematic available</text>
+    <text x="130" y="154" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a">Schemă indisponibilă</text>
   </svg>`;
 }
 
@@ -1058,7 +1061,7 @@ function formatMoneyOrPending(
   currency: string,
   pending?: boolean,
 ) {
-  return pending || value === null || value === undefined ? "Pending" : formatMoney(value, currency);
+  return pending || value === null || value === undefined ? "În așteptare" : formatMoney(value, currency);
 }
 
 function minorToNumber(value: TemplateAMoneyMinor) {
@@ -1074,7 +1077,18 @@ function formatArea(value: number | null | undefined) {
     return null;
   }
 
-  return `${value.toFixed(2)} sqm`;
+  return `${value.toFixed(2)} mp`;
+}
+
+function formatVersionStatus(value: string) {
+  const statuses: Record<string, string> = {
+    DRAFT: "Ciornă",
+    LOCKED: "Blocată",
+    SENT: "Trimisă",
+    SUPERSEDED: "Înlocuită",
+  };
+
+  return statuses[value] ?? value;
 }
 
 function formatDate(value: string) {
@@ -1084,7 +1098,7 @@ function formatDate(value: string) {
     return value;
   }
 
-  return date.toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("ro-RO", { timeZone: "UTC" }).format(date);
 }
 
 function safeCurrency(value: string) {

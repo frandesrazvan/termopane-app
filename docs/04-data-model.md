@@ -210,3 +210,19 @@ Revisions are created from the current locked/sent version by inserting a new dr
 copying the source version snapshots and quote item snapshots into new rows, updating
 `Quote.currentVersionId` to the new version, and marking the quote as `REVISED`. The source version
 and its items remain unchanged so generated PDFs can stay bound to immutable snapshots.
+
+## COD-015 Template A preview notes
+
+Template A customer-facing HTML previews are built from the current tenant-scoped `QuoteVersion` and
+its stored `QuoteItem` snapshots. Draft or unlocked versions can be previewed for review but are
+clearly labeled as drafts. The preview hides internal material costs and calculation traces, uses
+stored drawing SVG when available, and falls back to safe placeholders when an item has no reusable
+schematic.
+
+## COD-016 immutable document notes
+
+Generated quote PDFs are stored as tenant-owned `Document` records bound to a specific
+`QuoteVersion`. Each generation creates a new document row rather than silently overwriting prior
+PDFs. Document metadata stores the template key, file name, local development storage key, MIME type,
+checksum, visible totals snapshot, generating user, and creation timestamp. Local files live under
+ignored development storage by default; production object storage remains a deployment follow-up.

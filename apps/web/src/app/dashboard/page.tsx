@@ -17,15 +17,16 @@ import {
   listTenantMemberships,
   requireTenant,
 } from "@/lib/auth";
+import { tenantMemberStatusLabel, tenantRoleLabel } from "@/lib/i18n";
 import { logoutAction } from "../logout/actions";
 import { switchTenantAction } from "./actions";
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard", active: true },
-  { label: "Customers", icon: UsersRound, href: "/dashboard/customers" },
-  { label: "Quotes", icon: FileText, href: "/dashboard/quotes" },
+  { label: "Panou", icon: LayoutDashboard, href: "/dashboard", active: true },
+  { label: "Clienți", icon: UsersRound, href: "/dashboard/customers" },
+  { label: "Oferte", icon: FileText, href: "/dashboard/quotes" },
   { label: "Catalog", icon: Archive, href: "#" },
-  { label: "Settings", icon: Settings, href: "#" },
+  { label: "Setări", icon: Settings, href: "#" },
 ];
 
 export const dynamic = "force-dynamic";
@@ -34,10 +35,10 @@ export default async function DashboardPage() {
   const context = await requireTenant();
   const memberships = await listTenantMemberships(context.user.id);
   const permissions = [
-    { label: "Internal costs", allowed: canViewInternalCosts(context.membership) },
-    { label: "Catalog admin", allowed: canManageCatalog(context.membership) },
-    { label: "User admin", allowed: canManageUsers(context.membership) },
-    { label: "PDF generation", allowed: canGeneratePdf(context.membership) },
+    { label: "Costuri interne", allowed: canViewInternalCosts(context.membership) },
+    { label: "Administrare catalog", allowed: canManageCatalog(context.membership) },
+    { label: "Administrare utilizatori", allowed: canManageUsers(context.membership) },
+    { label: "Generare PDF", allowed: canGeneratePdf(context.membership) },
   ];
 
   return (
@@ -54,7 +55,7 @@ export default async function DashboardPage() {
                   {context.tenant.name}
                 </p>
                 <p className="truncate text-xs text-zinc-500">
-                  {context.user.displayName} · {context.membership.role.toLowerCase()}
+                  {context.user.displayName} · {tenantRoleLabel(context.membership.role)}
                 </p>
               </div>
             </div>
@@ -62,7 +63,7 @@ export default async function DashboardPage() {
             <div className="flex items-center gap-2">
               <form action={switchTenantAction}>
                 <label className="sr-only" htmlFor="tenantId">
-                  Current tenant
+                  Tenant curent
                 </label>
                 <select
                   id="tenantId"
@@ -77,13 +78,13 @@ export default async function DashboardPage() {
                   ))}
                 </select>
                 <button className="ml-2 h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm">
-                  Switch
+                  Schimbă
                 </button>
               </form>
               <form action={logoutAction}>
                 <button className="flex size-10 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-700 shadow-sm">
                   <LogOut aria-hidden="true" size={17} />
-                  <span className="sr-only">Sign out</span>
+                  <span className="sr-only">Deconectare</span>
                 </button>
               </form>
             </div>
@@ -92,7 +93,7 @@ export default async function DashboardPage() {
 
         <div className="grid flex-1 grid-cols-1 lg:grid-cols-[220px_1fr]">
           <aside className="hidden border-r border-zinc-200 px-4 py-6 lg:block">
-            <nav className="space-y-1" aria-label="Main navigation">
+            <nav className="space-y-1" aria-label="Navigare principală">
               {navItems.map((item) => (
                 <Link
                   key={item.label}
@@ -113,14 +114,14 @@ export default async function DashboardPage() {
           <section className="px-4 py-6 pb-24 sm:px-6 lg:px-8">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-teal-700">Protected workspace</p>
+                <p className="text-sm font-medium text-teal-700">Spațiu protejat</p>
                 <h1 className="mt-1 text-2xl font-semibold tracking-normal text-zinc-950 sm:text-3xl">
-                  Tenant dashboard
+                  Panou tenant
                 </h1>
               </div>
               <div className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm">
                 <ShieldCheck aria-hidden="true" size={16} className="text-emerald-600" />
-                Server-authorized
+                Autorizat server-side
               </div>
             </div>
 
@@ -140,23 +141,26 @@ export default async function DashboardPage() {
                         : "bg-zinc-100 text-zinc-600"
                     }`}
                   >
-                    {permission.allowed ? "Allowed" : "Restricted"}
+                    {permission.allowed ? "Permis" : "Restricționat"}
                   </p>
                 </div>
               ))}
             </div>
 
             <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
-              <h2 className="text-base font-semibold text-zinc-950">Tenant context</h2>
+              <h2 className="text-base font-semibold text-zinc-950">Context tenant</h2>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <p className="rounded-md bg-stone-100 p-3 text-sm leading-6 text-zinc-700">
-                  Active tenant: <span className="font-semibold">{context.tenant.slug}</span>
+                  Tenant activ: <span className="font-semibold">{context.tenant.slug}</span>
                 </p>
                 <p className="rounded-md bg-stone-100 p-3 text-sm leading-6 text-zinc-700">
-                  Membership: <span className="font-semibold">{context.membership.status}</span>
+                  Apartenență:{" "}
+                  <span className="font-semibold">
+                    {tenantMemberStatusLabel(context.membership.status)}
+                  </span>
                 </p>
                 <p className="rounded-md bg-stone-100 p-3 text-sm leading-6 text-zinc-700">
-                  Tenants available: <span className="font-semibold">{memberships.length}</span>
+                  Tenant-uri disponibile: <span className="font-semibold">{memberships.length}</span>
                 </p>
               </div>
             </section>

@@ -39,14 +39,14 @@ export default async function QuotePreviewPage({ params }: QuotePreviewPageProps
               className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"
             >
               <ArrowLeft aria-hidden="true" size={16} />
-              Back to quote
+              Înapoi la ofertă
             </Link>
             <h1 className="mt-3 flex items-center gap-2 text-2xl font-semibold text-zinc-950 sm:text-3xl">
               <FileText aria-hidden="true" size={24} />
-              Offer preview
+              Previzualizare ofertă
             </h1>
             <p className="mt-1 text-sm text-zinc-600">
-              Customer-facing Template A preview for {quoteState.quote.quoteNumber}, version{" "}
+              Previzualizare Template A pentru client: {quoteState.quote.quoteNumber}, versiunea{" "}
               {quoteState.currentVersion.versionNumber}
             </p>
           </div>
@@ -67,7 +67,7 @@ export default async function QuotePreviewPage({ params }: QuotePreviewPageProps
             className="h-[900px] w-full rounded-sm border-0 bg-white"
             sandbox=""
             srcDoc={previewHtml}
-            title={`Offer preview ${quoteState.quote.quoteNumber}`}
+            title={`Previzualizare ofertă ${quoteState.quote.quoteNumber}`}
           />
         </section>
       </div>

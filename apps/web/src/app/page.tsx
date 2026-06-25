@@ -11,35 +11,35 @@ import {
 import Link from "next/link";
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
-  { label: "Quotes", icon: FileText },
+  { label: "Panou", icon: LayoutDashboard, active: true },
+  { label: "Oferte", icon: FileText },
   { label: "Catalog", icon: Archive },
-  { label: "Settings", icon: Settings },
+  { label: "Setări", icon: Settings },
 ];
 
 const readinessItems = [
-  { label: "Workspace", value: "Ready", tone: "bg-emerald-100 text-emerald-800" },
-  { label: "Auth", value: "Later", tone: "bg-amber-100 text-amber-800" },
-  { label: "Formulas", value: "Unvalidated", tone: "bg-rose-100 text-rose-800" },
+  { label: "Spațiu lucru", value: "Pregătit", tone: "bg-emerald-100 text-emerald-800" },
+  { label: "Autentificare", value: "Activă", tone: "bg-emerald-100 text-emerald-800" },
+  { label: "Formule", value: "Nevalidate", tone: "bg-rose-100 text-rose-800" },
 ];
 
 const workflowCards = [
   {
-    title: "Quote Drafts",
+    title: "Ciorne ofertă",
     value: "0",
-    detail: "Saved offer workflow will start here.",
+    detail: "Fluxul de oferte salvate pornește de aici.",
     icon: FileText,
   },
   {
-    title: "Catalog Admin",
+    title: "Administrare catalog",
     value: "0",
-    detail: "Profile, glass, hardware, and accessory records are not seeded yet.",
+    detail: "Profilurile, sticla, feroneria și accesoriile au date demo limitate.",
     icon: Archive,
   },
   {
-    title: "Calculation Package",
-    value: "Stub",
-    detail: "No production formulas are implemented in the foundation.",
+    title: "Pachet calcul",
+    value: "MVP",
+    detail: "Calculele rămân pe snapshot-uri sintetice, fără formule de producție reale.",
     icon: Calculator,
   },
 ];
@@ -59,20 +59,20 @@ export default function Home() {
                   Termopane App
                 </p>
                 <p className="truncate text-xs text-zinc-500">
-                  Foundation workspace
+                  Spațiu de lucru MVP
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm">
               <ShieldCheck aria-hidden="true" size={16} className="text-emerald-600" />
-              MVP scope
+              Scop MVP
             </div>
           </div>
         </header>
 
         <div className="grid flex-1 grid-cols-1 lg:grid-cols-[220px_1fr]">
           <aside className="hidden border-r border-zinc-200 px-4 py-6 lg:block">
-            <nav className="space-y-1" aria-label="Main navigation">
+            <nav className="space-y-1" aria-label="Navigare principală">
               {navItems.map((item) => (
                 <a
                   key={item.label}
@@ -93,9 +93,9 @@ export default function Home() {
           <section className="px-4 py-6 pb-24 sm:px-6 lg:px-8">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-teal-700">Scaffold</p>
+                <p className="text-sm font-medium text-teal-700">Spațiu demo</p>
                 <h1 className="mt-1 text-2xl font-semibold tracking-normal text-zinc-950 sm:text-3xl">
-                  Mobile dashboard foundation
+                  Panou mobil pentru oferte de termopane
                 </h1>
               </div>
               <Link
@@ -103,7 +103,7 @@ export default function Home() {
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
               >
                 <Sparkles aria-hidden="true" size={17} />
-                Open app
+                Deschide aplicația
               </Link>
             </div>
 
@@ -154,21 +154,21 @@ export default function Home() {
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-zinc-950">
-                    Foundation guardrails
+                    Reguli de lucru
                   </h2>
                   <p className="mt-1 text-sm text-zinc-600">
-                    Business rules remain configurable until validated.
+                    Regulile comerciale rămân configurabile până la validare.
                   </p>
                 </div>
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <p className="rounded-md bg-stone-100 p-3 text-sm leading-6 text-zinc-700">
-                  Authentication now uses server-side signed sessions and tenant memberships before
-                  protected workspace access.
+                  Autentificarea folosește sesiuni semnate server-side și apartenență activă la
+                  tenant înainte de acces.
                 </p>
                 <p className="rounded-md bg-stone-100 p-3 text-sm leading-6 text-zinc-700">
-                  Placeholder packages exist so future work can add tested domain behavior in small
-                  steps.
+                  Pachetele de calcul, desen și PDF sunt legate prin snapshot-uri testabile, fără
+                  reguli de producție inventate.
                 </p>
               </div>
             </section>
@@ -176,7 +176,7 @@ export default function Home() {
         </div>
 
         <nav
-          aria-label="Mobile navigation"
+          aria-label="Navigare mobilă"
           className="fixed inset-x-0 bottom-0 border-t border-zinc-200 bg-white px-3 py-2 shadow-[0_-8px_24px_rgba(24,24,27,0.08)] lg:hidden"
         >
           <div className="mx-auto grid max-w-md grid-cols-4 gap-1">

@@ -12,7 +12,7 @@ describe("QuoteItemDrawingPreview", () => {
     expect(markup).toContain("<svg");
     expect(markup).toContain("1200 mm");
     expect(markup).toContain("1400 mm");
-    expect(markup).toContain("FIXED");
+    expect(markup).toContain("FIXĂ");
   });
 
   it("uses a safe placeholder for custom-line items", () => {
@@ -30,7 +30,7 @@ describe("QuoteItemDrawingPreview", () => {
               input: {
                 type: "custom-placeholder",
                 label: "Manual <script>alert(1)</script>",
-                note: "Custom manual line",
+                note: "Poziție manuală personalizată",
               },
             },
           },
@@ -38,7 +38,7 @@ describe("QuoteItemDrawingPreview", () => {
       />,
     );
 
-    expect(markup).toContain("Custom manual line");
+    expect(markup).toContain("Poziție manuală personalizată");
     expect(markup).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(markup).not.toContain("<script>");
   });
