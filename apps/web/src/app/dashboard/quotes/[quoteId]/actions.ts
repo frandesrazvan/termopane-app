@@ -14,6 +14,10 @@ import {
   type TenantQuoteItemUpdateInput,
   type TenantQuoteItemWriteInput,
 } from "@/lib/data";
+import {
+  customLineDrawingSnapshot,
+  fixedWindowDrawingSnapshot,
+} from "@/lib/drawing/quote-item-drawings";
 
 const optionalText = (maxLength: number) =>
   z
@@ -254,6 +258,11 @@ function fixedWindowInput(
       widthMm: data.widthMm,
       heightMm: data.heightMm,
       currency,
+      drawing: fixedWindowDrawingSnapshot({
+        widthMm: data.widthMm,
+        heightMm: data.heightMm,
+        label: data.customerDescription,
+      }),
       source: "quote-item-draft-editor",
       requiresCalculation: true,
     },
@@ -284,6 +293,9 @@ function customLineInput(
       },
       source: "quote-item-draft-editor",
       requiresCalculation: false,
+      drawing: customLineDrawingSnapshot({
+        label: data.customerDescription,
+      }),
     },
     catalogSnapshot: {
       ...draftCatalogPlaceholder("Custom-line price is an explicit manual snapshot, not a formula."),

@@ -190,3 +190,11 @@ instead of invented formulas. Recalculation is allowed only for the current muta
 locked or sent versions must be revised rather than mutated. Internal calculation traces are stored
 for authorized support/admin inspection, while quote detail UI hides trace details unless the active
 membership can view internal costs.
+
+## COD-013 quote item drawing notes
+
+Fixed-window and custom-line quote item configuration snapshots now include a deterministic
+`drawing` snapshot from `@termopane/drawing`. The snapshot stores the drawing JSON input and a safe
+schematic SVG string for quote detail previews and future PDF reuse. These drawings are visual
+customer-review aids only; they do not encode production profile dimensions, CAD geometry, doors,
+multi-sash layouts, or fabrication rules.

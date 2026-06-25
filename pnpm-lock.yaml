@@ -36,6 +36,9 @@ importers:
       '@termopane/calculation':
         specifier: workspace:*
         version: link:../../packages/calculation
+      '@termopane/drawing':
+        specifier: workspace:*
+        version: link:../../packages/drawing
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
