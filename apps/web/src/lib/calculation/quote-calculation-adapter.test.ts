@@ -5,6 +5,7 @@ import {
   type AuditLog,
   type CompanySettings,
   type Customer,
+  type Document,
   type Project,
   type Quote,
   type QuoteCalculationResult,
@@ -114,6 +115,7 @@ function testState({
     quoteVersion: delegate(quoteVersions),
     quoteItem: delegate(quoteItems),
     quoteCalculationResult: delegate(calculationResults),
+    document: delegate([] as Document[]),
     auditLog: delegate([] as AuditLog[]),
     companySettings: delegate([] as CompanySettings[]),
   };

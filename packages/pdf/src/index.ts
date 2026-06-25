@@ -1,8 +1,9 @@
 export type PdfPackageInfo = Readonly<{
   packageName: "@termopane/pdf";
-  status: "template-a-html-preview";
+  status: "template-a-html-and-pdf";
   bindsToQuoteVersion: true;
   supportedTemplates: readonly ["template-a"];
+  supportedOutputs: readonly ["html", "pdf"];
 }>;
 
 export type PdfPlaceholder = PdfPackageInfo;
@@ -92,9 +93,10 @@ export type TemplateAOfferSnapshot = Readonly<{
 export function getPdfPackageInfo(): PdfPackageInfo {
   return Object.freeze({
     packageName: "@termopane/pdf",
-    status: "template-a-html-preview",
+    status: "template-a-html-and-pdf",
     bindsToQuoteVersion: true,
     supportedTemplates: ["template-a"] as const,
+    supportedOutputs: ["html", "pdf"] as const,
   });
 }
 
@@ -305,6 +307,566 @@ export function buildTemplateAHtml(snapshot: TemplateAOfferSnapshot): string {
 </html>`;
 }
 
+export function buildTemplateAPdf(snapshot: TemplateAOfferSnapshot): Uint8Array {
+  const renderer = new TemplateAPdfRenderer(snapshot);
+
+  return renderer.render();
+}
+
+const PDF_PAGE_WIDTH = 595.28;
+const PDF_PAGE_HEIGHT = 841.89;
+const PDF_MARGIN = 42;
+const PDF_CONTENT_WIDTH = PDF_PAGE_WIDTH - PDF_MARGIN * 2;
+
+class TemplateAPdfRenderer {
+  private currentPage = new PdfPageCanvas();
+  private readonly pages: PdfPageCanvas[] = [this.currentPage];
+  private cursorTop = PDF_MARGIN;
+  private readonly currency: string;
+  private readonly sortedItems: TemplateAItemSnapshot[];
+
+  constructor(private readonly snapshot: TemplateAOfferSnapshot) {
+    this.currency = safeCurrency(snapshot.totals.currency || snapshot.quote.currency);
+    this.sortedItems = [...snapshot.items].sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+  }
+
+  render() {
+    this.renderHeader();
+    this.renderCustomerSummary();
+    this.renderItems();
+    this.renderTotalsAndTerms();
+    this.renderFooters();
+
+    return writePdfDocument(this.pages.map((page) => page.toString()));
+  }
+
+  private renderHeader() {
+    if (this.snapshot.isDraft) {
+      this.currentPage.fillRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, 24, 1, 0.97, 0.86);
+      this.currentPage.text(
+        PDF_MARGIN + 8,
+        this.cursorTop + 15,
+        this.snapshot.warning ?? "Draft/test PDF. Lock the quote version before sending.",
+        9,
+        "bold",
+      );
+      this.cursorTop += 38;
+    }
+
+    this.currentPage.text(PDF_MARGIN, this.cursorTop, this.snapshot.company.displayName, 18, "bold");
+    this.currentPage.textRight(
+      PDF_MARGIN + PDF_CONTENT_WIDTH,
+      this.cursorTop,
+      this.snapshot.quote.quoteNumber,
+      18,
+      "bold",
+    );
+    this.cursorTop += 18;
+
+    const companyLines = cleanTextList([
+      this.snapshot.company.legalName,
+      this.snapshot.company.taxIdentifier
+        ? `Tax ID: ${this.snapshot.company.taxIdentifier}`
+        : null,
+      this.snapshot.company.registrationNumber
+        ? `Reg.: ${this.snapshot.company.registrationNumber}`
+        : null,
+      ...(this.snapshot.company.addressLines ?? []),
+      this.snapshot.company.phone,
+      this.snapshot.company.email,
+      this.snapshot.company.website,
+    ]);
+
+    const metaLines = [
+      "Template A offer",
+      `Version ${this.snapshot.quote.versionNumber} - ${this.snapshot.quote.versionStatus}`,
+      `Date ${formatDate(this.snapshot.quote.issueDateIso)}`,
+    ];
+
+    const lines = Math.max(companyLines.length, metaLines.length);
+
+    for (let index = 0; index < lines; index += 1) {
+      const top = this.cursorTop + index * 12;
+      const companyLine = companyLines[index];
+      const metaLine = metaLines[index];
+
+      if (companyLine) {
+        this.currentPage.text(PDF_MARGIN, top, companyLine, 9);
+      }
+
+      if (metaLine) {
+        this.currentPage.textRight(PDF_MARGIN + PDF_CONTENT_WIDTH, top, metaLine, 9);
+      }
+    }
+
+    this.cursorTop += lines * 12 + 18;
+    this.currentPage.line(PDF_MARGIN, this.cursorTop, PDF_MARGIN + PDF_CONTENT_WIDTH, this.cursorTop);
+    this.cursorTop += 18;
+  }
+
+  private renderCustomerSummary() {
+    const boxWidth = (PDF_CONTENT_WIDTH - 16) / 2;
+    const boxHeight = 118;
+
+    this.ensureSpace(boxHeight + 20);
+    this.currentPage.strokeRect(PDF_MARGIN, this.cursorTop, boxWidth, boxHeight);
+    this.currentPage.strokeRect(PDF_MARGIN + boxWidth + 16, this.cursorTop, boxWidth, boxHeight);
+    this.currentPage.text(PDF_MARGIN + 10, this.cursorTop + 16, "Customer", 12, "bold");
+    this.currentPage.text(
+      PDF_MARGIN + boxWidth + 26,
+      this.cursorTop + 16,
+      "Offer summary",
+      12,
+      "bold",
+    );
+
+    const customerLines = cleanTextList([
+      this.snapshot.customer.displayName,
+      this.snapshot.customer.companyName,
+      this.snapshot.customer.contactName,
+      this.snapshot.customer.taxIdentifier
+        ? `Tax ID: ${this.snapshot.customer.taxIdentifier}`
+        : null,
+      this.snapshot.customer.email,
+      this.snapshot.customer.phone,
+      ...(this.snapshot.customer.addressLines ?? []),
+    ]);
+    this.currentPage.textBlock(PDF_MARGIN + 10, this.cursorTop + 34, boxWidth - 20, customerLines, 9);
+
+    const summaryLines = [
+      this.snapshot.quote.quoteTitle ?? "Customer offer",
+      `Currency: ${this.currency}`,
+      `Items: ${this.sortedItems.length}`,
+      `Final total: ${formatMoney(this.snapshot.totals.totalMinor, this.currency)}`,
+    ];
+    this.currentPage.textBlock(
+      PDF_MARGIN + boxWidth + 26,
+      this.cursorTop + 34,
+      boxWidth - 20,
+      summaryLines,
+      9,
+    );
+
+    this.cursorTop += boxHeight + 24;
+  }
+
+  private renderItems() {
+    this.currentPage.text(PDF_MARGIN, this.cursorTop, "Items", 14, "bold");
+    this.cursorTop += 20;
+
+    if (this.sortedItems.length === 0) {
+      this.ensureSpace(48);
+      this.currentPage.strokeRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, 38);
+      this.currentPage.text(
+        PDF_MARGIN + 10,
+        this.cursorTop + 22,
+        "No customer-facing items are stored on this quote version.",
+        9,
+      );
+      this.cursorTop += 54;
+      return;
+    }
+
+    this.sortedItems.forEach((item, index) => this.renderItem(item, index));
+  }
+
+  private renderItem(item: TemplateAItemSnapshot, index: number) {
+    const itemHeight = 156;
+
+    this.ensureSpace(itemHeight + 18);
+    this.currentPage.strokeRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, itemHeight);
+    this.currentPage.fillRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, 28, 0.97, 0.98, 1);
+    this.currentPage.text(
+      PDF_MARGIN + 10,
+      this.cursorTop + 17,
+      `#${index + 1} ${item.itemTypeLabel}`,
+      9,
+      "bold",
+    );
+    this.currentPage.textRight(
+      PDF_MARGIN + PDF_CONTENT_WIDTH - 10,
+      this.cursorTop + 17,
+      formatMoneyOrPending(item.totalMinor, this.currency, item.totalsPending),
+      9,
+      "bold",
+    );
+
+    const drawingLeft = PDF_MARGIN + 10;
+    const drawingTop = this.cursorTop + 42;
+    this.renderItemSchematic(item, drawingLeft, drawingTop, 150, 88);
+
+    const textLeft = drawingLeft + 166;
+    const textWidth = PDF_CONTENT_WIDTH - 186;
+    this.currentPage.text(textLeft, drawingTop, item.customerDescription, 11, "bold");
+
+    const specs = cleanTextList([
+      `Quantity: ${item.quantity}`,
+      item.widthMm && item.heightMm
+        ? `Dimensions: ${formatDimension(item.widthMm)} x ${formatDimension(item.heightMm)} mm`
+        : "Dimensions: Not specified",
+      item.surfaceAreaSquareMeters
+        ? `Surface: ${item.surfaceAreaSquareMeters.toFixed(2)} sqm`
+        : null,
+      item.profileLabel ? `Profile: ${item.profileLabel}` : null,
+      item.glassLabel ? `Glass/panel: ${item.glassLabel}` : null,
+      item.hardwareLabel ? `Hardware: ${item.hardwareLabel}` : null,
+      `Unit price: ${formatMoneyOrPending(item.unitPriceMinor, this.currency, item.totalsPending)}`,
+      `Subtotal: ${formatMoneyOrPending(item.subtotalMinor, this.currency, item.totalsPending)}`,
+      `VAT: ${formatMoneyOrPending(item.vatMinor, this.currency, item.totalsPending)}`,
+    ]);
+
+    this.currentPage.textBlock(textLeft, drawingTop + 18, textWidth, specs, 8.5);
+    this.cursorTop += itemHeight + 16;
+  }
+
+  private renderItemSchematic(
+    item: TemplateAItemSnapshot,
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+  ) {
+    this.currentPage.strokeRect(left, top, width, height);
+    this.currentPage.fillRect(left + 6, top + 6, width - 12, height - 12, 0.94, 0.98, 1);
+    this.currentPage.strokeRect(left + 20, top + 16, width - 40, height - 34);
+
+    if (item.widthMm && item.heightMm) {
+      this.currentPage.textCenter(
+        left + width / 2,
+        top + height - 10,
+        `${formatDimension(item.widthMm)} mm`,
+        7.5,
+      );
+      this.currentPage.textRight(
+        left + width - 6,
+        top + height / 2,
+        `${formatDimension(item.heightMm)} mm`,
+        7.5,
+      );
+    } else {
+      this.currentPage.textCenter(left + width / 2, top + height / 2, "Schematic placeholder", 8);
+    }
+  }
+
+  private renderTotalsAndTerms() {
+    this.ensureSpace(170);
+    const totalsWidth = 230;
+    const totalsLeft = PDF_MARGIN + PDF_CONTENT_WIDTH - totalsWidth;
+
+    this.currentPage.strokeRect(totalsLeft, this.cursorTop, totalsWidth, 88);
+    this.currentPage.text(totalsLeft + 10, this.cursorTop + 18, "Totals", 12, "bold");
+    this.currentPage.text(totalsLeft + 10, this.cursorTop + 38, "Subtotal", 9);
+    this.currentPage.textRight(
+      totalsLeft + totalsWidth - 10,
+      this.cursorTop + 38,
+      formatMoney(this.snapshot.totals.subtotalMinor, this.currency),
+      9,
+      "bold",
+    );
+    this.currentPage.text(totalsLeft + 10, this.cursorTop + 54, "VAT", 9);
+    this.currentPage.textRight(
+      totalsLeft + totalsWidth - 10,
+      this.cursorTop + 54,
+      formatMoney(this.snapshot.totals.vatMinor, this.currency),
+      9,
+      "bold",
+    );
+    this.currentPage.line(totalsLeft + 10, this.cursorTop + 64, totalsLeft + totalsWidth - 10, this.cursorTop + 64);
+    this.currentPage.text(totalsLeft + 10, this.cursorTop + 78, "Final total", 11, "bold");
+    this.currentPage.textRight(
+      totalsLeft + totalsWidth - 10,
+      this.cursorTop + 78,
+      formatMoney(this.snapshot.totals.totalMinor, this.currency),
+      11,
+      "bold",
+    );
+
+    this.cursorTop += 112;
+
+    const terms = cleanTextList([
+      this.snapshot.terms?.deliveryText ? `Delivery: ${this.snapshot.terms.deliveryText}` : null,
+      this.snapshot.terms?.advancePaymentText
+        ? `Advance payment: ${this.snapshot.terms.advancePaymentText}`
+        : null,
+      this.snapshot.terms?.paymentTermsText
+        ? `Payment: ${this.snapshot.terms.paymentTermsText}`
+        : null,
+      this.snapshot.terms?.warrantyText ? `Warranty: ${this.snapshot.terms.warrantyText}` : null,
+      this.snapshot.terms?.validityText ? `Validity: ${this.snapshot.terms.validityText}` : null,
+    ]);
+
+    if (terms.length > 0) {
+      this.ensureSpace(90);
+      this.currentPage.text(PDF_MARGIN, this.cursorTop, "Terms", 12, "bold");
+      this.currentPage.textBlock(PDF_MARGIN, this.cursorTop + 18, PDF_CONTENT_WIDTH, terms, 9);
+      this.cursorTop += 28 + terms.length * 13;
+    }
+
+    if (this.snapshot.terms?.footerText) {
+      this.ensureSpace(42);
+      this.currentPage.line(PDF_MARGIN, this.cursorTop, PDF_MARGIN + PDF_CONTENT_WIDTH, this.cursorTop);
+      this.currentPage.textBlock(
+        PDF_MARGIN,
+        this.cursorTop + 14,
+        PDF_CONTENT_WIDTH,
+        [this.snapshot.terms.footerText],
+        8,
+      );
+    }
+  }
+
+  private renderFooters() {
+    const pageCount = this.pages.length;
+
+    this.pages.forEach((page, index) => {
+      page.line(PDF_MARGIN, PDF_PAGE_HEIGHT - 34, PDF_MARGIN + PDF_CONTENT_WIDTH, PDF_PAGE_HEIGHT - 34);
+      page.text(PDF_MARGIN, PDF_PAGE_HEIGHT - 20, "Generated from quote version snapshot", 7.5);
+      page.textRight(
+        PDF_MARGIN + PDF_CONTENT_WIDTH,
+        PDF_PAGE_HEIGHT - 20,
+        `Page ${index + 1} of ${pageCount}`,
+        7.5,
+      );
+    });
+  }
+
+  private ensureSpace(height: number) {
+    if (this.cursorTop + height <= PDF_PAGE_HEIGHT - PDF_MARGIN) {
+      return;
+    }
+
+    this.currentPage = new PdfPageCanvas();
+    this.pages.push(this.currentPage);
+    this.cursorTop = PDF_MARGIN;
+  }
+}
+
+class PdfPageCanvas {
+  private readonly operations: string[] = [];
+
+  text(
+    x: number,
+    top: number,
+    value: string,
+    size: number,
+    font: "regular" | "bold" = "regular",
+  ) {
+    this.operations.push(
+      `BT /${font === "bold" ? "F2" : "F1"} ${formatPdfNumber(size)} Tf 1 0 0 1 ${formatPdfNumber(x)} ${formatPdfNumber(topToPdfY(top))} Tm (${escapePdfText(value)}) Tj ET`,
+    );
+  }
+
+  textRight(
+    x: number,
+    top: number,
+    value: string,
+    size: number,
+    font: "regular" | "bold" = "regular",
+  ) {
+    const width = estimateTextWidth(value, size);
+
+    this.text(x - width, top, value, size, font);
+  }
+
+  textCenter(x: number, top: number, value: string, size: number) {
+    this.text(x - estimateTextWidth(value, size) / 2, top, value, size);
+  }
+
+  textBlock(
+    x: number,
+    top: number,
+    width: number,
+    lines: readonly string[],
+    size: number,
+  ) {
+    let currentTop = top;
+
+    for (const line of lines) {
+      for (const wrappedLine of wrapText(line, width, size)) {
+        this.text(x, currentTop, wrappedLine, size);
+        currentTop += size + 4;
+      }
+    }
+  }
+
+  line(left: number, top: number, right: number, bottom: number) {
+    this.operations.push(
+      `${formatPdfNumber(left)} ${formatPdfNumber(topToPdfY(top))} m ${formatPdfNumber(right)} ${formatPdfNumber(topToPdfY(bottom))} l S`,
+    );
+  }
+
+  strokeRect(left: number, top: number, width: number, height: number) {
+    this.operations.push(
+      `${formatPdfNumber(left)} ${formatPdfNumber(topToPdfY(top + height))} ${formatPdfNumber(width)} ${formatPdfNumber(height)} re S`,
+    );
+  }
+
+  fillRect(
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+    red: number,
+    green: number,
+    blue: number,
+  ) {
+    this.operations.push(
+      `q ${formatPdfNumber(red)} ${formatPdfNumber(green)} ${formatPdfNumber(blue)} rg ${formatPdfNumber(left)} ${formatPdfNumber(topToPdfY(top + height))} ${formatPdfNumber(width)} ${formatPdfNumber(height)} re f Q`,
+    );
+  }
+
+  toString() {
+    return this.operations.join("\n");
+  }
+}
+
+class PdfObjectWriter {
+  private readonly objects: string[] = [];
+
+  reserveObject() {
+    this.objects.push("");
+
+    return this.objects.length;
+  }
+
+  addObject(content: string) {
+    const id = this.reserveObject();
+
+    this.setObject(id, content);
+
+    return id;
+  }
+
+  setObject(id: number, content: string) {
+    this.objects[id - 1] = content;
+  }
+
+  write(rootObjectId: number) {
+    const chunks = ["%PDF-1.4\n"];
+    const offsets = [0];
+    let offset = chunks[0]?.length ?? 0;
+
+    this.objects.forEach((content, index) => {
+      offsets.push(offset);
+      const objectText = `${index + 1} 0 obj\n${content}\nendobj\n`;
+
+      chunks.push(objectText);
+      offset += objectText.length;
+    });
+
+    const xrefOffset = offset;
+    const xref = [
+      "xref",
+      `0 ${this.objects.length + 1}`,
+      "0000000000 65535 f ",
+      ...offsets.slice(1).map((entry) => `${String(entry).padStart(10, "0")} 00000 n `),
+      "trailer",
+      `<< /Size ${this.objects.length + 1} /Root ${rootObjectId} 0 R >>`,
+      "startxref",
+      String(xrefOffset),
+      "%%EOF",
+      "",
+    ].join("\n");
+
+    chunks.push(xref);
+
+    return new TextEncoder().encode(chunks.join(""));
+  }
+}
+
+function writePdfDocument(pageContents: readonly string[]) {
+  const writer = new PdfObjectWriter();
+  const pagesObjectId = writer.reserveObject();
+  const fontObjectId = writer.addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const boldFontObjectId = writer.addObject(
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
+  );
+  const pageObjectIds = pageContents.map((content) => {
+    const streamObjectId = writer.addObject(
+      `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    );
+
+    return writer.addObject(
+      `<< /Type /Page /Parent ${pagesObjectId} 0 R /MediaBox [0 0 ${PDF_PAGE_WIDTH} ${PDF_PAGE_HEIGHT}] /Resources << /Font << /F1 ${fontObjectId} 0 R /F2 ${boldFontObjectId} 0 R >> >> /Contents ${streamObjectId} 0 R >>`,
+    );
+  });
+  writer.setObject(
+    pagesObjectId,
+    `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageObjectIds.length} >>`,
+  );
+  const catalogObjectId = writer.addObject(`<< /Type /Catalog /Pages ${pagesObjectId} 0 R >>`);
+
+  return writer.write(catalogObjectId);
+}
+
+function topToPdfY(top: number) {
+  return PDF_PAGE_HEIGHT - top;
+}
+
+function wrapText(value: string, width: number, size: number) {
+  const sanitized = value.replace(/\s+/g, " ").trim();
+  const maxCharacters = Math.max(12, Math.floor(width / (size * 0.52)));
+
+  if (sanitized.length <= maxCharacters) {
+    return [sanitized];
+  }
+
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of sanitized.split(" ")) {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+
+    if (candidate.length <= maxCharacters) {
+      currentLine = candidate;
+      continue;
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    if (word.length <= maxCharacters) {
+      currentLine = word;
+      continue;
+    }
+
+    for (let index = 0; index < word.length; index += maxCharacters) {
+      lines.push(word.slice(index, index + maxCharacters));
+    }
+
+    currentLine = "";
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
+function estimateTextWidth(value: string, size: number) {
+  return value.length * size * 0.52;
+}
+
+function formatPdfNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function escapePdfText(value: string) {
+  return value
+    .replace(/[^\x20-\x7E]/g, "?")
+    .replaceAll("\\", "\\\\")
+    .replaceAll("(", "\\(")
+    .replaceAll(")", "\\)");
+}
+
 function renderCompanyHeader(company: TemplateACompanySnapshot) {
   const logoUrl = safeUrl(company.logoUrl);
   const addressLines = cleanTextList(company.addressLines);
@@ -489,6 +1051,14 @@ function formatMoney(value: TemplateAMoneyMinor, currency: string) {
   const decimals = String(absolute % 100).padStart(2, "0");
 
   return `${sign}${whole},${decimals} ${safeCurrency(currency)}`;
+}
+
+function formatMoneyOrPending(
+  value: TemplateAMoneyMinor | null | undefined,
+  currency: string,
+  pending?: boolean,
+) {
+  return pending || value === null || value === undefined ? "Pending" : formatMoney(value, currency);
 }
 
 function minorToNumber(value: TemplateAMoneyMinor) {
