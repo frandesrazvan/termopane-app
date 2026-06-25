@@ -1,7 +1,18 @@
-import { QuoteStatus, type CompanySettings, type Customer, type Project, type Quote, type QuoteVersion } from "@prisma/client";
+import {
+  QuoteItemType,
+  QuoteStatus,
+  QuoteVersionStatus,
+  type CompanySettings,
+  type Customer,
+  type Project,
+  type Quote,
+  type QuoteItem,
+  type QuoteVersion,
+} from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   createTenantDataAccess,
+  QuoteNumberCollisionError,
   tenantIdFromScope,
   type TenantDataClient,
 } from "./tenant-repositories";
@@ -11,7 +22,12 @@ type TenantRecord = {
   tenantId: string;
 };
 
-function delegate<TRecord extends TenantRecord>(records: TRecord[]) {
+type UniqueConstraint<TRecord> = Array<Extract<keyof TRecord, string>>;
+
+function delegate<TRecord extends TenantRecord>(
+  records: TRecord[],
+  options: { unique?: Array<UniqueConstraint<TRecord>> } = {},
+) {
   let createCount = 0;
 
   return {
@@ -22,6 +38,16 @@ function delegate<TRecord extends TenantRecord>(records: TRecord[]) {
       return records.filter((record) => matchesWhere(record, where));
     },
     async create({ data }: { data: Record<string, unknown> }) {
+      const duplicateConstraint = options.unique?.find((constraint) =>
+        records.some((record) =>
+          constraint.every((field) => record[field] === data[field]),
+        ),
+      );
+
+      if (duplicateConstraint) {
+        throw uniqueConstraintError(duplicateConstraint);
+      }
+
       createCount += 1;
       const record = {
         id: data.id ?? `created-${createCount}`,
@@ -43,7 +69,25 @@ function delegate<TRecord extends TenantRecord>(records: TRecord[]) {
 
       return record;
     },
+    async delete({ where }: { where: { id: string } }) {
+      const recordIndex = records.findIndex((candidate) => candidate.id === where.id);
+
+      if (recordIndex === -1) {
+        throw new Error(`Record ${where.id} was not found.`);
+      }
+
+      const [record] = records.splice(recordIndex, 1);
+
+      return record;
+    },
   };
+}
+
+function uniqueConstraintError(target: string[]) {
+  return Object.assign(new Error(`Unique constraint failed on ${target.join(", ")}`), {
+    code: "P2002",
+    meta: { target },
+  });
 }
 
 function matchesWhere<TRecord extends TenantRecord>(
@@ -93,8 +137,8 @@ function isRangeFilter(value: unknown): value is { gte?: Date | number; lte?: Da
   );
 }
 
-function testClient(): TenantDataClient {
-  return {
+function testClient(options: { onTransaction?: () => void } = {}): TenantDataClient {
+  const client: TenantDataClient = {
     customer: delegate([
       {
         id: "customer-a",
@@ -108,10 +152,17 @@ function testClient(): TenantDataClient {
         displayName: "B Customer",
         contactName: "Bob Contact",
       },
+      {
+        id: "customer-c",
+        tenantId: "tenant-a",
+        displayName: "C Customer",
+        contactName: "Carol Contact",
+      },
     ] as Customer[]),
     project: delegate([
       { id: "project-a", tenantId: "tenant-a", customerId: "customer-a", name: "A Project" },
       { id: "project-b", tenantId: "tenant-b", customerId: "customer-b", name: "B Project" },
+      { id: "project-c", tenantId: "tenant-a", customerId: "customer-c", name: "C Project" },
     ] as Project[]),
     quote: delegate([
       {
@@ -136,11 +187,103 @@ function testClient(): TenantDataClient {
         currentVersionId: "version-b",
         createdAt: new Date("2026-01-11T00:00:00.000Z"),
       },
-    ] as Quote[]),
+      {
+        id: "quote-locked",
+        tenantId: "tenant-a",
+        customerId: "customer-a",
+        projectId: "project-a",
+        quoteNumber: "A-locked",
+        status: QuoteStatus.SENT,
+        createdById: "user-a",
+        currentVersionId: "version-locked",
+        createdAt: new Date("2026-01-12T00:00:00.000Z"),
+      },
+      {
+        id: "quote-mismatch",
+        tenantId: "tenant-a",
+        customerId: "customer-a",
+        projectId: "project-c",
+        quoteNumber: "A-mismatch",
+        status: QuoteStatus.DRAFT,
+        createdById: "user-a",
+        currentVersionId: "version-mismatch",
+        createdAt: new Date("2026-01-13T00:00:00.000Z"),
+      },
+    ] as Quote[], { unique: [["tenantId", "quoteNumber"]] }),
     quoteVersion: delegate([
-      { id: "version-a", tenantId: "tenant-a", quoteId: "quote-a", versionNumber: 1 },
-      { id: "version-b", tenantId: "tenant-b", quoteId: "quote-b", versionNumber: 1 },
+      {
+        id: "version-a",
+        tenantId: "tenant-a",
+        quoteId: "quote-a",
+        versionNumber: 1,
+        status: QuoteVersionStatus.DRAFT,
+        isLocked: false,
+      },
+      {
+        id: "version-b",
+        tenantId: "tenant-b",
+        quoteId: "quote-b",
+        versionNumber: 1,
+        status: QuoteVersionStatus.DRAFT,
+        isLocked: false,
+      },
+      {
+        id: "version-locked",
+        tenantId: "tenant-a",
+        quoteId: "quote-locked",
+        versionNumber: 1,
+        status: QuoteVersionStatus.SENT,
+        isLocked: true,
+        sentAt: new Date("2026-01-12T10:00:00.000Z"),
+      },
+      {
+        id: "version-mismatch",
+        tenantId: "tenant-a",
+        quoteId: "quote-mismatch",
+        versionNumber: 1,
+        status: QuoteVersionStatus.DRAFT,
+        isLocked: false,
+      },
     ] as QuoteVersion[]),
+    quoteItem: delegate([
+      {
+        id: "item-a",
+        tenantId: "tenant-a",
+        quoteVersionId: "version-a",
+        type: QuoteItemType.WINDOW,
+        sortOrder: 0,
+        quantity: 1,
+        widthMm: 1200,
+        heightMm: 1000,
+        customerDescription: "Fixed window",
+        internalNotes: "Synthetic item",
+        configurationSnapshot: { kind: "fixed-window" },
+        catalogSnapshot: { placeholder: true },
+        totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0 },
+      },
+      {
+        id: "item-b",
+        tenantId: "tenant-b",
+        quoteVersionId: "version-b",
+        type: QuoteItemType.CUSTOM,
+        sortOrder: 0,
+        quantity: 1,
+        customerDescription: "Other tenant custom line",
+        configurationSnapshot: { kind: "custom-line" },
+        totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0 },
+      },
+      {
+        id: "item-locked",
+        tenantId: "tenant-a",
+        quoteVersionId: "version-locked",
+        type: QuoteItemType.CUSTOM,
+        sortOrder: 0,
+        quantity: 1,
+        customerDescription: "Locked custom line",
+        configurationSnapshot: { kind: "custom-line" },
+        totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0 },
+      },
+    ] as unknown as QuoteItem[]),
     companySettings: delegate([
       {
         id: "settings-a",
@@ -151,6 +294,16 @@ function testClient(): TenantDataClient {
       },
     ] as CompanySettings[]),
   };
+
+  if (options.onTransaction) {
+    client.$transaction = async (operation) => {
+      options.onTransaction?.();
+
+      return operation(client);
+    };
+  }
+
+  return client;
 }
 
 describe("tenant repositories", () => {
@@ -170,11 +323,13 @@ describe("tenant repositories", () => {
 
   it("does not return customers across tenant boundaries", async () => {
     const data = createTenantDataAccess(testClient());
+    const customers = await data.listTenantCustomers({ tenantId: "tenant-a" });
 
     await expect(data.getTenantCustomer({ tenantId: "tenant-a" }, "customer-b")).resolves.toBeNull();
-    await expect(data.listTenantCustomers({ tenantId: "tenant-a" })).resolves.toMatchObject([
-      { id: "customer-a", tenantId: "tenant-a" },
-    ]);
+    expect(customers).toEqual(
+      expect.arrayContaining([{ id: "customer-a", tenantId: "tenant-a", displayName: "A Customer", contactName: "Alice Contact" }]),
+    );
+    expect(customers).not.toEqual(expect.arrayContaining([{ id: "customer-b" }]));
   });
 
   it("searches customer name and contact fields inside the tenant boundary", async () => {
@@ -218,11 +373,13 @@ describe("tenant repositories", () => {
 
   it("does not return projects across tenant boundaries", async () => {
     const data = createTenantDataAccess(testClient());
+    const projects = await data.listTenantProjects({ tenantId: "tenant-a" });
 
     await expect(data.getTenantProject({ tenantId: "tenant-a" }, "project-b")).resolves.toBeNull();
-    await expect(data.listTenantProjects({ tenantId: "tenant-a" })).resolves.toMatchObject([
-      { id: "project-a", tenantId: "tenant-a" },
-    ]);
+    expect(projects).toEqual(
+      expect.arrayContaining([{ id: "project-a", tenantId: "tenant-a", customerId: "customer-a", name: "A Project" }]),
+    );
+    expect(projects).not.toEqual(expect.arrayContaining([{ id: "project-b" }]));
   });
 
   it("lists projects by customer inside the tenant boundary", async () => {
@@ -282,25 +439,40 @@ describe("tenant repositories", () => {
 
   it("does not return quotes across tenant boundaries", async () => {
     const data = createTenantDataAccess(testClient());
+    const quotes = await data.listTenantQuotes({ tenantId: "tenant-a" });
 
     await expect(data.getTenantQuote({ tenantId: "tenant-a" }, "quote-b")).resolves.toBeNull();
-    await expect(data.listTenantQuotes({ tenantId: "tenant-a" })).resolves.toMatchObject([
-      { id: "quote-a", tenantId: "tenant-a" },
-    ]);
+    expect(quotes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "quote-a", tenantId: "tenant-a", customerId: "customer-a" }),
+      ]),
+    );
+    expect(quotes).not.toEqual(expect.arrayContaining([{ id: "quote-b" }]));
   });
 
   it("filters saved quote lists inside the tenant boundary", async () => {
     const data = createTenantDataAccess(testClient());
+    const customerQuotes = await data.listTenantQuotes(
+      { tenantId: "tenant-a" },
+      { customerId: "customer-a" },
+    );
 
-    await expect(
-      data.listTenantQuotes({ tenantId: "tenant-a" }, { customerId: "customer-a" }),
-    ).resolves.toMatchObject([{ id: "quote-a", tenantId: "tenant-a" }]);
+    expect(customerQuotes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "quote-a", tenantId: "tenant-a", customerId: "customer-a" }),
+      ]),
+    );
+    expect(customerQuotes).not.toEqual(expect.arrayContaining([{ id: "quote-b" }]));
     await expect(
       data.listTenantQuotes({ tenantId: "tenant-a" }, { status: QuoteStatus.SENT }),
-    ).resolves.toEqual([]);
+    ).resolves.toMatchObject([{ id: "quote-locked", tenantId: "tenant-a" }]);
     await expect(
       data.listTenantQuotes({ tenantId: "tenant-a" }, { createdById: "user-a" }),
-    ).resolves.toMatchObject([{ id: "quote-a", tenantId: "tenant-a" }]);
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "quote-a", tenantId: "tenant-a" }),
+      ]),
+    );
     await expect(
       data.listTenantQuotes(
         { tenantId: "tenant-a" },
@@ -325,6 +497,10 @@ describe("tenant repositories", () => {
       },
     );
 
+    expect(result).not.toBeNull();
+    expect(result?.quote).toBeDefined();
+    expect(result?.currentVersion).toBeDefined();
+    expect(result?.quote.currentVersionId).toBe(result?.currentVersion.id);
     expect(result?.quote).toMatchObject({
       tenantId: "tenant-a",
       customerId: "customer-a",
@@ -337,13 +513,41 @@ describe("tenant repositories", () => {
       tenantId: "tenant-a",
       quoteId: result?.quote.id,
       versionNumber: 1,
-      status: "DRAFT",
+      status: QuoteVersionStatus.DRAFT,
       isLocked: false,
       totalMinor: 0,
     });
   });
 
-  it("does not create quotes for customers or projects outside the tenant boundary", async () => {
+  it("creates a draft quote shell inside a transaction when the client supports it", async () => {
+    let transactionCount = 0;
+    const data = createTenantDataAccess(
+      testClient({
+        onTransaction: () => {
+          transactionCount += 1;
+        },
+      }),
+      {
+        quoteNumberGenerator: () => "A-transaction",
+      },
+    );
+
+    await expect(
+      data.createTenantQuoteDraft({ tenantId: "tenant-a" }, { customerId: "customer-a" }),
+    ).resolves.toMatchObject({
+      quote: {
+        tenantId: "tenant-a",
+        quoteNumber: "A-transaction",
+      },
+      currentVersion: {
+        tenantId: "tenant-a",
+        versionNumber: 1,
+      },
+    });
+    expect(transactionCount).toBe(1);
+  });
+
+  it("rejects draft quote creation for a customer outside the tenant boundary", async () => {
     const data = createTenantDataAccess(testClient());
 
     await expect(
@@ -352,12 +556,50 @@ describe("tenant repositories", () => {
         { customerId: "customer-b", quoteNumber: "A-003" },
       ),
     ).resolves.toBeNull();
+  });
+
+  it("rejects draft quote creation for a project outside the tenant boundary", async () => {
+    const data = createTenantDataAccess(testClient());
+
     await expect(
       data.createTenantQuoteDraft(
         { tenantId: "tenant-a" },
         { customerId: "customer-a", projectId: "project-b", quoteNumber: "A-004" },
       ),
     ).resolves.toBeNull();
+  });
+
+  it("retries generated quote numbers when a tenant-scoped collision occurs", async () => {
+    const generatedNumbers = ["A-001", "A-002"];
+    const data = createTenantDataAccess(testClient(), {
+      quoteNumberGenerator: () => generatedNumbers.shift() ?? "A-003",
+    });
+    const result = await data.createTenantQuoteDraft(
+      { tenantId: "tenant-a" },
+      { customerId: "customer-a", createdById: "user-a" },
+    );
+
+    expect(result?.quote).toMatchObject({
+      tenantId: "tenant-a",
+      quoteNumber: "A-002",
+      currentVersionId: result?.currentVersion.id,
+    });
+    expect(result?.currentVersion).toMatchObject({
+      tenantId: "tenant-a",
+      quoteId: result?.quote.id,
+      versionNumber: 1,
+    });
+  });
+
+  it("returns a controlled error for an explicit duplicate quote number", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(
+      data.createTenantQuoteDraft(
+        { tenantId: "tenant-a" },
+        { customerId: "customer-a", quoteNumber: "A-001" },
+      ),
+    ).rejects.toBeInstanceOf(QuoteNumberCollisionError);
   });
 
   it("does not return quote versions across tenant boundaries", async () => {
@@ -378,5 +620,145 @@ describe("tenant repositories", () => {
       { id: "version-a", tenantId: "tenant-a", quoteId: "quote-a" },
     ]);
     await expect(data.listTenantQuoteVersions({ tenantId: "tenant-a" }, "quote-b")).resolves.toEqual([]);
+  });
+
+  it("returns a tenant quote with its current version after validating customer and project links", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(
+      data.getTenantQuoteWithCurrentVersion({ tenantId: "tenant-a" }, "quote-a"),
+    ).resolves.toMatchObject({
+      quote: {
+        id: "quote-a",
+        tenantId: "tenant-a",
+      },
+      currentVersion: {
+        id: "version-a",
+        tenantId: "tenant-a",
+        status: QuoteVersionStatus.DRAFT,
+      },
+    });
+    await expect(
+      data.getTenantQuoteWithCurrentVersion({ tenantId: "tenant-a" }, "quote-b"),
+    ).resolves.toBeNull();
+    await expect(
+      data.getTenantQuoteWithCurrentVersion({ tenantId: "tenant-a" }, "quote-mismatch"),
+    ).resolves.toBeNull();
+  });
+
+  it("adds an item to the current draft quote version", async () => {
+    const data = createTenantDataAccess(testClient());
+    const item = await data.createTenantQuoteItem(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      {
+        type: QuoteItemType.WINDOW,
+        quantity: 2,
+        widthMm: 1400,
+        heightMm: 1100,
+        customerDescription: "Living room fixed window",
+        internalNotes: "Synthetic draft item",
+        configurationSnapshot: {
+          kind: "fixed-window",
+          widthMm: 1400,
+          heightMm: 1100,
+        },
+        catalogSnapshot: {
+          placeholder: true,
+        },
+      },
+    );
+
+    expect(item).toMatchObject({
+      tenantId: "tenant-a",
+      quoteVersionId: "version-a",
+      type: QuoteItemType.WINDOW,
+      quantity: 2,
+      widthMm: 1400,
+      heightMm: 1100,
+      sortOrder: 1,
+      customerDescription: "Living room fixed window",
+      totalsSnapshot: {
+        subtotalMinor: 0,
+        vatMinor: 0,
+        totalMinor: 0,
+      },
+    });
+    await expect(data.listTenantQuoteItems({ tenantId: "tenant-a" }, "version-a")).resolves.toHaveLength(2);
+  });
+
+  it("edits an item in the same tenant and current draft version", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(
+      data.updateTenantQuoteItem({ tenantId: "tenant-a" }, "item-a", {
+        quantity: 3,
+        widthMm: 1300,
+        customerDescription: "Updated fixed window",
+        configurationSnapshot: {
+          kind: "fixed-window",
+          widthMm: 1300,
+          heightMm: 1000,
+        },
+      }),
+    ).resolves.toMatchObject({
+      id: "item-a",
+      tenantId: "tenant-a",
+      quoteVersionId: "version-a",
+      quantity: 3,
+      widthMm: 1300,
+      heightMm: 1000,
+      customerDescription: "Updated fixed window",
+    });
+  });
+
+  it("deletes an item in the same tenant and current draft version", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(
+      data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-a"),
+    ).resolves.toMatchObject({
+      id: "item-a",
+      tenantId: "tenant-a",
+    });
+    await expect(data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-a")).resolves.toBeNull();
+  });
+
+  it("rejects item mutations on locked or sent quote versions", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(
+      data.createTenantQuoteItem(
+        { tenantId: "tenant-a" },
+        "quote-locked",
+        {
+          type: QuoteItemType.CUSTOM,
+          quantity: 1,
+          customerDescription: "Blocked custom line",
+          configurationSnapshot: { kind: "custom-line" },
+        },
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      data.updateTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked", {
+        customerDescription: "Blocked edit",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked"),
+    ).resolves.toBeNull();
+  });
+
+  it("rejects cross-tenant quote item access and mutations", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-b")).resolves.toBeNull();
+    await expect(data.listTenantQuoteItems({ tenantId: "tenant-a" }, "version-b")).resolves.toEqual([]);
+    await expect(
+      data.updateTenantQuoteItem({ tenantId: "tenant-a" }, "item-b", {
+        customerDescription: "Blocked edit",
+      }),
+    ).resolves.toBeNull();
+    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-b")).resolves.toBeNull();
   });
 });

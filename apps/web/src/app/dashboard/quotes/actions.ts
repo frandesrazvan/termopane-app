@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireTenant } from "@/lib/auth";
-import { createTenantQuoteDraft } from "@/lib/data";
+import { createTenantQuoteDraft, QuoteNumberCollisionError } from "@/lib/data";
 
 const optionalText = (maxLength: number) =>
   z
@@ -36,17 +36,32 @@ export async function createQuoteAction(formData: FormData) {
     redirect("/dashboard/quotes/new?error=validation");
   }
 
-  const result = await createTenantQuoteDraft(context, {
-    customerId: parsed.data.customerId,
-    projectId: parsed.data.projectId,
-    title: parsed.data.title,
-    createdById: context.user.id,
-    assignedToId: context.user.id,
-  });
+  const result = await createDraftOrRedirectOnNumberCollision(context, parsed.data);
 
   if (!result) {
     redirect("/forbidden");
   }
 
   redirect(`/dashboard/quotes/${result.quote.id}`);
+}
+
+async function createDraftOrRedirectOnNumberCollision(
+  context: Awaited<ReturnType<typeof requireTenant>>,
+  data: z.infer<typeof quoteSchema>,
+) {
+  try {
+    return await createTenantQuoteDraft(context, {
+      customerId: data.customerId,
+      projectId: data.projectId,
+      title: data.title,
+      createdById: context.user.id,
+      assignedToId: context.user.id,
+    });
+  } catch (error) {
+    if (error instanceof QuoteNumberCollisionError) {
+      redirect("/dashboard/quotes/new?error=quote-number");
+    }
+
+    throw error;
+  }
 }

@@ -42,7 +42,9 @@ export default async function NewQuotePage({
 
           {params.error ? (
             <p className="mt-5 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
-              Select a customer and check the project selection.
+              {params.error === "quote-number"
+                ? "A draft quote number could not be reserved. Try creating the draft again."
+                : "Select a customer and check the project selection."}
             </p>
           ) : null}
 

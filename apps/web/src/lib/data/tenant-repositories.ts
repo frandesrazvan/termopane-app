@@ -1,10 +1,12 @@
 import {
   QuoteStatus,
+  QuoteItemType,
   QuoteVersionStatus,
   type CompanySettings,
   type Customer,
   type Project,
   type Quote,
+  type QuoteItem,
   type QuoteVersion,
 } from "@prisma/client";
 import type { TenantContext } from "../auth/tenant-context";
@@ -36,6 +38,12 @@ type UpdateArgs = {
   data: Record<string, unknown>;
 };
 
+type DeleteArgs = {
+  where: {
+    id: string;
+  };
+};
+
 type TenantModelDelegate<TRecord> = {
   findFirst(args: FindFirstArgs): Promise<TRecord | null>;
   findMany(args: FindManyArgs): Promise<TRecord[]>;
@@ -46,12 +54,24 @@ type TenantWritableModelDelegate<TRecord> = TenantModelDelegate<TRecord> & {
   update(args: UpdateArgs): Promise<TRecord>;
 };
 
+type TenantDeletableModelDelegate<TRecord> = TenantWritableModelDelegate<TRecord> & {
+  delete(args: DeleteArgs): Promise<TRecord>;
+};
+
 export type TenantDataClient = {
   customer: TenantWritableModelDelegate<Customer>;
   project: TenantWritableModelDelegate<Project>;
   quote: TenantWritableModelDelegate<Quote>;
   quoteVersion: TenantWritableModelDelegate<QuoteVersion>;
+  quoteItem: TenantDeletableModelDelegate<QuoteItem>;
   companySettings: TenantModelDelegate<CompanySettings>;
+  $transaction?: <TResult>(
+    operation: (transactionClient: TenantDataClient) => Promise<TResult>,
+  ) => Promise<TResult>;
+};
+
+export type CreateTenantDataAccessOptions = {
+  quoteNumberGenerator?: () => string;
 };
 
 export type TenantCustomerWriteInput = {
@@ -113,6 +133,36 @@ export type TenantQuoteDraftResult = {
   currentVersion: QuoteVersion;
 };
 
+export type TenantQuoteWithCurrentVersionResult = {
+  quote: Quote;
+  currentVersion: QuoteVersion | null;
+};
+
+export type TenantQuoteItemWriteInput = {
+  type: QuoteItemType;
+  quantity: number;
+  widthMm?: number | null;
+  heightMm?: number | null;
+  customerDescription?: string | null;
+  internalNotes?: string | null;
+  configurationSnapshot: Record<string, unknown>;
+  catalogSnapshot?: Record<string, unknown> | null;
+  totalsSnapshot?: Record<string, unknown> | null;
+  sortOrder?: number;
+};
+
+export type TenantQuoteItemUpdateInput = Partial<TenantQuoteItemWriteInput>;
+
+export class QuoteNumberCollisionError extends Error {
+  constructor(message = "Could not create a unique quote number for this tenant.") {
+    super(message);
+    this.name = "QuoteNumberCollisionError";
+    Object.setPrototypeOf(this, QuoteNumberCollisionError.prototype);
+  }
+}
+
+const GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS = 3;
+
 export function tenantIdFromScope(scope: TenantDataScope) {
   const tenantId = "tenantId" in scope ? scope.tenantId : scope.tenant.id;
 
@@ -168,7 +218,10 @@ function customerSearchWhere(search: string) {
 
 export function createTenantDataAccess(
   client: TenantDataClient = prisma as unknown as TenantDataClient,
+  options: CreateTenantDataAccessOptions = {},
 ) {
+  const quoteNumberGenerator = options.quoteNumberGenerator ?? generateQuoteNumber;
+
   const access = {
     getTenantCustomer(scope: TenantDataScope, customerId: string) {
       return client.customer.findFirst({
@@ -270,6 +323,44 @@ export function createTenantDataAccess(
       });
     },
 
+    async getTenantQuoteWithCurrentVersion(
+      scope: TenantDataScope,
+      quoteId: string,
+    ): Promise<TenantQuoteWithCurrentVersionResult | null> {
+      const quote = await access.getTenantQuote(scope, quoteId);
+
+      if (!quote) {
+        return null;
+      }
+
+      const customer = await access.getTenantCustomer(scope, quote.customerId);
+
+      if (!customer) {
+        return null;
+      }
+
+      if (quote.projectId) {
+        const project = await access.getTenantProject(scope, quote.projectId);
+
+        if (!project || project.customerId !== quote.customerId) {
+          return null;
+        }
+      }
+
+      const currentVersion = quote.currentVersionId
+        ? await access.getTenantQuoteVersion(scope, quote.currentVersionId)
+        : null;
+
+      if (quote.currentVersionId && (!currentVersion || currentVersion.quoteId !== quote.id)) {
+        return null;
+      }
+
+      return {
+        quote,
+        currentVersion,
+      };
+    },
+
     listTenantQuotes(scope: TenantDataScope, options: ListTenantQuotesOptions = {}) {
       return client.quote.findMany({
         where: tenantWhere(scope, quoteFilterWhere(options)),
@@ -297,62 +388,87 @@ export function createTenantDataAccess(
       }
 
       const currency = data.currency ?? "RON";
-      const quote = await client.quote.create({
-        data: {
-          tenantId,
-          customerId: customer.id,
-          projectId: data.projectId ?? null,
-          quoteNumber: data.quoteNumber ?? generateQuoteNumber(),
-          status: QuoteStatus.DRAFT,
-          title: data.title ?? null,
-          currency,
-          createdById: data.createdById ?? null,
-          assignedToId: data.assignedToId ?? null,
-          tags: ["draft"],
-        },
-      });
-      const companySettings = await client.companySettings.findFirst({
-        where: tenantWhere(scope),
-      });
-      const currentVersion = await client.quoteVersion.create({
-        data: {
-          tenantId,
-          quoteId: quote.id,
-          versionNumber: 1,
-          status: QuoteVersionStatus.DRAFT,
-          isLocked: false,
-          currency,
-          customerSnapshot: customerSnapshot(customer),
-          companySettingsSnapshot: companySettingsSnapshot(companySettings),
-          itemSnapshot: {
-            items: [],
-          },
-          totalsSnapshot: {
-            subtotalMinor: 0,
-            vatMinor: 0,
-            totalMinor: 0,
-          },
-          warningsSnapshot: [],
-          traceSummary: {
-            source: "quote-shell",
-          },
-          subtotalMinor: 0,
-          vatMinor: 0,
-          totalMinor: 0,
-          createdById: data.createdById ?? null,
-        },
-      });
-      const updatedQuote = await client.quote.update({
-        where: { id: quote.id },
-        data: {
-          currentVersionId: currentVersion.id,
-        },
-      });
+      const requestedQuoteNumber = data.quoteNumber?.trim() || null;
+      const attemptCount = requestedQuoteNumber ? 1 : GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS;
 
-      return {
-        quote: updatedQuote,
-        currentVersion,
-      };
+      for (let attempt = 0; attempt < attemptCount; attempt += 1) {
+        const quoteNumber = requestedQuoteNumber ?? quoteNumberGenerator();
+
+        try {
+          return await runTenantDataTransaction(client, async (transactionClient) => {
+            const companySettings = await transactionClient.companySettings.findFirst({
+              where: tenantWhere(scope),
+            });
+            const quote = await transactionClient.quote.create({
+              data: {
+                tenantId,
+                customerId: customer.id,
+                projectId: data.projectId ?? null,
+                quoteNumber,
+                status: QuoteStatus.DRAFT,
+                title: data.title ?? null,
+                currency,
+                createdById: data.createdById ?? null,
+                assignedToId: data.assignedToId ?? null,
+                tags: ["draft"],
+              },
+            });
+            const currentVersion = await transactionClient.quoteVersion.create({
+              data: {
+                tenantId,
+                quoteId: quote.id,
+                versionNumber: 1,
+                status: QuoteVersionStatus.DRAFT,
+                isLocked: false,
+                currency,
+                customerSnapshot: customerSnapshot(customer),
+                companySettingsSnapshot: companySettingsSnapshot(companySettings),
+                itemSnapshot: {
+                  items: [],
+                },
+                totalsSnapshot: {
+                  subtotalMinor: 0,
+                  vatMinor: 0,
+                  totalMinor: 0,
+                },
+                warningsSnapshot: [],
+                traceSummary: {
+                  source: "quote-shell",
+                },
+                subtotalMinor: 0,
+                vatMinor: 0,
+                totalMinor: 0,
+                createdById: data.createdById ?? null,
+              },
+            });
+            const updatedQuote = await transactionClient.quote.update({
+              where: { id: quote.id },
+              data: {
+                currentVersionId: currentVersion.id,
+              },
+            });
+
+            return {
+              quote: updatedQuote,
+              currentVersion,
+            };
+          });
+        } catch (error) {
+          if (!isQuoteNumberUniqueCollision(error)) {
+            throw error;
+          }
+
+          if (requestedQuoteNumber) {
+            throw new QuoteNumberCollisionError(
+              `Quote number "${requestedQuoteNumber}" already exists for this tenant.`,
+            );
+          }
+        }
+      }
+
+      throw new QuoteNumberCollisionError(
+        `Could not generate a unique quote number after ${GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS} attempts.`,
+      );
     },
 
     getTenantQuoteVersion(scope: TenantDataScope, quoteVersionId: string) {
@@ -373,7 +489,137 @@ export function createTenantDataAccess(
         orderBy: [{ versionNumber: "desc" }],
       });
     },
+
+    async listTenantQuoteItems(scope: TenantDataScope, quoteVersionId: string) {
+      const quoteVersion = await access.getTenantQuoteVersion(scope, quoteVersionId);
+
+      if (!quoteVersion) {
+        return [];
+      }
+
+      return client.quoteItem.findMany({
+        where: tenantWhere(scope, { quoteVersionId }),
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      });
+    },
+
+    getTenantQuoteItem(scope: TenantDataScope, quoteItemId: string) {
+      return client.quoteItem.findFirst({
+        where: tenantWhere(scope, { id: quoteItemId }),
+      });
+    },
+
+    async createTenantQuoteItem(
+      scope: TenantDataScope,
+      quoteId: string,
+      data: TenantQuoteItemWriteInput,
+    ) {
+      const quoteState = await access.getTenantQuoteWithCurrentVersion(scope, quoteId);
+
+      if (!quoteState?.currentVersion || !isDraftVersionMutable(quoteState.currentVersion)) {
+        return null;
+      }
+
+      const tenantId = tenantIdFromScope(scope);
+      const existingItems = await access.listTenantQuoteItems(scope, quoteState.currentVersion.id);
+      const nextSortOrder =
+        existingItems.reduce((highest, item) => Math.max(highest, item.sortOrder), -1) + 1;
+
+      return client.quoteItem.create({
+        data: {
+          tenantId,
+          quoteVersionId: quoteState.currentVersion.id,
+          type: data.type,
+          sortOrder: data.sortOrder ?? nextSortOrder,
+          quantity: data.quantity,
+          widthMm: data.widthMm ?? null,
+          heightMm: data.heightMm ?? null,
+          customerDescription: data.customerDescription ?? null,
+          internalNotes: data.internalNotes ?? null,
+          configurationSnapshot: data.configurationSnapshot,
+          catalogSnapshot: data.catalogSnapshot ?? null,
+          calculationSnapshot: null,
+          totalsSnapshot: data.totalsSnapshot ?? emptyDraftItemTotalsSnapshot(),
+        },
+      });
+    },
+
+    async updateTenantQuoteItem(
+      scope: TenantDataScope,
+      quoteItemId: string,
+      data: TenantQuoteItemUpdateInput,
+    ) {
+      const existingItem = await access.getTenantQuoteItem(scope, quoteItemId);
+
+      if (!existingItem) {
+        return null;
+      }
+
+      const quoteState = await getMutableCurrentQuoteStateForItem(scope, existingItem);
+
+      if (!quoteState) {
+        return null;
+      }
+
+      return client.quoteItem.update({
+        where: { id: quoteItemId },
+        data: compactRecord({
+          type: data.type,
+          sortOrder: data.sortOrder,
+          quantity: data.quantity,
+          widthMm: data.widthMm,
+          heightMm: data.heightMm,
+          customerDescription: data.customerDescription,
+          internalNotes: data.internalNotes,
+          configurationSnapshot: data.configurationSnapshot,
+          catalogSnapshot: data.catalogSnapshot,
+          totalsSnapshot: data.totalsSnapshot,
+          calculationSnapshot: null,
+        }),
+      });
+    },
+
+    async deleteTenantQuoteItem(scope: TenantDataScope, quoteItemId: string) {
+      const existingItem = await access.getTenantQuoteItem(scope, quoteItemId);
+
+      if (!existingItem) {
+        return null;
+      }
+
+      const quoteState = await getMutableCurrentQuoteStateForItem(scope, existingItem);
+
+      if (!quoteState) {
+        return null;
+      }
+
+      return client.quoteItem.delete({
+        where: { id: quoteItemId },
+      });
+    },
   };
+
+  async function getMutableCurrentQuoteStateForItem(
+    scope: TenantDataScope,
+    item: QuoteItem,
+  ) {
+    const quoteVersion = await access.getTenantQuoteVersion(scope, item.quoteVersionId);
+
+    if (!quoteVersion) {
+      return null;
+    }
+
+    const quoteState = await access.getTenantQuoteWithCurrentVersion(scope, quoteVersion.quoteId);
+
+    if (
+      !quoteState?.currentVersion ||
+      quoteState.currentVersion.id !== item.quoteVersionId ||
+      !isDraftVersionMutable(quoteState.currentVersion)
+    ) {
+      return null;
+    }
+
+    return quoteState;
+  }
 
   return access;
 }
@@ -427,6 +673,10 @@ export function getTenantQuote(scope: TenantDataScope, quoteId: string) {
   return tenantDataAccess.getTenantQuote(scope, quoteId);
 }
 
+export function getTenantQuoteWithCurrentVersion(scope: TenantDataScope, quoteId: string) {
+  return tenantDataAccess.getTenantQuoteWithCurrentVersion(scope, quoteId);
+}
+
 export function listTenantQuotes(scope: TenantDataScope, options?: ListTenantQuotesOptions) {
   return tenantDataAccess.listTenantQuotes(scope, options);
 }
@@ -441,6 +691,34 @@ export function getTenantQuoteVersion(scope: TenantDataScope, quoteVersionId: st
 
 export function listTenantQuoteVersions(scope: TenantDataScope, quoteId: string) {
   return tenantDataAccess.listTenantQuoteVersions(scope, quoteId);
+}
+
+export function listTenantQuoteItems(scope: TenantDataScope, quoteVersionId: string) {
+  return tenantDataAccess.listTenantQuoteItems(scope, quoteVersionId);
+}
+
+export function getTenantQuoteItem(scope: TenantDataScope, quoteItemId: string) {
+  return tenantDataAccess.getTenantQuoteItem(scope, quoteItemId);
+}
+
+export function createTenantQuoteItem(
+  scope: TenantDataScope,
+  quoteId: string,
+  data: TenantQuoteItemWriteInput,
+) {
+  return tenantDataAccess.createTenantQuoteItem(scope, quoteId, data);
+}
+
+export function updateTenantQuoteItem(
+  scope: TenantDataScope,
+  quoteItemId: string,
+  data: TenantQuoteItemUpdateInput,
+) {
+  return tenantDataAccess.updateTenantQuoteItem(scope, quoteItemId, data);
+}
+
+export function deleteTenantQuoteItem(scope: TenantDataScope, quoteItemId: string) {
+  return tenantDataAccess.deleteTenantQuoteItem(scope, quoteItemId);
 }
 
 function customerSnapshot(customer: Customer) {
@@ -481,7 +759,74 @@ function companySettingsSnapshot(companySettings: CompanySettings | null) {
   };
 }
 
+function isDraftVersionMutable(quoteVersion: QuoteVersion) {
+  return (
+    quoteVersion.status === QuoteVersionStatus.DRAFT &&
+    !quoteVersion.isLocked &&
+    !quoteVersion.lockedAt &&
+    !quoteVersion.sentAt
+  );
+}
+
+function emptyDraftItemTotalsSnapshot() {
+  return {
+    subtotalMinor: 0,
+    vatMinor: 0,
+    totalMinor: 0,
+    pendingCalculation: true,
+    source: "quote-item-draft-editor",
+  };
+}
+
+function compactRecord(record: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(record).filter(([, value]) => value !== undefined),
+  );
+}
+
+function runTenantDataTransaction<TResult>(
+  client: TenantDataClient,
+  operation: (transactionClient: TenantDataClient) => Promise<TResult>,
+) {
+  if (client.$transaction) {
+    return client.$transaction(operation);
+  }
+
+  return operation(client);
+}
+
+function isQuoteNumberUniqueCollision(error: unknown) {
+  if (!isPrismaUniqueConstraintError(error)) {
+    return false;
+  }
+
+  const target = error.meta?.target;
+
+  if (Array.isArray(target)) {
+    return target.includes("quoteNumber");
+  }
+
+  if (typeof target === "string") {
+    return target.includes("quoteNumber");
+  }
+
+  return true;
+}
+
+function isPrismaUniqueConstraintError(
+  error: unknown,
+): error is { code: "P2002"; meta?: { target?: unknown } } {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: unknown }).code === "P2002",
+  );
+}
+
 function generateQuoteNumber() {
+  // Temporary until tenant-configurable quote numbering exists. The database unique index remains
+  // the final guard and createTenantQuoteDraft retries generated collisions a few times.
   const datePart = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
 
