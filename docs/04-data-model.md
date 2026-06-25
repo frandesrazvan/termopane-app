@@ -198,3 +198,15 @@ Fixed-window and custom-line quote item configuration snapshots now include a de
 schematic SVG string for quote detail previews and future PDF reuse. These drawings are visual
 customer-review aids only; they do not encode production profile dimensions, CAD geometry, doors,
 multi-sash layouts, or fabrication rules.
+
+## COD-014 quote version lifecycle notes
+
+The current draft quote version can now be locked before customer-facing document generation.
+Locking sets `QuoteVersion.isLocked`, moves the version status to `LOCKED`, records `lockedAt`, and
+creates an `AuditLog` entry. Existing item and recalculation helpers continue to reject mutations
+once a version is locked or sent.
+
+Revisions are created from the current locked/sent version by inserting a new draft `QuoteVersion`,
+copying the source version snapshots and quote item snapshots into new rows, updating
+`Quote.currentVersionId` to the new version, and marking the quote as `REVISED`. The source version
+and its items remain unchanged so generated PDFs can stay bound to immutable snapshots.

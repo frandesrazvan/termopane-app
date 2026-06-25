@@ -1,7 +1,9 @@
 import {
+  AuditAction,
   QuoteStatus,
   QuoteItemType,
   QuoteVersionStatus,
+  type AuditLog,
   type CompanySettings,
   type Customer,
   type Project,
@@ -66,6 +68,7 @@ export type TenantDataClient = {
   quoteVersion: TenantWritableModelDelegate<QuoteVersion>;
   quoteItem: TenantDeletableModelDelegate<QuoteItem>;
   quoteCalculationResult: TenantWritableModelDelegate<QuoteCalculationResult>;
+  auditLog: TenantWritableModelDelegate<AuditLog>;
   companySettings: TenantModelDelegate<CompanySettings>;
   $transaction?: <TResult>(
     operation: (transactionClient: TenantDataClient) => Promise<TResult>,
@@ -177,6 +180,25 @@ export type TenantQuoteCalculationResultWriteInput = {
   outputSnapshot: Record<string, unknown>;
   warnings?: readonly unknown[] | null;
   trace?: readonly unknown[] | null;
+};
+
+export type TenantQuoteLockInput = {
+  actorUserId?: string | null;
+  status?: QuoteVersionStatus;
+};
+
+export type TenantQuoteRevisionInput = {
+  actorUserId?: string | null;
+};
+
+export type TenantQuoteLifecycleResult = {
+  quote: Quote;
+  currentVersion: QuoteVersion;
+};
+
+export type TenantQuoteRevisionResult = TenantQuoteLifecycleResult & {
+  sourceVersion: QuoteVersion;
+  items: QuoteItem[];
 };
 
 export class QuoteNumberCollisionError extends Error {
@@ -719,6 +741,178 @@ export function createTenantDataAccess(
         },
       });
     },
+
+    async lockTenantQuoteVersion(
+      scope: TenantDataScope,
+      quoteId: string,
+      data: TenantQuoteLockInput = {},
+    ): Promise<TenantQuoteLifecycleResult | null> {
+      return runTenantDataTransaction(client, async (transactionClient) => {
+        const transactionAccess = createTenantDataAccess(transactionClient, options);
+        const quoteState = await transactionAccess.getTenantQuoteWithCurrentVersion(scope, quoteId);
+
+        if (!quoteState?.currentVersion || !isDraftVersionMutable(quoteState.currentVersion)) {
+          return null;
+        }
+
+        const lockedAt = new Date();
+        const targetStatus =
+          data.status === QuoteVersionStatus.SENT
+            ? QuoteVersionStatus.SENT
+            : QuoteVersionStatus.LOCKED;
+        const updatedVersion = await transactionClient.quoteVersion.update({
+          where: { id: quoteState.currentVersion.id },
+          data: {
+            status: targetStatus,
+            isLocked: true,
+            lockedAt,
+            sentAt: targetStatus === QuoteVersionStatus.SENT ? lockedAt : quoteState.currentVersion.sentAt,
+          },
+        });
+        const updatedQuote =
+          targetStatus === QuoteVersionStatus.SENT
+            ? await transactionClient.quote.update({
+                where: { id: quoteState.quote.id },
+                data: {
+                  status: QuoteStatus.SENT,
+                },
+              })
+            : quoteState.quote;
+
+        await transactionClient.auditLog.create({
+          data: {
+            tenantId: tenantIdFromScope(scope),
+            actorUserId: data.actorUserId ?? null,
+            action:
+              targetStatus === QuoteVersionStatus.SENT
+                ? AuditAction.QUOTE_SENT
+                : AuditAction.QUOTE_VERSION_LOCKED,
+            entityType: "QuoteVersion",
+            entityId: updatedVersion.id,
+            beforeSnapshot: quoteVersionAuditSnapshot(quoteState.currentVersion),
+            afterSnapshot: quoteVersionAuditSnapshot(updatedVersion),
+            metadata: {
+              quoteId: quoteState.quote.id,
+              quoteNumber: quoteState.quote.quoteNumber,
+              targetStatus,
+            },
+          },
+        });
+
+        return {
+          quote: updatedQuote,
+          currentVersion: updatedVersion,
+        };
+      });
+    },
+
+    async createTenantQuoteRevision(
+      scope: TenantDataScope,
+      quoteId: string,
+      data: TenantQuoteRevisionInput = {},
+    ): Promise<TenantQuoteRevisionResult | null> {
+      return runTenantDataTransaction(client, async (transactionClient) => {
+        const transactionAccess = createTenantDataAccess(transactionClient, options);
+        const quoteState = await transactionAccess.getTenantQuoteWithCurrentVersion(scope, quoteId);
+
+        if (!quoteState) {
+          return null;
+        }
+
+        const versions = await transactionAccess.listTenantQuoteVersions(scope, quoteState.quote.id);
+        const sourceVersion = quoteState.currentVersion ?? latestQuoteVersion(versions);
+
+        if (!sourceVersion || isDraftVersionMutable(sourceVersion)) {
+          return null;
+        }
+
+        const sourceItems = await transactionAccess.listTenantQuoteItems(scope, sourceVersion.id);
+        const nextVersionNumber =
+          versions.reduce((highest, version) => Math.max(highest, version.versionNumber), 0) + 1;
+        const newVersion = await transactionClient.quoteVersion.create({
+          data: {
+            tenantId: tenantIdFromScope(scope),
+            quoteId: quoteState.quote.id,
+            versionNumber: nextVersionNumber,
+            status: QuoteVersionStatus.DRAFT,
+            isLocked: false,
+            currency: sourceVersion.currency,
+            customerSnapshot: cloneJsonValue(sourceVersion.customerSnapshot),
+            companySettingsSnapshot: cloneJsonValue(sourceVersion.companySettingsSnapshot),
+            priceSnapshot: cloneNullableJsonValue(sourceVersion.priceSnapshot),
+            itemSnapshot: cloneNullableJsonValue(sourceVersion.itemSnapshot),
+            totalsSnapshot: cloneNullableJsonValue(sourceVersion.totalsSnapshot),
+            warningsSnapshot: cloneNullableJsonValue(sourceVersion.warningsSnapshot),
+            traceSummary: cloneNullableJsonValue(sourceVersion.traceSummary),
+            subtotalMinor: sourceVersion.subtotalMinor,
+            vatMinor: sourceVersion.vatMinor,
+            totalMinor: sourceVersion.totalMinor,
+            createdById: data.actorUserId ?? sourceVersion.createdById ?? null,
+            lockedAt: null,
+            sentAt: null,
+          },
+        });
+        const copiedItems: QuoteItem[] = [];
+
+        for (const item of sourceItems) {
+          const copiedItem = await transactionClient.quoteItem.create({
+            data: {
+              tenantId: tenantIdFromScope(scope),
+              quoteVersionId: newVersion.id,
+              type: item.type,
+              sortOrder: item.sortOrder,
+              quantity: item.quantity,
+              widthMm: item.widthMm,
+              heightMm: item.heightMm,
+              customerDescription: item.customerDescription,
+              internalNotes: item.internalNotes,
+              configurationSnapshot: cloneJsonValue(item.configurationSnapshot),
+              catalogSnapshot: cloneNullableJsonValue(item.catalogSnapshot),
+              calculationSnapshot: cloneNullableJsonValue(item.calculationSnapshot),
+              totalsSnapshot: cloneNullableJsonValue(item.totalsSnapshot),
+            },
+          });
+
+          copiedItems.push(copiedItem);
+        }
+
+        const updatedQuote = await transactionClient.quote.update({
+          where: { id: quoteState.quote.id },
+          data: {
+            currentVersionId: newVersion.id,
+            status: QuoteStatus.REVISED,
+          },
+        });
+
+        await transactionClient.auditLog.create({
+          data: {
+            tenantId: tenantIdFromScope(scope),
+            actorUserId: data.actorUserId ?? null,
+            action: AuditAction.QUOTE_VERSION_CREATED,
+            entityType: "QuoteVersion",
+            entityId: newVersion.id,
+            beforeSnapshot: quoteVersionAuditSnapshot(sourceVersion),
+            afterSnapshot: quoteVersionAuditSnapshot(newVersion),
+            metadata: {
+              quoteId: quoteState.quote.id,
+              quoteNumber: quoteState.quote.quoteNumber,
+              sourceVersionId: sourceVersion.id,
+              sourceVersionNumber: sourceVersion.versionNumber,
+              newVersionNumber: newVersion.versionNumber,
+              copiedItemCount: copiedItems.length,
+              reason: "quote-revision",
+            },
+          },
+        });
+
+        return {
+          quote: updatedQuote,
+          sourceVersion,
+          currentVersion: newVersion,
+          items: copiedItems,
+        };
+      });
+    },
   };
 
   async function getMutableCurrentQuoteStateForVersion(
@@ -882,6 +1076,22 @@ export function upsertTenantQuoteCalculationResult(
   return tenantDataAccess.upsertTenantQuoteCalculationResult(scope, quoteVersionId, data);
 }
 
+export function lockTenantQuoteVersion(
+  scope: TenantDataScope,
+  quoteId: string,
+  data?: TenantQuoteLockInput,
+) {
+  return tenantDataAccess.lockTenantQuoteVersion(scope, quoteId, data);
+}
+
+export function createTenantQuoteRevision(
+  scope: TenantDataScope,
+  quoteId: string,
+  data?: TenantQuoteRevisionInput,
+) {
+  return tenantDataAccess.createTenantQuoteRevision(scope, quoteId, data);
+}
+
 function customerSnapshot(customer: Customer) {
   return {
     id: customer.id,
@@ -943,6 +1153,46 @@ function compactRecord(record: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(record).filter(([, value]) => value !== undefined),
   );
+}
+
+function latestQuoteVersion(versions: QuoteVersion[]) {
+  return versions.reduce<QuoteVersion | null>(
+    (latest, version) =>
+      !latest || version.versionNumber > latest.versionNumber ? version : latest,
+    null,
+  );
+}
+
+function cloneJsonValue<TValue>(value: TValue): TValue {
+  if (value === undefined) {
+    return null as TValue;
+  }
+
+  return JSON.parse(JSON.stringify(value)) as TValue;
+}
+
+function cloneNullableJsonValue<TValue>(value: TValue | null | undefined): TValue | null {
+  return value === null || value === undefined ? null : cloneJsonValue(value);
+}
+
+function quoteVersionAuditSnapshot(quoteVersion: QuoteVersion) {
+  return {
+    id: quoteVersion.id,
+    tenantId: quoteVersion.tenantId,
+    quoteId: quoteVersion.quoteId,
+    versionNumber: quoteVersion.versionNumber,
+    status: quoteVersion.status,
+    isLocked: quoteVersion.isLocked,
+    lockedAt: quoteVersion.lockedAt?.toISOString() ?? null,
+    sentAt: quoteVersion.sentAt?.toISOString() ?? null,
+    subtotalMinor: minorValueAuditString(quoteVersion.subtotalMinor),
+    vatMinor: minorValueAuditString(quoteVersion.vatMinor),
+    totalMinor: minorValueAuditString(quoteVersion.totalMinor),
+  };
+}
+
+function minorValueAuditString(value: bigint | number | null | undefined) {
+  return value === null || value === undefined ? "0" : value.toString();
 }
 
 function runTenantDataTransaction<TResult>(

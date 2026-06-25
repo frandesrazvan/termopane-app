@@ -34,7 +34,9 @@ import {
 import {
   addCustomLineItemAction,
   addFixedWindowItemAction,
+  createQuoteRevisionAction,
   deleteQuoteItemAction,
+  lockCurrentQuoteVersionAction,
   recalculateCurrentQuoteVersionAction,
   updateQuoteItemAction,
 } from "./actions";
@@ -47,7 +49,13 @@ export default async function QuoteDetailPage({
   searchParams,
 }: {
   params: Promise<{ quoteId: string }>;
-  searchParams: Promise<{ calculated?: string; calculationError?: string; itemError?: string }>;
+  searchParams: Promise<{
+    calculated?: string;
+    calculationError?: string;
+    itemError?: string;
+    versionError?: string;
+    versionEvent?: string;
+  }>;
 }) {
   const context = await requireTenant();
   const { quoteId } = await params;
@@ -85,6 +93,7 @@ export default async function QuoteDetailPage({
   }
 
   const canEditItems = currentVersion ? isDraftVersionMutable(currentVersion) : false;
+  const canCreateRevision = currentVersion ? isLockedOrSentVersion(currentVersion) : false;
   const canViewInternalTrace = canViewInternalCosts(context.membership);
 
   return (
@@ -108,6 +117,15 @@ export default async function QuoteDetailPage({
           </div>
           <StatusBadge status={quote.status} />
         </div>
+
+        <VersionLifecyclePanel
+          canCreateRevision={canCreateRevision}
+          canLockVersion={canEditItems}
+          currentVersion={currentVersion}
+          quoteId={quote.id}
+          versionError={paramsValue.versionError}
+          versionEvent={paramsValue.versionEvent}
+        />
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
@@ -331,6 +349,83 @@ function AddItemForms({ quoteId, currency }: { quoteId: string; currency: string
         </form>
       </details>
     </div>
+  );
+}
+
+function VersionLifecyclePanel({
+  canCreateRevision,
+  canLockVersion,
+  currentVersion,
+  quoteId,
+  versionError,
+  versionEvent,
+}: {
+  canCreateRevision: boolean;
+  canLockVersion: boolean;
+  currentVersion: QuoteVersion | null;
+  quoteId: string;
+  versionError?: string;
+  versionEvent?: string;
+}) {
+  if (!currentVersion) {
+    return null;
+  }
+
+  return (
+    <section className="mt-6 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
+      {versionEvent ? (
+        <p className="mb-3 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+          {versionEvent === "locked"
+            ? "Current version was locked for document generation."
+            : "A new draft revision was created from the locked version."}
+        </p>
+      ) : null}
+      {versionError ? (
+        <p className="mb-3 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
+          {versionError === "lock"
+            ? "This version could not be locked. Refresh and check whether it is still a draft."
+            : "A revision could not be created from this version."}
+        </p>
+      ) : null}
+
+      {canLockVersion ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-950">
+              Version {currentVersion.versionNumber} is editable
+            </h2>
+            <p className="mt-1 text-sm text-zinc-600">
+              Lock this draft before generating customer-facing documents.
+            </p>
+          </div>
+          <form action={lockCurrentQuoteVersionAction.bind(null, quoteId)}>
+            <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
+              <Lock aria-hidden="true" size={15} />
+              Lock version
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      {canCreateRevision ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-950">
+              Version {currentVersion.versionNumber} is locked
+            </h2>
+            <p className="mt-1 text-sm text-zinc-600">
+              Create a revision before editing items, totals, or calculation snapshots.
+            </p>
+          </div>
+          <form action={createQuoteRevisionAction.bind(null, quoteId)}>
+            <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
+              <Plus aria-hidden="true" size={15} />
+              Create revision
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -770,6 +865,21 @@ function isDraftVersionMutable(quoteVersion: {
     !quoteVersion.isLocked &&
     !quoteVersion.lockedAt &&
     !quoteVersion.sentAt
+  );
+}
+
+function isLockedOrSentVersion(quoteVersion: {
+  status: QuoteVersionStatus;
+  isLocked: boolean;
+  lockedAt: Date | null;
+  sentAt: Date | null;
+}) {
+  return (
+    quoteVersion.isLocked ||
+    quoteVersion.status === QuoteVersionStatus.LOCKED ||
+    quoteVersion.status === QuoteVersionStatus.SENT ||
+    Boolean(quoteVersion.lockedAt) ||
+    Boolean(quoteVersion.sentAt)
   );
 }
 

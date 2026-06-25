@@ -1,4 +1,6 @@
 import {
+  AuditAction,
+  type AuditLog,
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
@@ -138,7 +140,9 @@ function isRangeFilter(value: unknown): value is { gte?: Date | number; lte?: Da
   );
 }
 
-function testClient(options: { onTransaction?: () => void } = {}): TenantDataClient {
+function testClient(
+  options: { auditLogs?: AuditLog[]; onTransaction?: () => void } = {},
+): TenantDataClient {
   const client: TenantDataClient = {
     customer: delegate([
       {
@@ -219,6 +223,19 @@ function testClient(options: { onTransaction?: () => void } = {}): TenantDataCli
         versionNumber: 1,
         status: QuoteVersionStatus.DRAFT,
         isLocked: false,
+        currency: "RON",
+        customerSnapshot: { id: "customer-a", displayName: "A Customer" },
+        companySettingsSnapshot: { displayName: "Tenant A" },
+        itemSnapshot: { items: ["item-a"] },
+        totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0 },
+        warningsSnapshot: [],
+        traceSummary: { source: "test" },
+        subtotalMinor: 0,
+        vatMinor: 0,
+        totalMinor: 0,
+        createdById: "user-a",
+        lockedAt: null,
+        sentAt: null,
       },
       {
         id: "version-b",
@@ -227,6 +244,19 @@ function testClient(options: { onTransaction?: () => void } = {}): TenantDataCli
         versionNumber: 1,
         status: QuoteVersionStatus.DRAFT,
         isLocked: false,
+        currency: "RON",
+        customerSnapshot: { id: "customer-b", displayName: "B Customer" },
+        companySettingsSnapshot: { displayName: "Tenant B" },
+        itemSnapshot: { items: ["item-b"] },
+        totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0 },
+        warningsSnapshot: [],
+        traceSummary: { source: "test" },
+        subtotalMinor: 0,
+        vatMinor: 0,
+        totalMinor: 0,
+        createdById: "user-b",
+        lockedAt: null,
+        sentAt: null,
       },
       {
         id: "version-locked",
@@ -235,6 +265,18 @@ function testClient(options: { onTransaction?: () => void } = {}): TenantDataCli
         versionNumber: 1,
         status: QuoteVersionStatus.SENT,
         isLocked: true,
+        currency: "RON",
+        customerSnapshot: { id: "customer-a", displayName: "A Customer" },
+        companySettingsSnapshot: { displayName: "Tenant A" },
+        itemSnapshot: { items: ["item-locked"] },
+        totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0 },
+        warningsSnapshot: [],
+        traceSummary: { source: "test" },
+        subtotalMinor: 0,
+        vatMinor: 0,
+        totalMinor: 0,
+        createdById: "user-a",
+        lockedAt: new Date("2026-01-12T10:00:00.000Z"),
         sentAt: new Date("2026-01-12T10:00:00.000Z"),
       },
       {
@@ -244,8 +286,21 @@ function testClient(options: { onTransaction?: () => void } = {}): TenantDataCli
         versionNumber: 1,
         status: QuoteVersionStatus.DRAFT,
         isLocked: false,
+        currency: "RON",
+        customerSnapshot: { id: "customer-a", displayName: "A Customer" },
+        companySettingsSnapshot: { displayName: "Tenant A" },
+        itemSnapshot: { items: [] },
+        totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0 },
+        warningsSnapshot: [],
+        traceSummary: { source: "test" },
+        subtotalMinor: 0,
+        vatMinor: 0,
+        totalMinor: 0,
+        createdById: "user-a",
+        lockedAt: null,
+        sentAt: null,
       },
-    ] as QuoteVersion[]),
+    ] as unknown as QuoteVersion[]),
     quoteItem: delegate([
       {
         id: "item-a",
@@ -286,6 +341,7 @@ function testClient(options: { onTransaction?: () => void } = {}): TenantDataCli
       },
     ] as unknown as QuoteItem[]),
     quoteCalculationResult: delegate([] as QuoteCalculationResult[]),
+    auditLog: delegate(options.auditLogs ?? ([] as AuditLog[])),
     companySettings: delegate([
       {
         id: "settings-a",
@@ -749,6 +805,149 @@ describe("tenant repositories", () => {
     await expect(
       data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked"),
     ).resolves.toBeNull();
+  });
+
+  it("locks the current draft version and prevents item and calculation mutations", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+    const result = await data.lockTenantQuoteVersion(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      { actorUserId: "user-a" },
+    );
+
+    expect(result).toMatchObject({
+      quote: {
+        id: "quote-a",
+        currentVersionId: "version-a",
+      },
+      currentVersion: {
+        id: "version-a",
+        status: QuoteVersionStatus.LOCKED,
+        isLocked: true,
+      },
+    });
+    expect(result?.currentVersion.lockedAt).toBeInstanceOf(Date);
+    await expect(
+      data.updateTenantQuoteItem({ tenantId: "tenant-a" }, "item-a", {
+        customerDescription: "Blocked after lock",
+      }),
+    ).resolves.toBeNull();
+    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-a")).resolves.toBeNull();
+    await expect(
+      data.updateTenantQuoteVersionCalculation({ tenantId: "tenant-a" }, "version-a", {
+        subtotalMinor: 100,
+        vatMinor: 19,
+        totalMinor: 119,
+        totalsSnapshot: { totalMinor: 119 },
+        warningsSnapshot: [],
+        traceSummary: { source: "blocked-test" },
+      }),
+    ).resolves.toBeNull();
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0]).toMatchObject({
+      tenantId: "tenant-a",
+      actorUserId: "user-a",
+      action: AuditAction.QUOTE_VERSION_LOCKED,
+      entityType: "QuoteVersion",
+      entityId: "version-a",
+      metadata: {
+        quoteId: "quote-a",
+        targetStatus: QuoteVersionStatus.LOCKED,
+      },
+    });
+  });
+
+  it("creates a revision from a locked version while preserving the old version and copying item snapshots", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+    const sourceVersionBefore = await data.getTenantQuoteVersion({ tenantId: "tenant-a" }, "version-locked");
+    const sourceItemBefore = await data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked");
+    const result = await data.createTenantQuoteRevision(
+      { tenantId: "tenant-a" },
+      "quote-locked",
+      { actorUserId: "user-a" },
+    );
+
+    expect(result).toMatchObject({
+      quote: {
+        id: "quote-locked",
+        status: QuoteStatus.REVISED,
+        currentVersionId: result?.currentVersion.id,
+      },
+      sourceVersion: {
+        id: "version-locked",
+        status: QuoteVersionStatus.SENT,
+        isLocked: true,
+      },
+      currentVersion: {
+        tenantId: "tenant-a",
+        quoteId: "quote-locked",
+        versionNumber: 2,
+        status: QuoteVersionStatus.DRAFT,
+        isLocked: false,
+      },
+    });
+    expect(result?.currentVersion.id).not.toBe("version-locked");
+    expect(result?.items).toHaveLength(1);
+    expect(result?.items[0]).toMatchObject({
+      tenantId: "tenant-a",
+      quoteVersionId: result?.currentVersion.id,
+      type: QuoteItemType.CUSTOM,
+      quantity: 1,
+      customerDescription: "Locked custom line",
+      configurationSnapshot: { kind: "custom-line" },
+      totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0 },
+    });
+    expect(result?.items[0]?.id).not.toBe("item-locked");
+    await expect(
+      data.getTenantQuoteVersion({ tenantId: "tenant-a" }, "version-locked"),
+    ).resolves.toEqual(sourceVersionBefore);
+    await expect(data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked")).resolves.toEqual(
+      sourceItemBefore,
+    );
+    await expect(
+      data.getTenantQuoteWithCurrentVersion({ tenantId: "tenant-a" }, "quote-locked"),
+    ).resolves.toMatchObject({
+      quote: {
+        currentVersionId: result?.currentVersion.id,
+        status: QuoteStatus.REVISED,
+      },
+      currentVersion: {
+        id: result?.currentVersion.id,
+        status: QuoteVersionStatus.DRAFT,
+      },
+    });
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0]).toMatchObject({
+      tenantId: "tenant-a",
+      actorUserId: "user-a",
+      action: AuditAction.QUOTE_VERSION_CREATED,
+      entityType: "QuoteVersion",
+      entityId: result?.currentVersion.id,
+      metadata: {
+        quoteId: "quote-locked",
+        sourceVersionId: "version-locked",
+        copiedItemCount: 1,
+      },
+    });
+  });
+
+  it("rejects cross-tenant lock and revision attempts", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+
+    await expect(
+      data.lockTenantQuoteVersion({ tenantId: "tenant-a" }, "quote-b", {
+        actorUserId: "user-a",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantQuoteRevision({ tenantId: "tenant-a" }, "quote-b", {
+        actorUserId: "user-a",
+      }),
+    ).resolves.toBeNull();
+    expect(auditLogs).toHaveLength(0);
   });
 
   it("rejects cross-tenant quote item access and mutations", async () => {

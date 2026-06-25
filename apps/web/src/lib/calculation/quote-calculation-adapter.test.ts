@@ -2,6 +2,7 @@ import {
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
+  type AuditLog,
   type CompanySettings,
   type Customer,
   type Project,
@@ -113,6 +114,7 @@ function testState({
     quoteVersion: delegate(quoteVersions),
     quoteItem: delegate(quoteItems),
     quoteCalculationResult: delegate(calculationResults),
+    auditLog: delegate([] as AuditLog[]),
     companySettings: delegate([] as CompanySettings[]),
   };
 
