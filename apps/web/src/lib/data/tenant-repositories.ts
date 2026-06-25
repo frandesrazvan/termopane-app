@@ -1,9 +1,25 @@
 import {
+  Accessory,
   AuditAction,
+  CatalogMaterialType,
+  CatalogUnit,
+  ColorFinish,
   DocumentType,
+  GlassPackage,
+  HardwareKit,
+  PriceList,
+  PriceListItem,
+  PriceListItemType,
+  PricingRule,
+  ProfileItem,
+  ProfileItemType,
+  ProfileSystem,
   QuoteStatus,
   QuoteItemType,
   QuoteVersionStatus,
+  Supplier,
+  TaxRate,
+  ServiceItem,
   type AuditLog,
   type CompanySettings,
   type Customer,
@@ -64,7 +80,16 @@ type TenantDeletableModelDelegate<TRecord> = TenantWritableModelDelegate<TRecord
 };
 
 export type TenantDataClient = {
+  accessory: TenantWritableModelDelegate<Accessory>;
+  colorFinish: TenantWritableModelDelegate<ColorFinish>;
   customer: TenantWritableModelDelegate<Customer>;
+  glassPackage: TenantWritableModelDelegate<GlassPackage>;
+  hardwareKit: TenantWritableModelDelegate<HardwareKit>;
+  priceList: TenantWritableModelDelegate<PriceList>;
+  priceListItem: TenantWritableModelDelegate<PriceListItem>;
+  pricingRule: TenantWritableModelDelegate<PricingRule>;
+  profileItem: TenantWritableModelDelegate<ProfileItem>;
+  profileSystem: TenantWritableModelDelegate<ProfileSystem>;
   project: TenantWritableModelDelegate<Project>;
   quote: TenantWritableModelDelegate<Quote>;
   quoteVersion: TenantWritableModelDelegate<QuoteVersion>;
@@ -73,6 +98,9 @@ export type TenantDataClient = {
   document: TenantWritableModelDelegate<Document>;
   auditLog: TenantWritableModelDelegate<AuditLog>;
   companySettings: TenantModelDelegate<CompanySettings>;
+  serviceItem: TenantWritableModelDelegate<ServiceItem>;
+  supplier: TenantWritableModelDelegate<Supplier>;
+  taxRate: TenantWritableModelDelegate<TaxRate>;
   $transaction?: <TResult>(
     operation: (transactionClient: TenantDataClient) => Promise<TResult>,
   ) => Promise<TResult>;
@@ -185,6 +213,128 @@ export type TenantQuoteCalculationResultWriteInput = {
   trace?: readonly unknown[] | null;
 };
 
+export type TenantSupplierWriteInput = {
+  name: string;
+  code?: string | null;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+};
+
+export type TenantProfileSystemWriteInput = {
+  supplierId?: string | null;
+  name: string;
+  code?: string | null;
+  materialType: CatalogMaterialType;
+  description?: string | null;
+  configuration?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type TenantProfileItemWriteInput = {
+  profileSystemId: string;
+  supplierId?: string | null;
+  name: string;
+  code?: string | null;
+  type: ProfileItemType;
+  unit: CatalogUnit;
+  description?: string | null;
+  deductionRule?: Record<string, unknown> | null;
+  wasteRule?: Record<string, unknown> | null;
+  configuration?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type TenantGlassPackageWriteInput = {
+  supplierId?: string | null;
+  name: string;
+  code?: string | null;
+  compositionLabel?: string | null;
+  unit: CatalogUnit;
+  minBillableAreaSquareMm?: number | null;
+  deductionRule?: Record<string, unknown> | null;
+  configuration?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type TenantHardwareKitWriteInput = {
+  supplierId?: string | null;
+  name: string;
+  code?: string | null;
+  category?: string | null;
+  openingType?: string | null;
+  unit: CatalogUnit;
+  quantityRule?: Record<string, unknown> | null;
+  configuration?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type TenantColorFinishWriteInput = {
+  profileSystemId?: string | null;
+  supplierId?: string | null;
+  name: string;
+  code?: string | null;
+  surface?: string | null;
+  configuration?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type TenantAccessoryWriteInput = {
+  supplierId?: string | null;
+  name: string;
+  code?: string | null;
+  category?: string | null;
+  unit: CatalogUnit;
+  quantityRule?: Record<string, unknown> | null;
+  configuration?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type TenantServiceItemWriteInput = {
+  name: string;
+  code?: string | null;
+  category?: string | null;
+  unit: CatalogUnit;
+  configuration?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type TenantTaxRateWriteInput = {
+  name: string;
+  code?: string | null;
+  rateBasisPoints: number;
+  isDefault?: boolean;
+  validFrom?: Date | null;
+  validTo?: Date | null;
+  configuration?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type TenantPriceListItemWriteInput = {
+  priceListId: string;
+  itemType: PriceListItemType;
+  catalogItemId: string;
+  sku?: string | null;
+  description?: string | null;
+  unit: CatalogUnit;
+  costMinor?: bigint | number | null;
+  saleMinor?: bigint | number | null;
+  currency?: string;
+  metadata?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type ListTenantPriceListItemsOptions = {
+  priceListId?: string | null;
+};
+
+export type ListTenantPricingRulesOptions = {
+  priceListId?: string | null;
+};
+
 export type TenantQuoteLockInput = {
   actorUserId?: string | null;
   status?: QuoteVersionStatus;
@@ -284,6 +434,696 @@ export function createTenantDataAccess(
   const quoteNumberGenerator = options.quoteNumberGenerator ?? generateQuoteNumber;
 
   const access = {
+    listTenantSuppliers(scope: TenantDataScope) {
+      return client.supplier.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantSupplier(scope: TenantDataScope, supplierId: string) {
+      return client.supplier.findFirst({
+        where: tenantWhere(scope, { id: supplierId }),
+      });
+    },
+
+    createTenantSupplier(scope: TenantDataScope, data: TenantSupplierWriteInput) {
+      return client.supplier.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantSupplier(
+      scope: TenantDataScope,
+      supplierId: string,
+      data: TenantSupplierWriteInput,
+    ) {
+      const existingSupplier = await access.getTenantSupplier(scope, supplierId);
+
+      if (!existingSupplier) {
+        return null;
+      }
+
+      return client.supplier.update({
+        where: { id: supplierId },
+        data: compactRecord(data),
+      });
+    },
+
+    async archiveTenantSupplier(scope: TenantDataScope, supplierId: string) {
+      const existingSupplier = await access.getTenantSupplier(scope, supplierId);
+
+      if (!existingSupplier) {
+        return null;
+      }
+
+      return client.supplier.update({
+        where: { id: supplierId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantProfileSystems(scope: TenantDataScope) {
+      return client.profileSystem.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantProfileSystem(scope: TenantDataScope, profileSystemId: string) {
+      return client.profileSystem.findFirst({
+        where: tenantWhere(scope, { id: profileSystemId }),
+      });
+    },
+
+    async createTenantProfileSystem(
+      scope: TenantDataScope,
+      data: TenantProfileSystemWriteInput,
+    ) {
+      if (!(await supplierBelongsToTenant(scope, data.supplierId))) {
+        return null;
+      }
+
+      return client.profileSystem.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          supplierId: data.supplierId ?? null,
+          configuration: data.configuration ?? null,
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantProfileSystem(
+      scope: TenantDataScope,
+      profileSystemId: string,
+      data: TenantProfileSystemWriteInput,
+    ) {
+      const existingProfileSystem = await access.getTenantProfileSystem(scope, profileSystemId);
+
+      if (!existingProfileSystem || !(await supplierBelongsToTenant(scope, data.supplierId))) {
+        return null;
+      }
+
+      return client.profileSystem.update({
+        where: { id: profileSystemId },
+        data: compactRecord({
+          ...data,
+          supplierId: data.supplierId ?? null,
+          configuration: data.configuration ?? null,
+        }),
+      });
+    },
+
+    async archiveTenantProfileSystem(scope: TenantDataScope, profileSystemId: string) {
+      const existingProfileSystem = await access.getTenantProfileSystem(scope, profileSystemId);
+
+      if (!existingProfileSystem) {
+        return null;
+      }
+
+      return client.profileSystem.update({
+        where: { id: profileSystemId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantProfileItems(scope: TenantDataScope) {
+      return client.profileItem.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantProfileItem(scope: TenantDataScope, profileItemId: string) {
+      return client.profileItem.findFirst({
+        where: tenantWhere(scope, { id: profileItemId }),
+      });
+    },
+
+    async createTenantProfileItem(scope: TenantDataScope, data: TenantProfileItemWriteInput) {
+      if (
+        !(await profileSystemBelongsToTenant(scope, data.profileSystemId)) ||
+        !(await supplierBelongsToTenant(scope, data.supplierId))
+      ) {
+        return null;
+      }
+
+      return client.profileItem.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          supplierId: data.supplierId ?? null,
+          deductionRule: data.deductionRule ?? null,
+          wasteRule: data.wasteRule ?? null,
+          configuration: data.configuration ?? null,
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantProfileItem(
+      scope: TenantDataScope,
+      profileItemId: string,
+      data: TenantProfileItemWriteInput,
+    ) {
+      const existingProfileItem = await access.getTenantProfileItem(scope, profileItemId);
+
+      if (
+        !existingProfileItem ||
+        !(await profileSystemBelongsToTenant(scope, data.profileSystemId)) ||
+        !(await supplierBelongsToTenant(scope, data.supplierId))
+      ) {
+        return null;
+      }
+
+      return client.profileItem.update({
+        where: { id: profileItemId },
+        data: compactRecord({
+          ...data,
+          supplierId: data.supplierId ?? null,
+          deductionRule: data.deductionRule ?? null,
+          wasteRule: data.wasteRule ?? null,
+          configuration: data.configuration ?? null,
+        }),
+      });
+    },
+
+    async archiveTenantProfileItem(scope: TenantDataScope, profileItemId: string) {
+      const existingProfileItem = await access.getTenantProfileItem(scope, profileItemId);
+
+      if (!existingProfileItem) {
+        return null;
+      }
+
+      return client.profileItem.update({
+        where: { id: profileItemId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantGlassPackages(scope: TenantDataScope) {
+      return client.glassPackage.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantGlassPackage(scope: TenantDataScope, glassPackageId: string) {
+      return client.glassPackage.findFirst({
+        where: tenantWhere(scope, { id: glassPackageId }),
+      });
+    },
+
+    async createTenantGlassPackage(scope: TenantDataScope, data: TenantGlassPackageWriteInput) {
+      if (!(await supplierBelongsToTenant(scope, data.supplierId))) {
+        return null;
+      }
+
+      return client.glassPackage.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          supplierId: data.supplierId ?? null,
+          deductionRule: data.deductionRule ?? null,
+          configuration: data.configuration ?? null,
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantGlassPackage(
+      scope: TenantDataScope,
+      glassPackageId: string,
+      data: TenantGlassPackageWriteInput,
+    ) {
+      const existingGlassPackage = await access.getTenantGlassPackage(scope, glassPackageId);
+
+      if (!existingGlassPackage || !(await supplierBelongsToTenant(scope, data.supplierId))) {
+        return null;
+      }
+
+      return client.glassPackage.update({
+        where: { id: glassPackageId },
+        data: compactRecord({
+          ...data,
+          supplierId: data.supplierId ?? null,
+          deductionRule: data.deductionRule ?? null,
+          configuration: data.configuration ?? null,
+        }),
+      });
+    },
+
+    async archiveTenantGlassPackage(scope: TenantDataScope, glassPackageId: string) {
+      const existingGlassPackage = await access.getTenantGlassPackage(scope, glassPackageId);
+
+      if (!existingGlassPackage) {
+        return null;
+      }
+
+      return client.glassPackage.update({
+        where: { id: glassPackageId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantHardwareKits(scope: TenantDataScope) {
+      return client.hardwareKit.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantHardwareKit(scope: TenantDataScope, hardwareKitId: string) {
+      return client.hardwareKit.findFirst({
+        where: tenantWhere(scope, { id: hardwareKitId }),
+      });
+    },
+
+    async createTenantHardwareKit(scope: TenantDataScope, data: TenantHardwareKitWriteInput) {
+      if (!(await supplierBelongsToTenant(scope, data.supplierId))) {
+        return null;
+      }
+
+      return client.hardwareKit.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          supplierId: data.supplierId ?? null,
+          quantityRule: data.quantityRule ?? null,
+          configuration: data.configuration ?? null,
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantHardwareKit(
+      scope: TenantDataScope,
+      hardwareKitId: string,
+      data: TenantHardwareKitWriteInput,
+    ) {
+      const existingHardwareKit = await access.getTenantHardwareKit(scope, hardwareKitId);
+
+      if (!existingHardwareKit || !(await supplierBelongsToTenant(scope, data.supplierId))) {
+        return null;
+      }
+
+      return client.hardwareKit.update({
+        where: { id: hardwareKitId },
+        data: compactRecord({
+          ...data,
+          supplierId: data.supplierId ?? null,
+          quantityRule: data.quantityRule ?? null,
+          configuration: data.configuration ?? null,
+        }),
+      });
+    },
+
+    async archiveTenantHardwareKit(scope: TenantDataScope, hardwareKitId: string) {
+      const existingHardwareKit = await access.getTenantHardwareKit(scope, hardwareKitId);
+
+      if (!existingHardwareKit) {
+        return null;
+      }
+
+      return client.hardwareKit.update({
+        where: { id: hardwareKitId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantColorFinishes(scope: TenantDataScope) {
+      return client.colorFinish.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantColorFinish(scope: TenantDataScope, colorFinishId: string) {
+      return client.colorFinish.findFirst({
+        where: tenantWhere(scope, { id: colorFinishId }),
+      });
+    },
+
+    async createTenantColorFinish(scope: TenantDataScope, data: TenantColorFinishWriteInput) {
+      if (
+        !(await profileSystemBelongsToTenant(scope, data.profileSystemId)) ||
+        !(await supplierBelongsToTenant(scope, data.supplierId))
+      ) {
+        return null;
+      }
+
+      return client.colorFinish.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          profileSystemId: data.profileSystemId ?? null,
+          supplierId: data.supplierId ?? null,
+          configuration: data.configuration ?? null,
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantColorFinish(
+      scope: TenantDataScope,
+      colorFinishId: string,
+      data: TenantColorFinishWriteInput,
+    ) {
+      const existingColorFinish = await access.getTenantColorFinish(scope, colorFinishId);
+
+      if (
+        !existingColorFinish ||
+        !(await profileSystemBelongsToTenant(scope, data.profileSystemId)) ||
+        !(await supplierBelongsToTenant(scope, data.supplierId))
+      ) {
+        return null;
+      }
+
+      return client.colorFinish.update({
+        where: { id: colorFinishId },
+        data: compactRecord({
+          ...data,
+          profileSystemId: data.profileSystemId ?? null,
+          supplierId: data.supplierId ?? null,
+          configuration: data.configuration ?? null,
+        }),
+      });
+    },
+
+    async archiveTenantColorFinish(scope: TenantDataScope, colorFinishId: string) {
+      const existingColorFinish = await access.getTenantColorFinish(scope, colorFinishId);
+
+      if (!existingColorFinish) {
+        return null;
+      }
+
+      return client.colorFinish.update({
+        where: { id: colorFinishId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantAccessories(scope: TenantDataScope) {
+      return client.accessory.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantAccessory(scope: TenantDataScope, accessoryId: string) {
+      return client.accessory.findFirst({
+        where: tenantWhere(scope, { id: accessoryId }),
+      });
+    },
+
+    async createTenantAccessory(scope: TenantDataScope, data: TenantAccessoryWriteInput) {
+      if (!(await supplierBelongsToTenant(scope, data.supplierId))) {
+        return null;
+      }
+
+      return client.accessory.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          supplierId: data.supplierId ?? null,
+          quantityRule: data.quantityRule ?? null,
+          configuration: data.configuration ?? null,
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantAccessory(
+      scope: TenantDataScope,
+      accessoryId: string,
+      data: TenantAccessoryWriteInput,
+    ) {
+      const existingAccessory = await access.getTenantAccessory(scope, accessoryId);
+
+      if (!existingAccessory || !(await supplierBelongsToTenant(scope, data.supplierId))) {
+        return null;
+      }
+
+      return client.accessory.update({
+        where: { id: accessoryId },
+        data: compactRecord({
+          ...data,
+          supplierId: data.supplierId ?? null,
+          quantityRule: data.quantityRule ?? null,
+          configuration: data.configuration ?? null,
+        }),
+      });
+    },
+
+    async archiveTenantAccessory(scope: TenantDataScope, accessoryId: string) {
+      const existingAccessory = await access.getTenantAccessory(scope, accessoryId);
+
+      if (!existingAccessory) {
+        return null;
+      }
+
+      return client.accessory.update({
+        where: { id: accessoryId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantServiceItems(scope: TenantDataScope) {
+      return client.serviceItem.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantServiceItem(scope: TenantDataScope, serviceItemId: string) {
+      return client.serviceItem.findFirst({
+        where: tenantWhere(scope, { id: serviceItemId }),
+      });
+    },
+
+    createTenantServiceItem(scope: TenantDataScope, data: TenantServiceItemWriteInput) {
+      return client.serviceItem.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          configuration: data.configuration ?? null,
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantServiceItem(
+      scope: TenantDataScope,
+      serviceItemId: string,
+      data: TenantServiceItemWriteInput,
+    ) {
+      const existingServiceItem = await access.getTenantServiceItem(scope, serviceItemId);
+
+      if (!existingServiceItem) {
+        return null;
+      }
+
+      return client.serviceItem.update({
+        where: { id: serviceItemId },
+        data: compactRecord({
+          ...data,
+          configuration: data.configuration ?? null,
+        }),
+      });
+    },
+
+    async archiveTenantServiceItem(scope: TenantDataScope, serviceItemId: string) {
+      const existingServiceItem = await access.getTenantServiceItem(scope, serviceItemId);
+
+      if (!existingServiceItem) {
+        return null;
+      }
+
+      return client.serviceItem.update({
+        where: { id: serviceItemId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantTaxRates(scope: TenantDataScope) {
+      return client.taxRate.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ isDefault: "desc" }, { name: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantTaxRate(scope: TenantDataScope, taxRateId: string) {
+      return client.taxRate.findFirst({
+        where: tenantWhere(scope, { id: taxRateId }),
+      });
+    },
+
+    createTenantTaxRate(scope: TenantDataScope, data: TenantTaxRateWriteInput) {
+      return client.taxRate.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          isDefault: data.isDefault ?? false,
+          configuration: data.configuration ?? null,
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantTaxRate(
+      scope: TenantDataScope,
+      taxRateId: string,
+      data: TenantTaxRateWriteInput,
+    ) {
+      const existingTaxRate = await access.getTenantTaxRate(scope, taxRateId);
+
+      if (!existingTaxRate) {
+        return null;
+      }
+
+      return client.taxRate.update({
+        where: { id: taxRateId },
+        data: compactRecord({
+          ...data,
+          configuration: data.configuration ?? null,
+        }),
+      });
+    },
+
+    async archiveTenantTaxRate(scope: TenantDataScope, taxRateId: string) {
+      const existingTaxRate = await access.getTenantTaxRate(scope, taxRateId);
+
+      if (!existingTaxRate) {
+        return null;
+      }
+
+      return client.taxRate.update({
+        where: { id: taxRateId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantPriceLists(scope: TenantDataScope) {
+      return client.priceList.findMany({
+        where: tenantWhere(scope),
+        orderBy: [{ effectiveFrom: "desc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantPriceList(scope: TenantDataScope, priceListId: string) {
+      return client.priceList.findFirst({
+        where: tenantWhere(scope, { id: priceListId }),
+      });
+    },
+
+    listTenantPriceListItems(
+      scope: TenantDataScope,
+      options: ListTenantPriceListItemsOptions = {},
+    ) {
+      return client.priceListItem.findMany({
+        where: tenantWhere(
+          scope,
+          options.priceListId ? { priceListId: options.priceListId } : undefined,
+        ),
+        orderBy: [{ itemType: "asc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantPriceListItem(scope: TenantDataScope, priceListItemId: string) {
+      return client.priceListItem.findFirst({
+        where: tenantWhere(scope, { id: priceListItemId }),
+      });
+    },
+
+    async createTenantPriceListItem(
+      scope: TenantDataScope,
+      data: TenantPriceListItemWriteInput,
+    ) {
+      if (
+        !(await priceListBelongsToTenant(scope, data.priceListId)) ||
+        !(await catalogItemBelongsToTenant(scope, data.itemType, data.catalogItemId))
+      ) {
+        return null;
+      }
+
+      return client.priceListItem.create({
+        data: {
+          ...data,
+          tenantId: tenantIdFromScope(scope),
+          currency: data.currency ?? "RON",
+          metadata: data.metadata ?? null,
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantPriceListItem(
+      scope: TenantDataScope,
+      priceListItemId: string,
+      data: TenantPriceListItemWriteInput,
+    ) {
+      const existingPriceListItem = await access.getTenantPriceListItem(scope, priceListItemId);
+
+      if (
+        !existingPriceListItem ||
+        !(await priceListBelongsToTenant(scope, data.priceListId)) ||
+        !(await catalogItemBelongsToTenant(scope, data.itemType, data.catalogItemId))
+      ) {
+        return null;
+      }
+
+      return client.priceListItem.update({
+        where: { id: priceListItemId },
+        data: compactRecord({
+          ...data,
+          currency: data.currency ?? "RON",
+          metadata: data.metadata ?? null,
+        }),
+      });
+    },
+
+    async archiveTenantPriceListItem(scope: TenantDataScope, priceListItemId: string) {
+      const existingPriceListItem = await access.getTenantPriceListItem(scope, priceListItemId);
+
+      if (!existingPriceListItem) {
+        return null;
+      }
+
+      return client.priceListItem.update({
+        where: { id: priceListItemId },
+        data: archiveCatalogRecordData(),
+      });
+    },
+
+    listTenantPricingRules(
+      scope: TenantDataScope,
+      options: ListTenantPricingRulesOptions = {},
+    ) {
+      return client.pricingRule.findMany({
+        where: tenantWhere(
+          scope,
+          options.priceListId ? { priceListId: options.priceListId } : undefined,
+        ),
+        orderBy: [{ priority: "asc" }, { name: "asc" }],
+      });
+    },
+
     getTenantCustomer(scope: TenantDataScope, customerId: string) {
       return client.customer.findFirst({
         where: tenantWhere(scope, { id: customerId }),
@@ -1031,6 +1871,52 @@ export function createTenantDataAccess(
     },
   };
 
+  async function supplierBelongsToTenant(scope: TenantDataScope, supplierId?: string | null) {
+    return !supplierId || Boolean(await access.getTenantSupplier(scope, supplierId));
+  }
+
+  async function profileSystemBelongsToTenant(
+    scope: TenantDataScope,
+    profileSystemId?: string | null,
+  ) {
+    return !profileSystemId || Boolean(await access.getTenantProfileSystem(scope, profileSystemId));
+  }
+
+  async function priceListBelongsToTenant(scope: TenantDataScope, priceListId: string) {
+    return Boolean(await access.getTenantPriceList(scope, priceListId));
+  }
+
+  async function catalogItemBelongsToTenant(
+    scope: TenantDataScope,
+    itemType: PriceListItemType,
+    catalogItemId: string,
+  ) {
+    if (!catalogItemId.trim()) {
+      return false;
+    }
+
+    switch (itemType) {
+      case PriceListItemType.PROFILE_ITEM:
+        return Boolean(await access.getTenantProfileItem(scope, catalogItemId));
+      case PriceListItemType.GLASS_PACKAGE:
+        return Boolean(await access.getTenantGlassPackage(scope, catalogItemId));
+      case PriceListItemType.HARDWARE_KIT:
+        return Boolean(await access.getTenantHardwareKit(scope, catalogItemId));
+      case PriceListItemType.COLOR_FINISH:
+        return Boolean(await access.getTenantColorFinish(scope, catalogItemId));
+      case PriceListItemType.ACCESSORY:
+        return Boolean(await access.getTenantAccessory(scope, catalogItemId));
+      case PriceListItemType.SERVICE_ITEM:
+        return Boolean(await access.getTenantServiceItem(scope, catalogItemId));
+      case PriceListItemType.TAX_RATE:
+        return Boolean(await access.getTenantTaxRate(scope, catalogItemId));
+      case PriceListItemType.CUSTOM:
+        return true;
+      default:
+        return false;
+    }
+  }
+
   async function getMutableCurrentQuoteStateForVersion(
     scope: TenantDataScope,
     quoteVersionId: string,
@@ -1232,6 +2118,281 @@ export function createTenantQuoteRevision(
   return tenantDataAccess.createTenantQuoteRevision(scope, quoteId, data);
 }
 
+export function listTenantSuppliers(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantSuppliers(scope);
+}
+
+export function getTenantSupplier(scope: TenantDataScope, supplierId: string) {
+  return tenantDataAccess.getTenantSupplier(scope, supplierId);
+}
+
+export function createTenantSupplier(scope: TenantDataScope, data: TenantSupplierWriteInput) {
+  return tenantDataAccess.createTenantSupplier(scope, data);
+}
+
+export function updateTenantSupplier(
+  scope: TenantDataScope,
+  supplierId: string,
+  data: TenantSupplierWriteInput,
+) {
+  return tenantDataAccess.updateTenantSupplier(scope, supplierId, data);
+}
+
+export function archiveTenantSupplier(scope: TenantDataScope, supplierId: string) {
+  return tenantDataAccess.archiveTenantSupplier(scope, supplierId);
+}
+
+export function listTenantProfileSystems(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantProfileSystems(scope);
+}
+
+export function getTenantProfileSystem(scope: TenantDataScope, profileSystemId: string) {
+  return tenantDataAccess.getTenantProfileSystem(scope, profileSystemId);
+}
+
+export function createTenantProfileSystem(
+  scope: TenantDataScope,
+  data: TenantProfileSystemWriteInput,
+) {
+  return tenantDataAccess.createTenantProfileSystem(scope, data);
+}
+
+export function updateTenantProfileSystem(
+  scope: TenantDataScope,
+  profileSystemId: string,
+  data: TenantProfileSystemWriteInput,
+) {
+  return tenantDataAccess.updateTenantProfileSystem(scope, profileSystemId, data);
+}
+
+export function archiveTenantProfileSystem(
+  scope: TenantDataScope,
+  profileSystemId: string,
+) {
+  return tenantDataAccess.archiveTenantProfileSystem(scope, profileSystemId);
+}
+
+export function listTenantProfileItems(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantProfileItems(scope);
+}
+
+export function getTenantProfileItem(scope: TenantDataScope, profileItemId: string) {
+  return tenantDataAccess.getTenantProfileItem(scope, profileItemId);
+}
+
+export function createTenantProfileItem(
+  scope: TenantDataScope,
+  data: TenantProfileItemWriteInput,
+) {
+  return tenantDataAccess.createTenantProfileItem(scope, data);
+}
+
+export function updateTenantProfileItem(
+  scope: TenantDataScope,
+  profileItemId: string,
+  data: TenantProfileItemWriteInput,
+) {
+  return tenantDataAccess.updateTenantProfileItem(scope, profileItemId, data);
+}
+
+export function archiveTenantProfileItem(scope: TenantDataScope, profileItemId: string) {
+  return tenantDataAccess.archiveTenantProfileItem(scope, profileItemId);
+}
+
+export function listTenantGlassPackages(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantGlassPackages(scope);
+}
+
+export function getTenantGlassPackage(scope: TenantDataScope, glassPackageId: string) {
+  return tenantDataAccess.getTenantGlassPackage(scope, glassPackageId);
+}
+
+export function createTenantGlassPackage(
+  scope: TenantDataScope,
+  data: TenantGlassPackageWriteInput,
+) {
+  return tenantDataAccess.createTenantGlassPackage(scope, data);
+}
+
+export function updateTenantGlassPackage(
+  scope: TenantDataScope,
+  glassPackageId: string,
+  data: TenantGlassPackageWriteInput,
+) {
+  return tenantDataAccess.updateTenantGlassPackage(scope, glassPackageId, data);
+}
+
+export function archiveTenantGlassPackage(scope: TenantDataScope, glassPackageId: string) {
+  return tenantDataAccess.archiveTenantGlassPackage(scope, glassPackageId);
+}
+
+export function listTenantHardwareKits(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantHardwareKits(scope);
+}
+
+export function getTenantHardwareKit(scope: TenantDataScope, hardwareKitId: string) {
+  return tenantDataAccess.getTenantHardwareKit(scope, hardwareKitId);
+}
+
+export function createTenantHardwareKit(
+  scope: TenantDataScope,
+  data: TenantHardwareKitWriteInput,
+) {
+  return tenantDataAccess.createTenantHardwareKit(scope, data);
+}
+
+export function updateTenantHardwareKit(
+  scope: TenantDataScope,
+  hardwareKitId: string,
+  data: TenantHardwareKitWriteInput,
+) {
+  return tenantDataAccess.updateTenantHardwareKit(scope, hardwareKitId, data);
+}
+
+export function archiveTenantHardwareKit(scope: TenantDataScope, hardwareKitId: string) {
+  return tenantDataAccess.archiveTenantHardwareKit(scope, hardwareKitId);
+}
+
+export function listTenantColorFinishes(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantColorFinishes(scope);
+}
+
+export function getTenantColorFinish(scope: TenantDataScope, colorFinishId: string) {
+  return tenantDataAccess.getTenantColorFinish(scope, colorFinishId);
+}
+
+export function createTenantColorFinish(
+  scope: TenantDataScope,
+  data: TenantColorFinishWriteInput,
+) {
+  return tenantDataAccess.createTenantColorFinish(scope, data);
+}
+
+export function updateTenantColorFinish(
+  scope: TenantDataScope,
+  colorFinishId: string,
+  data: TenantColorFinishWriteInput,
+) {
+  return tenantDataAccess.updateTenantColorFinish(scope, colorFinishId, data);
+}
+
+export function archiveTenantColorFinish(scope: TenantDataScope, colorFinishId: string) {
+  return tenantDataAccess.archiveTenantColorFinish(scope, colorFinishId);
+}
+
+export function listTenantAccessories(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantAccessories(scope);
+}
+
+export function getTenantAccessory(scope: TenantDataScope, accessoryId: string) {
+  return tenantDataAccess.getTenantAccessory(scope, accessoryId);
+}
+
+export function createTenantAccessory(scope: TenantDataScope, data: TenantAccessoryWriteInput) {
+  return tenantDataAccess.createTenantAccessory(scope, data);
+}
+
+export function updateTenantAccessory(
+  scope: TenantDataScope,
+  accessoryId: string,
+  data: TenantAccessoryWriteInput,
+) {
+  return tenantDataAccess.updateTenantAccessory(scope, accessoryId, data);
+}
+
+export function archiveTenantAccessory(scope: TenantDataScope, accessoryId: string) {
+  return tenantDataAccess.archiveTenantAccessory(scope, accessoryId);
+}
+
+export function listTenantServiceItems(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantServiceItems(scope);
+}
+
+export function getTenantServiceItem(scope: TenantDataScope, serviceItemId: string) {
+  return tenantDataAccess.getTenantServiceItem(scope, serviceItemId);
+}
+
+export function createTenantServiceItem(scope: TenantDataScope, data: TenantServiceItemWriteInput) {
+  return tenantDataAccess.createTenantServiceItem(scope, data);
+}
+
+export function updateTenantServiceItem(
+  scope: TenantDataScope,
+  serviceItemId: string,
+  data: TenantServiceItemWriteInput,
+) {
+  return tenantDataAccess.updateTenantServiceItem(scope, serviceItemId, data);
+}
+
+export function archiveTenantServiceItem(scope: TenantDataScope, serviceItemId: string) {
+  return tenantDataAccess.archiveTenantServiceItem(scope, serviceItemId);
+}
+
+export function listTenantTaxRates(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantTaxRates(scope);
+}
+
+export function getTenantTaxRate(scope: TenantDataScope, taxRateId: string) {
+  return tenantDataAccess.getTenantTaxRate(scope, taxRateId);
+}
+
+export function createTenantTaxRate(scope: TenantDataScope, data: TenantTaxRateWriteInput) {
+  return tenantDataAccess.createTenantTaxRate(scope, data);
+}
+
+export function updateTenantTaxRate(
+  scope: TenantDataScope,
+  taxRateId: string,
+  data: TenantTaxRateWriteInput,
+) {
+  return tenantDataAccess.updateTenantTaxRate(scope, taxRateId, data);
+}
+
+export function archiveTenantTaxRate(scope: TenantDataScope, taxRateId: string) {
+  return tenantDataAccess.archiveTenantTaxRate(scope, taxRateId);
+}
+
+export function listTenantPriceLists(scope: TenantDataScope) {
+  return tenantDataAccess.listTenantPriceLists(scope);
+}
+
+export function listTenantPriceListItems(
+  scope: TenantDataScope,
+  options?: ListTenantPriceListItemsOptions,
+) {
+  return tenantDataAccess.listTenantPriceListItems(scope, options);
+}
+
+export function getTenantPriceListItem(scope: TenantDataScope, priceListItemId: string) {
+  return tenantDataAccess.getTenantPriceListItem(scope, priceListItemId);
+}
+
+export function createTenantPriceListItem(
+  scope: TenantDataScope,
+  data: TenantPriceListItemWriteInput,
+) {
+  return tenantDataAccess.createTenantPriceListItem(scope, data);
+}
+
+export function updateTenantPriceListItem(
+  scope: TenantDataScope,
+  priceListItemId: string,
+  data: TenantPriceListItemWriteInput,
+) {
+  return tenantDataAccess.updateTenantPriceListItem(scope, priceListItemId, data);
+}
+
+export function archiveTenantPriceListItem(scope: TenantDataScope, priceListItemId: string) {
+  return tenantDataAccess.archiveTenantPriceListItem(scope, priceListItemId);
+}
+
+export function listTenantPricingRules(
+  scope: TenantDataScope,
+  options?: ListTenantPricingRulesOptions,
+) {
+  return tenantDataAccess.listTenantPricingRules(scope, options);
+}
+
 function customerSnapshot(customer: Customer) {
   return {
     id: customer.id,
@@ -1303,6 +2464,13 @@ function compactRecord(record: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(record).filter(([, value]) => value !== undefined),
   );
+}
+
+function archiveCatalogRecordData() {
+  return {
+    isActive: false,
+    deletedAt: new Date(),
+  };
 }
 
 function latestQuoteVersion(versions: QuoteVersion[]) {

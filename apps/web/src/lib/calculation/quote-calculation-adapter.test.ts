@@ -2,15 +2,27 @@ import {
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
+  type Accessory,
   type AuditLog,
+  type ColorFinish,
   type CompanySettings,
   type Customer,
   type Document,
+  type GlassPackage,
+  type HardwareKit,
+  type PriceList,
+  type PriceListItem,
+  type PricingRule,
+  type ProfileItem,
+  type ProfileSystem,
   type Project,
   type Quote,
   type QuoteCalculationResult,
   type QuoteItem,
   type QuoteVersion,
+  type ServiceItem,
+  type Supplier,
+  type TaxRate,
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
@@ -103,10 +115,19 @@ function testState({
   const quoteItems = items;
   const calculationResults: QuoteCalculationResult[] = [];
   const client: TenantDataClient = {
+    accessory: delegate([] as Accessory[]),
+    colorFinish: delegate([] as ColorFinish[]),
     customer: delegate([
       customer({ id: "customer-a", tenantId: "tenant-a" }),
       customer({ id: "customer-b", tenantId: "tenant-b" }),
     ]),
+    glassPackage: delegate([] as GlassPackage[]),
+    hardwareKit: delegate([] as HardwareKit[]),
+    priceList: delegate([] as PriceList[]),
+    priceListItem: delegate([] as PriceListItem[]),
+    pricingRule: delegate([] as PricingRule[]),
+    profileItem: delegate([] as ProfileItem[]),
+    profileSystem: delegate([] as ProfileSystem[]),
     project: delegate([] as Project[]),
     quote: delegate([
       quote({ id: "quote-a", tenantId: "tenant-a", customerId: "customer-a", currentVersionId: "version-a" }),
@@ -118,6 +139,9 @@ function testState({
     document: delegate([] as Document[]),
     auditLog: delegate([] as AuditLog[]),
     companySettings: delegate([] as CompanySettings[]),
+    serviceItem: delegate([] as ServiceItem[]),
+    supplier: delegate([] as Supplier[]),
+    taxRate: delegate([] as TaxRate[]),
   };
 
   client.$transaction = async (operation) => {

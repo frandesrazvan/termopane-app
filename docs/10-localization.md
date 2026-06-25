@@ -25,6 +25,26 @@ shared labels such as:
 Small one-off strings may stay local to the owning component, but new user-facing features should
 use Romanian copy by default.
 
+## COD-018 Catalog Labels
+
+The catalog admin UI uses these Romanian section labels:
+
+- `Catalog`
+- `Furnizori`
+- `Sisteme de profil`
+- `Profile`
+- `Pachete sticla`
+- `Kituri feronerie`
+- `Culori si finisaje`
+- `Accesorii`
+- `Servicii`
+- `Cote taxe`
+- `Liste de preturi`
+- `Pozitii de pret`
+
+Catalog record state labels are `activ`, `inactiv`, and `arhivat`. Records with unvalidated
+configuration or pricing-rule JSON show the badge `necesită validare business`.
+
 ## Customer-Facing Output
 
 Template A HTML previews and generated PDFs must use Romanian labels, including:

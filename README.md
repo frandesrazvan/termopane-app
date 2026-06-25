@@ -2,10 +2,26 @@
 
 Romanian-first SaaS/PWA for creating customer offers for termopane businesses.
 
-The current MVP has authentication, tenant context, customer/project CRUD, saved quote drafts,
-quote item drafting, calculation snapshots, drawing previews, quote version locking/revisions,
-Template A HTML preview, PDF generation, local document storage, immutable `Document` records, and
-audit logging.
+Future work should follow `AGENTS.md` and the docs in `docs/`. The app intentionally avoids
+production ERP, CNC export, stock management, invoicing, supplier integrations, and unvalidated
+production formulas.
+
+## Current MVP status
+
+- Authentication, tenant context, role permissions, customer/project records, saved quote shells,
+  draft quote items, calculation wiring, quote lifecycle, and Template A HTML preview foundations
+  are present.
+- PDF generation, local document storage, immutable `Document` records, and audit logging are
+  present for generated quote documents.
+- Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
+  glass packages, hardware kits, colors, accessories, services, tax rates, price lists, price-list
+  items, and pricing rules.
+- Catalog admin UI is available at `/dashboard/catalog`. OWNER and ADMIN memberships can create,
+  edit, and archive catalog records; ESTIMATOR and DEALER memberships have read-only catalog access.
+- Catalog archive actions use `deletedAt` soft delete and mark records inactive. Unvalidated
+  configuration/rule JSON is surfaced with the Romanian `necesită validare business` badge.
+- Catalog records are not wired into quote item selection or calculation yet; quote calculations
+  still use frozen snapshots and explicit placeholders.
 
 ## Stack
 
@@ -131,7 +147,13 @@ pnpm verify
 
 - Production object storage.
 - Email sending or customer delivery workflow.
-- Catalog admin UI.
+- Catalog selection wiring into quote items and calculations.
 - Template B.
 - Real production formulas or supplier-specific pricing rules.
 - Invoicing, ERP, CNC export, stock, or accounting integrations.
+
+## Scope Guardrails
+
+- Do not add fake formulas or pricing assumptions.
+- Do not add real customer/private data.
+- Keep future calculation work pure and snapshot-based.

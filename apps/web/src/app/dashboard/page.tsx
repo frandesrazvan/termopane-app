@@ -1,12 +1,7 @@
 import {
-  Archive,
   Building2,
-  FileText,
-  LayoutDashboard,
   LogOut,
-  Settings,
   ShieldCheck,
-  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -20,14 +15,7 @@ import {
 import { tenantMemberStatusLabel, tenantRoleLabel } from "@/lib/i18n";
 import { logoutAction } from "../logout/actions";
 import { switchTenantAction } from "./actions";
-
-const navItems = [
-  { label: "Panou", icon: LayoutDashboard, href: "/dashboard", active: true },
-  { label: "Clienți", icon: UsersRound, href: "/dashboard/customers" },
-  { label: "Oferte", icon: FileText, href: "/dashboard/quotes" },
-  { label: "Catalog", icon: Archive, href: "#" },
-  { label: "Setări", icon: Settings, href: "#" },
-];
+import { dashboardNavItems } from "./dashboard-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -94,7 +82,7 @@ export default async function DashboardPage() {
         <div className="grid flex-1 grid-cols-1 lg:grid-cols-[220px_1fr]">
           <aside className="hidden border-r border-zinc-200 px-4 py-6 lg:block">
             <nav className="space-y-1" aria-label="Navigare principală">
-              {navItems.map((item) => (
+              {dashboardNavItems.map((item) => (
                 <Link
                   key={item.label}
                   href={item.href}
