@@ -6,6 +6,7 @@ import {
   type Customer,
   type Project,
   type Quote,
+  type QuoteCalculationResult,
   type QuoteItem,
   type QuoteVersion,
 } from "@prisma/client";
@@ -284,6 +285,7 @@ function testClient(options: { onTransaction?: () => void } = {}): TenantDataCli
         totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0 },
       },
     ] as unknown as QuoteItem[]),
+    quoteCalculationResult: delegate([] as QuoteCalculationResult[]),
     companySettings: delegate([
       {
         id: "settings-a",

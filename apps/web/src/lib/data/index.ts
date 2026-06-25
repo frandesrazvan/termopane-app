@@ -8,6 +8,7 @@ export {
   getTenantCustomer,
   getTenantProject,
   getTenantQuote,
+  getTenantQuoteCalculationResult,
   getTenantQuoteItem,
   getTenantQuoteVersion,
   getTenantQuoteWithCurrentVersion,
@@ -20,7 +21,10 @@ export {
   tenantIdFromScope,
   updateTenantCustomer,
   updateTenantProject,
+  updateTenantQuoteItemCalculation,
   updateTenantQuoteItem,
+  updateTenantQuoteVersionCalculation,
+  upsertTenantQuoteCalculationResult,
 } from "./tenant-repositories";
 export type {
   CreateTenantDataAccessOptions,
@@ -31,11 +35,14 @@ export type {
   TenantCustomerWriteInput,
   TenantDataClient,
   TenantDataScope,
+  TenantQuoteCalculationResultWriteInput,
   TenantProjectUpdateInput,
   TenantProjectWriteInput,
   TenantQuoteDraftInput,
   TenantQuoteDraftResult,
+  TenantQuoteItemCalculationUpdateInput,
   TenantQuoteItemUpdateInput,
   TenantQuoteItemWriteInput,
+  TenantQuoteVersionCalculationUpdateInput,
   TenantQuoteWithCurrentVersionResult,
 } from "./tenant-repositories";

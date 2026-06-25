@@ -1,21 +1,32 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
+  Calculator,
   FileText,
   Lock,
   Pencil,
   Plus,
+  RefreshCw,
   Ruler,
   Trash2,
   UserRound,
 } from "lucide-react";
-import { QuoteItemType, QuoteStatus, QuoteVersionStatus, type QuoteItem } from "@prisma/client";
+import {
+  QuoteItemType,
+  QuoteStatus,
+  QuoteVersionStatus,
+  type QuoteCalculationResult,
+  type QuoteItem,
+  type QuoteVersion,
+} from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireTenant } from "@/lib/auth";
+import { canViewInternalCosts, requireTenant } from "@/lib/auth";
 import {
   getTenantCustomer,
   getTenantProject,
+  getTenantQuoteCalculationResult,
   getTenantQuoteWithCurrentVersion,
   listTenantQuoteItems,
   listTenantQuoteVersions,
@@ -24,6 +35,7 @@ import {
   addCustomLineItemAction,
   addFixedWindowItemAction,
   deleteQuoteItemAction,
+  recalculateCurrentQuoteVersionAction,
   updateQuoteItemAction,
 } from "./actions";
 
@@ -34,7 +46,7 @@ export default async function QuoteDetailPage({
   searchParams,
 }: {
   params: Promise<{ quoteId: string }>;
-  searchParams: Promise<{ itemError?: string }>;
+  searchParams: Promise<{ calculated?: string; calculationError?: string; itemError?: string }>;
 }) {
   const context = await requireTenant();
   const { quoteId } = await params;
@@ -61,8 +73,18 @@ export default async function QuoteDetailPage({
     versions.find((version) => version.id === quote.currentVersionId) ??
     versions[0] ??
     null;
-  const items = currentVersion ? await listTenantQuoteItems(context, currentVersion.id) : [];
+  let items: QuoteItem[] = [];
+  let calculationResult: QuoteCalculationResult | null = null;
+
+  if (currentVersion) {
+    [items, calculationResult] = await Promise.all([
+      listTenantQuoteItems(context, currentVersion.id),
+      getTenantQuoteCalculationResult(context, currentVersion.id),
+    ]);
+  }
+
   const canEditItems = currentVersion ? isDraftVersionMutable(currentVersion) : false;
+  const canViewInternalTrace = canViewInternalCosts(context.membership);
 
   return (
     <main className="min-h-screen bg-stone-50 px-4 py-5 sm:px-6 lg:px-8">
@@ -190,6 +212,17 @@ export default async function QuoteDetailPage({
           )}
         </section>
 
+        <CalculationReviewCard
+          calculationError={paramsValue.calculationError}
+          calculationResult={calculationResult}
+          canRecalculate={canEditItems}
+          canViewInternalTrace={canViewInternalTrace}
+          currency={quote.currency}
+          currentVersion={currentVersion}
+          quoteId={quote.id}
+          wasCalculated={paramsValue.calculated === "1"}
+        />
+
         <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-zinc-950">Versions</h2>
@@ -300,6 +333,149 @@ function AddItemForms({ quoteId, currency }: { quoteId: string; currency: string
   );
 }
 
+function CalculationReviewCard({
+  calculationError,
+  calculationResult,
+  canRecalculate,
+  canViewInternalTrace,
+  currency,
+  currentVersion,
+  quoteId,
+  wasCalculated,
+}: {
+  calculationError?: string;
+  calculationResult: QuoteCalculationResult | null;
+  canRecalculate: boolean;
+  canViewInternalTrace: boolean;
+  currency: string;
+  currentVersion: QuoteVersion | null;
+  quoteId: string;
+  wasCalculated: boolean;
+}) {
+  const output = asRecord(calculationResult?.outputSnapshot);
+  const metrics = calculationMetrics(output);
+  const warnings = calculationWarnings(currentVersion, calculationResult, output);
+  const traceSummary = asRecord(currentVersion?.traceSummary);
+  const traceCount = numberFrom(traceSummary?.traceEntryCount) ?? arrayLength(calculationResult?.trace);
+  const traceSteps = traceStepNames(calculationResult);
+
+  return (
+    <section id="calculation" className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-800">
+            <Calculator aria-hidden="true" size={19} />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-950">Calculation review</h2>
+            <p className="mt-1 text-sm text-zinc-600">
+              Version {currentVersion?.versionNumber ?? "-"} stored totals and warnings
+            </p>
+          </div>
+        </div>
+        {canRecalculate ? (
+          <form action={recalculateCurrentQuoteVersionAction.bind(null, quoteId)}>
+            <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
+              <RefreshCw aria-hidden="true" size={15} />
+              Recalculate
+            </button>
+          </form>
+        ) : (
+          <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-sm font-medium text-zinc-600">
+            Read-only
+          </span>
+        )}
+      </div>
+
+      {calculationError ? (
+        <p className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
+          This quote version is locked or sent, so it cannot be recalculated in place.
+        </p>
+      ) : null}
+      {wasCalculated ? (
+        <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+          Calculation snapshots were refreshed.
+        </p>
+      ) : null}
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <Metric label="Subtotal" value={formatMinor(currentVersion?.subtotalMinor, currency)} />
+        <Metric label="VAT" value={formatMinor(currentVersion?.vatMinor, currency)} />
+        <Metric label="Total" value={formatMinor(currentVersion?.totalMinor, currency)} emphasized />
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <Metric label="Material requirements" value={String(metrics.materialRequirementsCount)} />
+        <Metric label="Glass cuts" value={String(metrics.glassCutsCount)} />
+        <Metric label="Profile meters" value={`${formatMeasurement(metrics.profileMeters)} m`} />
+      </div>
+
+      {!calculationResult ? (
+        <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
+          No calculation has been stored for this version yet.
+        </p>
+      ) : null}
+
+      {warnings.length > 0 ? (
+        <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+            <AlertTriangle aria-hidden="true" size={16} />
+            Warnings
+          </div>
+          <ul className="mt-3 grid gap-2">
+            {warnings.map((warning, index) => (
+              <li key={`${warning.code}-${warning.path ?? index}`} className="text-sm text-amber-900">
+                <span className="font-semibold">{warning.code}</span>
+                {warning.message ? ` - ${warning.message}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : calculationResult ? (
+        <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+          No calculation warnings are stored for this version.
+        </p>
+      ) : null}
+
+      {traceCount > 0 ? (
+        canViewInternalTrace ? (
+          <div className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
+            <p className="font-semibold text-zinc-900">Trace entries: {traceCount}</p>
+            {traceSteps.length > 0 ? (
+              <p className="mt-2 break-words">
+                Steps: {traceSteps.slice(0, 8).join(", ")}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
+            Internal calculation trace is restricted for this role.
+          </p>
+        )
+      ) : null}
+    </section>
+  );
+}
+
+function Metric({
+  emphasized = false,
+  label,
+  value,
+}: {
+  emphasized?: boolean;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-md bg-stone-100 p-3">
+      <p className="text-xs font-medium uppercase text-zinc-500">{label}</p>
+      <p className={`mt-2 break-words text-sm font-semibold ${emphasized ? "text-zinc-950" : "text-zinc-800"}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function QuoteItemCard({
   canEdit,
   currency,
@@ -312,6 +488,7 @@ function QuoteItemCard({
   quoteId: string;
 }) {
   const manualUnitPriceMinor = manualUnitPriceFromItem(item);
+  const itemTotals = totalsFromItem(item);
 
   return (
     <article className="rounded-md border border-zinc-200 bg-white p-4">
@@ -341,7 +518,9 @@ function QuoteItemCard({
             Manual unit {formatMinor(manualUnitPriceMinor, currency)}
           </span>
         ) : null}
-        <span className="rounded-md bg-stone-100 px-2 py-1">Totals pending</span>
+        <span className="rounded-md bg-stone-100 px-2 py-1">
+          {itemTotals ? `Total ${formatMinor(itemTotals.totalMinor, currency)}` : "Totals pending"}
+        </span>
       </div>
 
       {item.internalNotes ? (
@@ -598,14 +777,130 @@ function manualUnitPriceFromItem(item: QuoteItem) {
     : null;
 }
 
+type CalculationWarningView = {
+  code: string;
+  message?: string;
+  path?: string;
+};
+
+function calculationMetrics(output: Record<string, unknown> | null) {
+  const profileMeters = recordsFromArray(output?.profileLinearMeters).reduce(
+    (sum, profileGroup) => sum + (numberFrom(profileGroup.totalLinearMeters) ?? 0),
+    0,
+  );
+
+  return {
+    materialRequirementsCount: arrayLength(output?.materialRequirements),
+    glassCutsCount: arrayLength(output?.glassCuts),
+    profileMeters,
+  };
+}
+
+function calculationWarnings(
+  currentVersion: QuoteVersion | null,
+  calculationResult: QuoteCalculationResult | null,
+  output: Record<string, unknown> | null,
+) {
+  const versionWarnings = warningRecords(currentVersion?.warningsSnapshot);
+
+  if (versionWarnings.length > 0) {
+    return versionWarnings;
+  }
+
+  const resultWarnings = warningRecords(calculationResult?.warnings);
+
+  if (resultWarnings.length > 0) {
+    return resultWarnings;
+  }
+
+  return warningRecords(output?.warnings);
+}
+
+function warningRecords(value: unknown): CalculationWarningView[] {
+  return recordsFromArray(value).flatMap((warning) => {
+    const code = stringFrom(warning.code);
+
+    if (!code) {
+      return [];
+    }
+
+    return [
+      {
+        code,
+        message: stringFrom(warning.message),
+        path: stringFrom(warning.path),
+      },
+    ];
+  });
+}
+
+function traceStepNames(calculationResult: QuoteCalculationResult | null) {
+  const steps = recordsFromArray(calculationResult?.trace).flatMap((entry) => {
+    const step = stringFrom(entry.step);
+
+    return step ? [step] : [];
+  });
+
+  return Array.from(new Set(steps));
+}
+
+function totalsFromItem(item: QuoteItem) {
+  const totals = asRecord(item.totalsSnapshot);
+  const totalMinor = numberFrom(totals?.totalMinor);
+
+  if (!totals || totals.pendingCalculation === true || totalMinor === undefined) {
+    return null;
+  }
+
+  return {
+    totalMinor,
+  };
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
 }
 
+function recordsFromArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.flatMap((entry) => {
+        const record = asRecord(entry);
+
+        return record ? [record] : [];
+      })
+    : [];
+}
+
+function arrayLength(value: unknown) {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function numberFrom(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+
+  return undefined;
+}
+
+function stringFrom(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
 function minorInput(value: number) {
   return (value / 100).toFixed(2);
+}
+
+function formatMeasurement(value: number) {
+  return new Intl.NumberFormat("ro-RO", {
+    maximumFractionDigits: 3,
+  }).format(value);
 }
 
 function formatMinor(value: bigint | number | null | undefined, currency = "RON") {

@@ -4,6 +4,7 @@ import { QuoteItemType, QuoteVersionStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireTenant } from "@/lib/auth";
+import { recalculateTenantCurrentQuoteVersion } from "@/lib/calculation/quote-calculation-adapter";
 import {
   createTenantQuoteItem,
   deleteTenantQuoteItem,
@@ -157,6 +158,26 @@ export async function deleteQuoteItemAction(
   }
 
   redirectToQuoteItems(quoteId);
+}
+
+export async function recalculateCurrentQuoteVersionAction(
+  quoteId: string,
+  formData: FormData,
+) {
+  void formData;
+
+  const context = await requireTenant();
+  const result = await recalculateTenantCurrentQuoteVersion(context, quoteId);
+
+  if (!result.ok) {
+    if (result.reason === "locked") {
+      redirectWithCalculationError(quoteId, "locked");
+    }
+
+    redirect("/forbidden");
+  }
+
+  redirectToCalculation(quoteId);
 }
 
 function parseItemUpdateInput(
@@ -324,6 +345,14 @@ function redirectToQuoteItems(quoteId: string): never {
   redirect(`${quotePath(quoteId)}#items`);
 }
 
+function redirectToCalculation(quoteId: string): never {
+  redirect(`${quotePath(quoteId)}?calculated=1#calculation`);
+}
+
 function redirectWithItemError(quoteId: string, error: "locked" | "validation"): never {
   redirect(`${quotePath(quoteId)}?itemError=${error}#items`);
+}
+
+function redirectWithCalculationError(quoteId: string, error: "locked"): never {
+  redirect(`${quotePath(quoteId)}?calculationError=${error}#calculation`);
 }
