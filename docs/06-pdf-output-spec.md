@@ -122,3 +122,14 @@ document value from the quote version totals snapshot. Generated Template B PDFs
 `template-b` on the immutable `Document`, include that key in visible totals metadata and audit
 metadata, and use a distinct filename suffix. Internal material costs, supplier notes, margins, and
 calculation traces remain excluded from Template B HTML/PDF output.
+
+## COD-024 pilot review fixture notes
+
+Business-owner review preparation starts in `fixtures/reference-offers`. The fixture README lists the
+required intake checklist: profile price list, glass deduction rules, glass price list, hardware
+rules, accessory/service prices, VAT/markup/discount rules, and preferred PDF template.
+
+The committed examples are synthetic redacted JSON fixtures, not PDF files. Real historical offer
+PDFs and source price lists must remain outside Git. Future validated cases should store only the
+redacted snapshot facts needed to reproduce the quote totals and selected `template-a` or
+`template-b` output.
