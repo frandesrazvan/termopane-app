@@ -57,7 +57,6 @@ function downloadFileName(value: string | null) {
 function isOperationalStorageError(error: unknown) {
   return (
     isDocumentStorageError(error, "configuration") ||
-    isDocumentStorageError(error, "not_implemented") ||
     isDocumentStorageError(error, "unavailable")
   );
 }

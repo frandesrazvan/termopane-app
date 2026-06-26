@@ -137,9 +137,9 @@ redacted snapshot facts needed to reproduce the quote totals and selected `templ
 ## COD-025 storage/deployment readiness notes
 
 Generated quote PDFs now go through a document storage provider interface. The local provider keeps
-the current development/test behavior under ignored local storage. The S3-compatible provider is a
-deployment configuration stub: it validates endpoint, region, bucket, and credential env values, then
-returns a controlled not-implemented storage error until an SDK-backed adapter is added.
+the current development/test behavior under ignored local storage. The S3-compatible provider uses
+the server-side AWS SDK v3 S3 client with endpoint, region, bucket, credential, and path-style
+configuration from environment variables.
 
 Generation distinguishes storage-write failures from `Document` metadata creation failures. The
 generated key remains the provider input, while the provider-returned storage key is persisted on the
@@ -147,3 +147,12 @@ immutable `Document` row. If bytes are stored but the `Document` row or audit me
 created, the app attempts to delete the provider-returned object so failed generations do not leave
 orphaned PDF files. Customer-facing PDF contents, tenant-scoped document access, quote-version
 binding, and hidden internal costs are unchanged.
+
+## COD-026 S3-compatible storage adapter notes
+
+S3-compatible PDF storage supports `put`, `get`, and `delete` through SDK commands. Put operations
+store the PDF `Content-Type` and portable metadata for checksum, quote version, template key, and
+tenant id. Get operations return bytes to the existing tenant/quote-scoped download route. Delete
+operations are used by failed generation cleanup. Missing objects map to `not_found`; invalid keys
+map to `invalid_key`; credential, endpoint, or network failures map to controlled storage errors
+without leaking secret values.

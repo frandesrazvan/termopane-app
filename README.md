@@ -14,8 +14,7 @@ production formulas.
 - PDF generation, local document storage, immutable `Document` records, selected template keys, and
   audit logging are present for generated quote documents.
 - Document storage now goes through a provider interface. The local provider remains the default
-  for dev/test, and an S3-compatible provider stub validates deployment config until a real adapter
-  is implemented.
+  for dev/test, and an SDK-backed S3-compatible provider is available for deployable object storage.
 - Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
   glass packages, hardware kits, colors, accessories, services, tax rates, price lists, price-list
   items, and pricing rules.
@@ -141,9 +140,8 @@ $env:DOCUMENT_STORAGE_PROVIDER="local"
 $env:DOCUMENT_STORAGE_ROOT="E:\path\to\storage"
 ```
 
-The `s3` provider is a deployment stub. It validates S3-compatible environment values and then
-returns a controlled "not implemented" storage error for reads and writes until an SDK-backed adapter
-is added. Do not use it for live PDF delivery yet:
+The `s3` provider uses the server-side AWS SDK v3 S3 client and supports S3-compatible storage with
+custom endpoint, region, bucket, access key, secret key, and force path-style settings:
 
 ```powershell
 $env:DOCUMENT_STORAGE_PROVIDER="s3"
@@ -159,6 +157,10 @@ PDF generation passes a requested storage key to the provider, then persists the
 provider on the immutable `Document` row. If metadata creation fails after storage succeeds, the app
 attempts to delete the returned storage key so failed generations do not leave orphaned files.
 
+No real bucket integration tests run in CI. Validate bucket credentials, endpoint behavior,
+path-style settings, lifecycle/retention policy, and object access controls in the target
+environment before using `DOCUMENT_STORAGE_PROVIDER="s3"` for live PDF delivery.
+
 ## Deployment Readiness
 
 Before deploying, configure these server-side environment values in the target platform secret store:
@@ -170,7 +172,7 @@ Before deploying, configure these server-side environment values in the target p
 - `AUTH_DEV_LOGIN_ENABLED="false"`
 - `DOCUMENT_STORAGE_PROVIDER`
 - Local-only: `DOCUMENT_STORAGE_ROOT`
-- S3-compatible stub: `DOCUMENT_STORAGE_S3_ENDPOINT`, `DOCUMENT_STORAGE_S3_REGION`,
+- S3-compatible: `DOCUMENT_STORAGE_S3_ENDPOINT`, `DOCUMENT_STORAGE_S3_REGION`,
   `DOCUMENT_STORAGE_S3_BUCKET`, `DOCUMENT_STORAGE_S3_ACCESS_KEY_ID`,
   `DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY`, and `DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE`
 
@@ -182,8 +184,7 @@ environment deploy; once migrations are committed, use the normal deployment mig
 the target database before starting `pnpm --filter web start`.
 
 Do not enable development login in production, do not store S3 credentials in source control, and do
-not use the `s3` provider for live PDF delivery until the SDK-backed adapter replaces the current
-stub.
+not expose bucket credentials to browser-side code.
 
 ## Validation
 
@@ -215,7 +216,7 @@ pnpm verify
 
 ## Not Done Yet
 
-- SDK-backed S3-compatible object storage.
+- Real bucket integration tests and deployment-specific storage smoke tests.
 - Email sending or customer delivery workflow.
 - Door, accessory, service, and advanced pricing-rule selection inside the quote builder.
 - Real production formulas or supplier-specific pricing rules.
