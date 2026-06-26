@@ -1,16 +1,24 @@
 "use server";
 
-import { ProfileItemType, QuoteItemType, QuoteVersionStatus } from "@prisma/client";
+import {
+  ProfileItemType,
+  QuoteItemType,
+  QuoteVersionStatus,
+  type QuoteItem,
+} from "@prisma/client";
 import { isQuotePdfTemplateKey } from "@termopane/pdf";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { canApplyCommercialOverrides, canGeneratePdf, requireTenant } from "@/lib/auth";
 import { recalculateTenantCurrentQuoteVersion } from "@/lib/calculation/quote-calculation-adapter";
 import {
+  buildAccessoryLineCatalogSnapshot,
   buildDoorCatalogSnapshot,
   buildFixedWindowCatalogSnapshot,
+  buildServiceLineCatalogSnapshot,
   isSelectableCatalogRecord,
   selectActiveCatalogPriceList,
+  type CatalogLineKind,
 } from "@/lib/catalog/quote-item-catalog-snapshot";
 import {
   applyTenantQuoteDiscount,
@@ -18,6 +26,7 @@ import {
   createTenantQuoteRevision,
   createTenantQuoteItem,
   deleteTenantQuoteItem,
+  getTenantAccessory,
   getTenantColorFinish,
   getTenantGlassPackage,
   getTenantHardwareKit,
@@ -25,6 +34,7 @@ import {
   getTenantProfileSystem,
   getTenantQuoteItem,
   getTenantQuoteWithCurrentVersion,
+  getTenantServiceItem,
   listTenantPriceListItems,
   listTenantPriceLists,
   lockTenantQuoteVersion,
@@ -47,6 +57,7 @@ const optionalText = (maxLength: number) =>
     .transform((value) => (value.length > 0 ? value : null));
 
 const quantitySchema = z.coerce.number().int().min(1).max(999);
+const lineQuantitySchema = z.coerce.number().positive().max(999_999);
 const dimensionSchema = z.coerce.number().int().min(1).max(20_000);
 const descriptionSchema = z.string().trim().min(1).max(400);
 const catalogIdSchema = z.string().trim().min(1).max(191);
@@ -114,6 +125,13 @@ const customLineSchema = z.object({
     .trim()
     .refine((value) => /^\d+(\.\d{1,2})?$/.test(value))
     .transform((value) => moneyToMinor(value)),
+});
+
+const catalogLineSchema = z.object({
+  catalogItemId: catalogIdSchema,
+  quantity: lineQuantitySchema,
+  customerDescription: optionalText(400),
+  internalNotes: optionalText(1000),
 });
 
 const commercialReasonSchema = z.string().trim().min(1).max(500);
@@ -309,6 +327,22 @@ export async function addCustomLineItemAction(quoteId: string, formData: FormDat
   redirectToQuoteItems(quoteId);
 }
 
+export async function addAccessoryLineItemAction(quoteId: string, formData: FormData) {
+  return addCatalogLineItemAction(quoteId, "accessory-line", formData);
+}
+
+export async function addServiceLineItemAction(quoteId: string, formData: FormData) {
+  return addCatalogLineItemAction(quoteId, "service-line", formData);
+}
+
+export async function addTransportLineItemAction(quoteId: string, formData: FormData) {
+  return addCatalogLineItemAction(quoteId, "transport-line", formData);
+}
+
+export async function addInstallationLineItemAction(quoteId: string, formData: FormData) {
+  return addCatalogLineItemAction(quoteId, "installation-line", formData);
+}
+
 export async function updateQuoteItemAction(
   quoteId: string,
   quoteItemId: string,
@@ -325,7 +359,7 @@ export async function updateQuoteItemAction(
   const updateInput = await parseItemUpdateInput(
     context,
     formData,
-    existingItem.type,
+    existingItem,
     quoteState.quote.currency,
     quoteId,
   );
@@ -513,14 +547,52 @@ export async function generateQuotePdfAction(
   redirectWithDocumentEvent(quoteId, "generated");
 }
 
+async function addCatalogLineItemAction(
+  quoteId: string,
+  lineKind: CatalogLineKind,
+  formData: FormData,
+) {
+  const context = await requireTenant();
+  const quoteState = await requireMutableCurrentQuote(context, quoteId);
+  const parsed = catalogLineSchema.safeParse({
+    catalogItemId: formText(formData, "catalogItemId"),
+    quantity: formText(formData, "quantity"),
+    customerDescription: formText(formData, "customerDescription"),
+    internalNotes: formText(formData, "internalNotes"),
+  });
+
+  if (!parsed.success) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  const catalogSnapshot = await resolveCatalogLineSnapshot(
+    context,
+    parsed.data.catalogItemId,
+    lineKind,
+    quoteState.quote.currency,
+    quoteId,
+  );
+  const item = await createTenantQuoteItem(
+    context,
+    quoteId,
+    catalogLineInput(parsed.data, lineKind, quoteState.quote.currency, catalogSnapshot),
+  );
+
+  if (!item) {
+    redirectWithItemError(quoteId, "locked");
+  }
+
+  redirectToQuoteItems(quoteId);
+}
+
 async function parseItemUpdateInput(
   context: TenantActionContext,
   formData: FormData,
-  itemType: string,
+  existingItem: QuoteItem,
   currency: string,
   quoteId: string,
 ): Promise<TenantQuoteItemUpdateInput> {
-  if (itemType === QuoteItemType.WINDOW) {
+  if (existingItem.type === QuoteItemType.WINDOW) {
     const parsed = fixedWindowSchema.safeParse({
       quantity: formText(formData, "quantity"),
       widthMm: formText(formData, "widthMm"),
@@ -548,7 +620,7 @@ async function parseItemUpdateInput(
     return fixedWindowInput(parsed.data, currency, catalogSnapshot);
   }
 
-  if (itemType === QuoteItemType.DOOR) {
+  if (existingItem.type === QuoteItemType.DOOR) {
     const parsed = doorSchema.safeParse({
       quantity: formText(formData, "quantity"),
       widthMm: formText(formData, "widthMm"),
@@ -580,7 +652,32 @@ async function parseItemUpdateInput(
     return doorInput(parsed.data, currency, catalogSnapshot);
   }
 
-  if (itemType === QuoteItemType.CUSTOM) {
+  const lineKind = catalogLineKindFromItem(existingItem);
+
+  if (lineKind) {
+    const parsed = catalogLineSchema.safeParse({
+      catalogItemId: formText(formData, "catalogItemId"),
+      quantity: formText(formData, "quantity"),
+      customerDescription: formText(formData, "customerDescription"),
+      internalNotes: formText(formData, "internalNotes"),
+    });
+
+    if (!parsed.success) {
+      redirectWithItemError(quoteId, "validation");
+    }
+
+    const catalogSnapshot = await resolveCatalogLineSnapshot(
+      context,
+      parsed.data.catalogItemId,
+      lineKind,
+      currency,
+      quoteId,
+    );
+
+    return catalogLineInput(parsed.data, lineKind, currency, catalogSnapshot);
+  }
+
+  if (existingItem.type === QuoteItemType.CUSTOM) {
     const parsed = customLineSchema.safeParse({
       quantity: formText(formData, "quantity"),
       customerDescription: formText(formData, "customerDescription"),
@@ -760,6 +857,47 @@ async function resolveDoorCatalogSnapshot(
   });
 }
 
+async function resolveCatalogLineSnapshot(
+  context: TenantActionContext,
+  catalogItemId: string,
+  lineKind: CatalogLineKind,
+  currency: string,
+  quoteId: string,
+) {
+  const priceLists = await listTenantPriceLists(context);
+  const priceList = selectActiveCatalogPriceList(priceLists, currency);
+  const priceListItems = priceList
+    ? await listTenantPriceListItems(context, { priceListId: priceList.id })
+    : [];
+
+  if (lineKind === "accessory-line") {
+    const accessory = await getTenantAccessory(context, catalogItemId);
+
+    if (!accessory || !isSelectableCatalogRecord(accessory)) {
+      redirectWithItemError(quoteId, "validation");
+    }
+
+    return buildAccessoryLineCatalogSnapshot({
+      accessory,
+      priceList,
+      priceListItems,
+    });
+  }
+
+  const serviceItem = await getTenantServiceItem(context, catalogItemId);
+
+  if (!serviceItem || !isSelectableCatalogRecord(serviceItem)) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  return buildServiceLineCatalogSnapshot({
+    lineKind,
+    serviceItem,
+    priceList,
+    priceListItems,
+  });
+}
+
 function fixedWindowInput(
   data: z.infer<typeof fixedWindowSchema>,
   currency: string,
@@ -902,6 +1040,45 @@ function customLineInput(
   };
 }
 
+function catalogLineInput(
+  data: z.infer<typeof catalogLineSchema>,
+  lineKind: CatalogLineKind,
+  currency: string,
+  catalogSnapshot: Record<string, unknown>,
+): TenantQuoteItemWriteInput {
+  const line = asRecord(catalogSnapshot.line);
+  const description =
+    data.customerDescription ??
+    stringFrom(line?.label, line?.name) ??
+    catalogLineKindLabel(lineKind);
+
+  return {
+    type: QuoteItemType.CUSTOM,
+    quantity: quoteItemIntegerQuantity(data.quantity),
+    widthMm: null,
+    heightMm: null,
+    customerDescription: description,
+    internalNotes: data.internalNotes,
+    configurationSnapshot: {
+      kind: lineKind,
+      quantity: data.quantity,
+      currency,
+      catalogSelection:
+        lineKind === "accessory-line"
+          ? { accessoryId: data.catalogItemId }
+          : { serviceItemId: data.catalogItemId },
+      source: "quote-item-draft-editor",
+      requiresCalculation: true,
+      calculationMode: "explicit-catalog-line-snapshot-only",
+      drawing: customLineDrawingSnapshot({
+        label: description,
+      }),
+    },
+    catalogSnapshot,
+    totalsSnapshot: emptyTotalsSnapshot(),
+  };
+}
+
 function draftCatalogPlaceholder(note: string) {
   return {
     placeholder: true,
@@ -937,6 +1114,55 @@ function doorDrawingSplit(
   }
 
   return "none" as const;
+}
+
+function catalogLineKindFromItem(item: QuoteItem): CatalogLineKind | null {
+  const configuration = asRecord(item.configurationSnapshot);
+  const kind = stringFrom(configuration?.kind);
+
+  return isCatalogLineKind(kind) ? kind : null;
+}
+
+function isCatalogLineKind(value: string | undefined): value is CatalogLineKind {
+  return (
+    value === "accessory-line" ||
+    value === "service-line" ||
+    value === "transport-line" ||
+    value === "installation-line"
+  );
+}
+
+function catalogLineKindLabel(lineKind: CatalogLineKind) {
+  switch (lineKind) {
+    case "accessory-line":
+      return "Accesoriu";
+    case "service-line":
+      return "Serviciu";
+    case "transport-line":
+      return "Transport";
+    case "installation-line":
+      return "Montaj";
+  }
+}
+
+function quoteItemIntegerQuantity(quantity: number) {
+  return Math.max(1, Math.ceil(quantity));
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function stringFrom(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return undefined;
 }
 
 function isDraftVersionMutable(quoteVersion: {

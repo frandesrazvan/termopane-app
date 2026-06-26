@@ -53,6 +53,16 @@ UX requirements:
 - Users must see when an item is incomplete because a configurable business rule is missing.
 - Custom items should clearly show which values are manual/customer-facing.
 
+## COD-029 accessory and service line UX notes
+
+The draft quote builder exposes separate mobile-friendly add forms for accessory, service, transport,
+and installation lines. Each line requires a tenant catalog selection and an explicit quantity; the
+active price list is shown near the selector, and missing catalog prices are surfaced later as
+calculation warnings rather than hidden fallbacks.
+
+Transport and installation remain manual service lines in the quote builder. The UI must not imply
+automatic distance lookup, route planning, installation scheduling, or labor formulas.
+
 ## Saved offers and filters
 
 - Saved offers list should support search and filters by customer, status, date range, author, and

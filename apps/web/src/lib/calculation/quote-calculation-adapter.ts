@@ -9,6 +9,7 @@ import {
 } from "@prisma/client";
 import {
   calculateQuote,
+  type CatalogLineItemInput,
   type CalculationItemInput,
   type CalculationTraceEntry,
   type CalculationUnit,
@@ -30,7 +31,7 @@ import {
 import { prisma } from "../prisma";
 
 const ADAPTER_SOURCE = "quote-calculation-adapter";
-const CALCULATOR_VERSION = "cod-012-web-adapter-v1";
+const CALCULATOR_VERSION = "cod-029-web-adapter-v1";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -207,6 +208,10 @@ function calculationItemFromQuoteItem(
     return fixedWindowInput(item, configuration, quoteRules);
   }
 
+  if (isCatalogLineKind(itemKind)) {
+    return catalogLineInput(item, configuration, itemKind, quoteRules);
+  }
+
   if (item.type === QuoteItemType.CUSTOM || itemKind === "custom-line") {
     return customLineInput(item, configuration, quoteRules);
   }
@@ -377,6 +382,51 @@ function customLineInput(
     explicitMaterialRequirements: explicitMaterialRequirementsFromSnapshot(
       configuration.explicitMaterialRequirements ?? catalog?.explicitMaterialRequirements,
     ),
+  };
+}
+
+function catalogLineInput(
+  item: QuoteItem,
+  configuration: JsonRecord,
+  lineKind: CatalogLineItemInput["type"],
+  quoteRules: CommercialRulesSnapshot,
+): CatalogLineItemInput {
+  const catalog = toNullableJsonRecord(item.catalogSnapshot);
+  const line = firstRecord(
+    catalog?.line,
+    catalog?.accessory,
+    catalog?.serviceItem,
+    configuration.catalogLine,
+  );
+  const price = firstRecord(line?.priceListItem, line?.price);
+  const unit =
+    calculationUnitFromSnapshot(
+      line?.calculationUnit,
+      price?.calculationUnit,
+      line?.unit,
+      price?.unit,
+      configuration.unit,
+    ) ?? "each";
+
+  return {
+    elementId: item.id,
+    type: lineKind,
+    quantity: numberFrom(configuration.quantity, item.quantity) ?? 0,
+    description:
+      item.customerDescription ??
+      stringFrom(configuration.customerDescription, configuration.description) ??
+      stringFrom(line?.label, line?.name) ??
+      "Linie catalog",
+    catalogItemId:
+      stringFrom(line?.id, line?.catalogItemId) ?? `missing-${lineKind}-${item.id}`,
+    catalogItemLabel:
+      stringFrom(line?.label, line?.name) ??
+      item.customerDescription ??
+      "Linie catalog",
+    unit,
+    unitPriceMinor: unitPriceMinorFromCatalogLine(line, price, unit),
+    commercialRules: commercialRulesFromSnapshot(configuration.commercialRules) ?? quoteRules,
+    manualOverride: manualOverrideFromSnapshot(configuration.manualOverride),
   };
 }
 
@@ -716,6 +766,30 @@ function unitPriceMinorFromSnapshot(
   return numberFrom(priceSnapshot?.saleMinor, priceSnapshot?.unitPriceMinor);
 }
 
+function unitPriceMinorFromCatalogLine(
+  lineSnapshot: JsonRecord | null,
+  priceSnapshot: JsonRecord | null,
+  expectedCalculationUnit: CalculationUnit,
+) {
+  const priceUnit = calculationUnitFromSnapshot(priceSnapshot?.calculationUnit, priceSnapshot?.unit);
+
+  if (priceUnit && priceUnit !== expectedCalculationUnit) {
+    return undefined;
+  }
+
+  const lineUnit = calculationUnitFromSnapshot(lineSnapshot?.calculationUnit, lineSnapshot?.unit);
+
+  if (lineUnit && lineUnit !== expectedCalculationUnit) {
+    return undefined;
+  }
+
+  return numberFrom(
+    lineSnapshot?.unitPriceMinor,
+    priceSnapshot?.saleMinor,
+    priceSnapshot?.unitPriceMinor,
+  );
+}
+
 function calculationUnitFromSnapshot(...values: unknown[]): CalculationUnit | undefined {
   const unit = stringFrom(...values);
   const normalized =
@@ -738,6 +812,15 @@ function calculationUnitFromSnapshot(...values: unknown[]): CalculationUnit | un
     normalized === "fixed"
     ? normalized
     : undefined;
+}
+
+function isCatalogLineKind(value: string | undefined): value is CatalogLineItemInput["type"] {
+  return (
+    value === "accessory-line" ||
+    value === "service-line" ||
+    value === "transport-line" ||
+    value === "installation-line"
+  );
 }
 
 function isExplicitMaterialType(

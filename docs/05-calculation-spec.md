@@ -154,3 +154,16 @@ The calculator emits `MISSING_DOOR_FORMULA` for door items because panel sizing,
 reinforcement, and door-specific fabrication formulas are not validated. Door glass, panel, profile,
 threshold, and hardware quantities must not be derived from hard-coded assumptions; future production
 behavior needs tenant-provided configuration or business-validated formulas.
+
+## COD-029 accessory/service line calculation notes
+
+Accessory, service, transport, and installation quote lines are calculated only from frozen explicit
+snapshots. The pure calculation package accepts catalog line inputs for `accessory-line`,
+`service-line`, `transport-line`, and `installation-line`, each with catalog item id, label, unit,
+quantity, and optional sale price in minor units.
+
+These lines produce material requirements with `materialType = accessory` for accessory rows and
+`materialType = service` for service, transport, and installation rows. Missing sale price snapshots
+emit `MISSING_EXPLICIT_MATERIAL_PRICE`; invalid or missing quantities emit `INVALID_QUANTITY`.
+Transport and installation do not derive quantities or prices from distance, dimensions, labor rules,
+or any other production formula.

@@ -1,4 +1,5 @@
 import {
+  CatalogUnit,
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
@@ -232,6 +233,48 @@ describe("quote calculation adapter", () => {
       customLineCostMinor: 10_000,
       totalWithVatMinor: 11_900,
     });
+  });
+
+  it("recalculates accessory and installation quote lines from explicit catalog snapshots", async () => {
+    const state = testState({ items: [accessoryLineItem(), installationLineItem()] });
+    const result = await recalculateTenantCurrentQuoteVersion(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      { client: state.client },
+    );
+
+    expectCalculationOk(result);
+    expect(result.quoteVersion).toMatchObject({
+      subtotalMinor: 18_000,
+      vatMinor: 3_420,
+      totalMinor: 21_420,
+    });
+
+    const outputSnapshot = asRecord(state.calculationResults[0]?.outputSnapshot);
+    const outputItems = outputSnapshot?.items as Array<Record<string, unknown>>;
+    const materialRequirements = outputSnapshot?.materialRequirements as Array<Record<string, unknown>>;
+
+    expect(outputItems.map((item) => item.type)).toEqual([
+      "accessory-line",
+      "installation-line",
+    ]);
+    expect(materialRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          materialType: "accessory",
+          catalogItemId: "accessory-sill",
+          quantity: 1.5,
+          costMinor: 3_000,
+        }),
+        expect.objectContaining({
+          materialType: "service",
+          catalogItemId: "service-installation",
+          quantity: 1,
+          costMinor: 15_000,
+        }),
+      ]),
+    );
+    expect(result.quoteVersion.warningsSnapshot).toEqual([]);
   });
 
   it("recalculates a door MVP item from explicit panel and hardware snapshots with warnings", async () => {
@@ -675,6 +718,102 @@ function customLineItem(overrides: Partial<QuoteItem> = {}) {
         unitPriceMinor: 5_000,
         currency: "RON",
         isFormula: false,
+      },
+    },
+    calculationSnapshot: null,
+    totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0, pendingCalculation: true },
+    createdAt: new Date("2026-06-25T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-25T00:00:00.000Z"),
+    ...overrides,
+  } as unknown as QuoteItem;
+}
+
+function accessoryLineItem(overrides: Partial<QuoteItem> = {}) {
+  return {
+    id: "item-accessory",
+    tenantId: "tenant-a",
+    quoteVersionId: "version-a",
+    type: QuoteItemType.CUSTOM,
+    sortOrder: 1,
+    quantity: 2,
+    widthMm: null,
+    heightMm: null,
+    customerDescription: "Synthetic sill line",
+    internalNotes: null,
+    configurationSnapshot: {
+      kind: "accessory-line",
+      quantity: 1.5,
+      currency: "RON",
+      catalogSelection: {
+        accessoryId: "accessory-sill",
+      },
+      source: "quote-item-draft-editor",
+      requiresCalculation: true,
+    },
+    catalogSnapshot: {
+      source: "tenant-catalog",
+      snapshotVersion: "cod-029-catalog-line-v1",
+      lineKind: "accessory-line",
+      line: {
+        id: "accessory-sill",
+        name: "Synthetic sill",
+        label: "Synthetic sill",
+        unit: CatalogUnit.LINEAR_METER,
+        calculationUnit: "linear-meter",
+        priceListItem: {
+          id: "price-accessory-sill",
+          unit: CatalogUnit.LINEAR_METER,
+          calculationUnit: "linear-meter",
+          saleMinor: 2_000,
+        },
+      },
+    },
+    calculationSnapshot: null,
+    totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0, pendingCalculation: true },
+    createdAt: new Date("2026-06-25T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-25T00:00:00.000Z"),
+    ...overrides,
+  } as unknown as QuoteItem;
+}
+
+function installationLineItem(overrides: Partial<QuoteItem> = {}) {
+  return {
+    id: "item-installation",
+    tenantId: "tenant-a",
+    quoteVersionId: "version-a",
+    type: QuoteItemType.CUSTOM,
+    sortOrder: 2,
+    quantity: 1,
+    widthMm: null,
+    heightMm: null,
+    customerDescription: "Synthetic installation line",
+    internalNotes: null,
+    configurationSnapshot: {
+      kind: "installation-line",
+      quantity: 1,
+      currency: "RON",
+      catalogSelection: {
+        serviceItemId: "service-installation",
+      },
+      source: "quote-item-draft-editor",
+      requiresCalculation: true,
+    },
+    catalogSnapshot: {
+      source: "tenant-catalog",
+      snapshotVersion: "cod-029-catalog-line-v1",
+      lineKind: "installation-line",
+      line: {
+        id: "service-installation",
+        name: "Synthetic installation",
+        label: "Synthetic installation",
+        unit: CatalogUnit.FIXED,
+        calculationUnit: "fixed",
+        priceListItem: {
+          id: "price-service-installation",
+          unit: CatalogUnit.FIXED,
+          calculationUnit: "fixed",
+          saleMinor: 15_000,
+        },
       },
     },
     calculationSnapshot: null,

@@ -77,6 +77,20 @@ Manual commercial controls in the quote workflow use Romanian labels:
 These labels are internal workflow UI labels, not database enum values. Audit action constants remain
 untranslated.
 
+## COD-029 Quote Accessory And Service Labels
+
+Draft quote accessory/service forms and customer-facing output use these Romanian labels:
+
+- `Accesoriu`
+- `Serviciu`
+- `Transport`
+- `Montaj`
+- `Serviciu transport`
+- `Serviciu montaj`
+
+Transport and installation labels describe explicit service lines only; they must not imply route
+distance lookup, scheduling, or automatic installation formulas.
+
 ## Customer-Facing Output
 
 Template A HTML previews and generated PDFs must use Romanian labels, including:

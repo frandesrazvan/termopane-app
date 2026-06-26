@@ -1,4 +1,5 @@
 import {
+  type Accessory,
   CatalogUnit,
   PriceListItemType,
   PriceListStatus,
@@ -9,10 +10,18 @@ import {
   type PriceListItem,
   type ProfileItem,
   type ProfileSystem,
+  type ServiceItem,
 } from "@prisma/client";
 
 const FIXED_WINDOW_SNAPSHOT_VERSION = "cod-019-fixed-window-catalog-v1";
 const DOOR_SNAPSHOT_VERSION = "cod-028-door-catalog-v1";
+const CATALOG_LINE_SNAPSHOT_VERSION = "cod-029-catalog-line-v1";
+
+export type CatalogLineKind =
+  | "accessory-line"
+  | "service-line"
+  | "transport-line"
+  | "installation-line";
 
 export type FixedWindowCatalogSnapshotInput = {
   profileSystem: ProfileSystem;
@@ -34,6 +43,19 @@ export type DoorCatalogSnapshotInput = {
   panelDescription?: string | null;
   manualPanelPriceMinor?: number | null;
   currency: string;
+  priceList?: PriceList | null;
+  priceListItems?: readonly PriceListItem[];
+};
+
+export type AccessoryLineCatalogSnapshotInput = {
+  accessory: Accessory;
+  priceList?: PriceList | null;
+  priceListItems?: readonly PriceListItem[];
+};
+
+export type ServiceLineCatalogSnapshotInput = {
+  lineKind: Exclude<CatalogLineKind, "accessory-line">;
+  serviceItem: ServiceItem;
   priceList?: PriceList | null;
   priceListItems?: readonly PriceListItem[];
 };
@@ -357,6 +379,70 @@ export function buildDoorCatalogSnapshot({
   };
 }
 
+export function buildAccessoryLineCatalogSnapshot({
+  accessory,
+  priceList = null,
+  priceListItems = [],
+}: AccessoryLineCatalogSnapshotInput): Record<string, unknown> {
+  const priceListItem = priceSnapshotFor(
+    priceListItems,
+    PriceListItemType.ACCESSORY,
+    accessory.id,
+    priceList?.id,
+  );
+
+  return {
+    source: "tenant-catalog",
+    snapshotVersion: CATALOG_LINE_SNAPSHOT_VERSION,
+    lineKind: "accessory-line",
+    selectedCatalogIds: {
+      accessoryId: accessory.id,
+    },
+    requiresBusinessValidation: requiresBusinessValidation(
+      accessory.quantityRule,
+      accessory.configuration,
+    ),
+    priceList: priceList ? priceListSnapshot(priceList) : null,
+    line: accessorySnapshot(accessory, priceListItem),
+    accessory: accessorySnapshot(accessory, priceListItem),
+    calculationNote:
+      "Accessory line stores an explicit user-entered quantity and catalog sale-price snapshot.",
+  };
+}
+
+export function buildServiceLineCatalogSnapshot({
+  lineKind,
+  priceList = null,
+  priceListItems = [],
+  serviceItem,
+}: ServiceLineCatalogSnapshotInput): Record<string, unknown> {
+  const priceListItem = priceSnapshotFor(
+    priceListItems,
+    PriceListItemType.SERVICE_ITEM,
+    serviceItem.id,
+    priceList?.id,
+  );
+
+  return {
+    source: "tenant-catalog",
+    snapshotVersion: CATALOG_LINE_SNAPSHOT_VERSION,
+    lineKind,
+    selectedCatalogIds: {
+      serviceItemId: serviceItem.id,
+    },
+    requiresBusinessValidation: requiresBusinessValidation(serviceItem.configuration),
+    priceList: priceList ? priceListSnapshot(priceList) : null,
+    line: serviceItemSnapshot(serviceItem, priceListItem),
+    serviceItem: serviceItemSnapshot(serviceItem, priceListItem),
+    calculationNote:
+      lineKind === "transport-line"
+        ? "Transport line uses an explicit snapshot only; no distance API or route formula is applied."
+        : lineKind === "installation-line"
+          ? "Installation line uses an explicit snapshot only; no automatic installation formula is applied."
+          : "Service line stores an explicit user-entered quantity and catalog sale-price snapshot.",
+  };
+}
+
 export function selectActiveCatalogPriceList(
   priceLists: readonly PriceList[],
   currency: string,
@@ -400,6 +486,44 @@ function profileItemSnapshot(profileItem: ProfileItem, priceListItem: PriceListI
     priceListItem,
     unitPriceMinorPerMeter:
       priceListItem?.unit === CatalogUnit.LINEAR_METER ? priceListItem.saleMinor : null,
+  };
+}
+
+function accessorySnapshot(accessory: Accessory, priceListItem: PriceListItemSnapshot | null) {
+  return {
+    id: accessory.id,
+    name: accessory.name,
+    label: accessory.name,
+    code: accessory.code,
+    category: accessory.category,
+    unit: accessory.unit,
+    calculationUnit: catalogUnitToCalculationUnit(accessory.unit),
+    supplierId: accessory.supplierId,
+    quantityRule: jsonRecordOrNull(accessory.quantityRule),
+    requiresBusinessValidation: requiresBusinessValidation(
+      accessory.quantityRule,
+      accessory.configuration,
+    ),
+    priceListItem,
+    unitPriceMinor: priceListItem?.unit === accessory.unit ? priceListItem.saleMinor : null,
+  };
+}
+
+function serviceItemSnapshot(
+  serviceItem: ServiceItem,
+  priceListItem: PriceListItemSnapshot | null,
+) {
+  return {
+    id: serviceItem.id,
+    name: serviceItem.name,
+    label: serviceItem.name,
+    code: serviceItem.code,
+    category: serviceItem.category,
+    unit: serviceItem.unit,
+    calculationUnit: catalogUnitToCalculationUnit(serviceItem.unit),
+    requiresBusinessValidation: requiresBusinessValidation(serviceItem.configuration),
+    priceListItem,
+    unitPriceMinor: priceListItem?.unit === serviceItem.unit ? priceListItem.saleMinor : null,
   };
 }
 

@@ -18,6 +18,8 @@ Included:
 - quote-level discount adjustments;
 - quote-level aggregation.
 - structured `materialRequirements`, `glassCuts`, and grouped `profileLinearMeters` outputs.
+- explicit catalog-backed accessory, service, transport, and installation line totals from frozen
+  quantity/unit/sale-price snapshots.
 
 Excluded:
 
@@ -25,9 +27,10 @@ Excluded:
 - auth or tenant lookup;
 - supplier-specific formulas;
 - production cut optimization;
-- hardware, reinforcement, labor, or accessory formulas.
+- hardware, reinforcement, labor, accessory, service, transport, or installation formulas.
 
-Hardware, reinforcement, labor, accessory, and service quantities may appear only as explicit
-snapshot requirements passed into the input. The package does not derive those quantities.
+Hardware, reinforcement, labor, accessory, service, transport, and installation quantities may
+appear only as explicit snapshot requirements passed into the input. The package does not derive
+those quantities.
 
 Unknown production rules must remain configurable or be marked as requiring business validation.

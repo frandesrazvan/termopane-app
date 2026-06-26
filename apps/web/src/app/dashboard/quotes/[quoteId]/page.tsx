@@ -18,6 +18,7 @@ import {
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
+  type Accessory,
   type ColorFinish,
   type QuoteCalculationResult,
   type Document,
@@ -27,6 +28,7 @@ import {
   type ProfileSystem,
   type QuoteItem,
   type QuoteVersion,
+  type ServiceItem,
 } from "@prisma/client";
 import type { QuotePdfTemplateKey } from "@termopane/pdf";
 import Link from "next/link";
@@ -46,6 +48,7 @@ import {
   getTenantProject,
   getTenantQuoteCalculationResult,
   getTenantQuoteWithCurrentVersion,
+  listTenantAccessories,
   listTenantColorFinishes,
   listTenantGlassPackages,
   listTenantHardwareKits,
@@ -55,6 +58,7 @@ import {
   listTenantQuoteDocuments,
   listTenantQuoteItems,
   listTenantQuoteVersions,
+  listTenantServiceItems,
 } from "@/lib/data";
 import {
   commonLabel,
@@ -67,9 +71,13 @@ import {
 } from "@/lib/i18n";
 import { defaultQuotePdfTemplateKeyFromVersion } from "@/lib/pdf/template-a-snapshot";
 import {
+  addAccessoryLineItemAction,
   addDoorItemAction,
   addCustomLineItemAction,
   addFixedWindowItemAction,
+  addInstallationLineItemAction,
+  addServiceLineItemAction,
+  addTransportLineItemAction,
   applyItemManualOverrideAction,
   applyQuoteDiscountAction,
   createQuoteRevisionAction,
@@ -80,9 +88,12 @@ import {
   updateQuoteItemAction,
 } from "./actions";
 import {
+  AccessoryLineCatalogFields,
   DoorCatalogFields,
   emptyFixedWindowCatalogFormOptions,
   FixedWindowCatalogFields,
+  ServiceLineCatalogFields,
+  type CatalogLineFieldDefaults,
   type FixedWindowCatalogFieldDefaults,
   type FixedWindowCatalogFormOptions,
 } from "./quote-item-catalog-fields";
@@ -415,18 +426,22 @@ async function loadFixedWindowCatalogOptions(
   currency: string,
 ): Promise<FixedWindowCatalogFormOptions> {
   const [
+    accessories,
     profileSystems,
     profileItems,
     glassPackages,
     colorFinishes,
     hardwareKits,
+    serviceItems,
     priceLists,
   ] = await Promise.all([
+    listTenantAccessories(context),
     listTenantProfileSystems(context),
     listTenantProfileItems(context),
     listTenantGlassPackages(context),
     listTenantColorFinishes(context),
     listTenantHardwareKits(context),
+    listTenantServiceItems(context),
     listTenantPriceLists(context),
   ]);
 
@@ -454,6 +469,8 @@ async function loadFixedWindowCatalogOptions(
           selectableProfileSystems.some((profileSystem) => profileSystem.id === colorFinish.profileSystemId)),
     ),
     hardwareKits: hardwareKits.filter(isSelectableHardwareKit),
+    accessories: accessories.filter(isSelectableAccessory),
+    serviceItems: serviceItems.filter(isSelectableServiceItem),
     activePriceList: selectActiveCatalogPriceList(priceLists, currency),
   };
 }
@@ -468,7 +485,7 @@ function AddItemForms({
   quoteId: string;
 }) {
   return (
-    <div className="mt-5 grid gap-3 lg:grid-cols-3">
+    <div className="mt-5 grid gap-3 lg:grid-cols-4">
       <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
           <Plus aria-hidden="true" size={17} />
@@ -558,7 +575,140 @@ function AddItemForms({
           <SubmitButton label="Adaugă poziție personalizată" />
         </form>
       </details>
+      <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
+          <Plus aria-hidden="true" size={17} />
+          Accesoriu
+        </summary>
+        <form action={addAccessoryLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+          <CatalogLinePriceNotice activePriceList={catalogOptions.activePriceList} currency={currency} />
+          <AccessoryLineCatalogFields options={catalogOptions} />
+          <NumberField
+            defaultValue="1"
+            inputMode="decimal"
+            label="Cantitate"
+            min={0.01}
+            name="quantity"
+            step="0.01"
+          />
+          <TextField
+            label="Descriere pentru client"
+            name="customerDescription"
+            placeholder="Implicit: denumirea din catalog"
+          />
+          <TextAreaField label="Note interne" name="internalNotes" />
+          <SubmitButton label="Adaugă accesoriu" />
+        </form>
+      </details>
+
+      <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
+          <Plus aria-hidden="true" size={17} />
+          Serviciu
+        </summary>
+        <form action={addServiceLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+          <CatalogLinePriceNotice activePriceList={catalogOptions.activePriceList} currency={currency} />
+          <ServiceLineCatalogFields options={catalogOptions} />
+          <NumberField
+            defaultValue="1"
+            inputMode="decimal"
+            label="Cantitate"
+            min={0.01}
+            name="quantity"
+            step="0.01"
+          />
+          <TextField
+            label="Descriere pentru client"
+            name="customerDescription"
+            placeholder="Implicit: denumirea din catalog"
+          />
+          <TextAreaField label="Note interne" name="internalNotes" />
+          <SubmitButton label="Adaugă serviciu" />
+        </form>
+      </details>
+
+      <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
+          <Plus aria-hidden="true" size={17} />
+          Transport
+        </summary>
+        <form action={addTransportLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+          <CatalogLinePriceNotice activePriceList={catalogOptions.activePriceList} currency={currency} />
+          <ServiceLineCatalogFields
+            label="Serviciu transport"
+            options={catalogOptions}
+            placeholder="Alege serviciul de transport"
+          />
+          <NumberField
+            defaultValue="1"
+            inputMode="decimal"
+            label="Cantitate"
+            min={0.01}
+            name="quantity"
+            step="0.01"
+          />
+          <TextField
+            label="Descriere pentru client"
+            name="customerDescription"
+            placeholder="Transport"
+          />
+          <TextAreaField label="Note interne" name="internalNotes" />
+          <SubmitButton label="Adaugă transport" />
+        </form>
+      </details>
+
+      <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
+          <Plus aria-hidden="true" size={17} />
+          Montaj
+        </summary>
+        <form action={addInstallationLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+          <CatalogLinePriceNotice activePriceList={catalogOptions.activePriceList} currency={currency} />
+          <ServiceLineCatalogFields
+            label="Serviciu montaj"
+            options={catalogOptions}
+            placeholder="Alege serviciul de montaj"
+          />
+          <NumberField
+            defaultValue="1"
+            inputMode="decimal"
+            label="Cantitate"
+            min={0.01}
+            name="quantity"
+            step="0.01"
+          />
+          <TextField
+            label="Descriere pentru client"
+            name="customerDescription"
+            placeholder="Montaj"
+          />
+          <TextAreaField label="Note interne" name="internalNotes" />
+          <SubmitButton label="Adaugă montaj" />
+        </form>
+      </details>
     </div>
+  );
+}
+
+function CatalogLinePriceNotice({
+  activePriceList,
+  currency,
+}: {
+  activePriceList: FixedWindowCatalogFormOptions["activePriceList"];
+  currency: string;
+}) {
+  if (activePriceList) {
+    return (
+      <p className="rounded-md bg-stone-100 px-3 py-2 text-sm font-medium text-zinc-700">
+        Listă activă: {activePriceList.name} / {activePriceList.version}
+      </p>
+    );
+  }
+
+  return (
+    <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+      Nu există listă de prețuri activă pentru {currency}; calculul va marca preț lipsă.
+    </p>
   );
 }
 
@@ -1169,6 +1319,7 @@ function QuoteItemCard({
   const manualOverride = manualOverrideFromItem(item);
   const catalogSummary = catalogSummaryFromItem(item);
   const catalogNeedsValidation = catalogRequiresBusinessValidation(item);
+  const catalogLineDetails = catalogLineDetailsFromItem(item);
 
   return (
     <article className="rounded-md border border-zinc-200 bg-white p-4">
@@ -1178,14 +1329,15 @@ function QuoteItemCard({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase text-zinc-500">
-                {quoteItemTypeLabel(item.type)}
+                {quoteItemDisplayTypeLabel(item)}
               </p>
               <h3 className="mt-1 break-words text-base font-semibold text-zinc-950">
                 {item.customerDescription || "Poziție fără titlu"}
               </h3>
             </div>
             <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-xs font-semibold text-zinc-700">
-              Cant. {item.quantity}
+              Cant. {formatQuantity(catalogLineDetails?.quantity ?? item.quantity)}
+              {catalogLineDetails?.unitLabel ? ` ${catalogLineDetails.unitLabel}` : ""}
             </span>
           </div>
 
@@ -1199,6 +1351,12 @@ function QuoteItemCard({
             {manualUnitPriceMinor !== null ? (
               <span className="rounded-md bg-stone-100 px-2 py-1">
                 Preț unitar manual {formatMinor(manualUnitPriceMinor, currency)}
+              </span>
+            ) : null}
+            {catalogLineDetails?.unitPriceMinor !== null &&
+            catalogLineDetails?.unitPriceMinor !== undefined ? (
+              <span className="rounded-md bg-stone-100 px-2 py-1">
+                Preț catalog unitar {formatMinor(catalogLineDetails.unitPriceMinor, currency)}
               </span>
             ) : null}
             <span className="rounded-md bg-stone-100 px-2 py-1">
@@ -1360,6 +1518,48 @@ function QuoteItemEditForm({
 }) {
   const catalogDefaults = catalogFieldDefaultsFromItem(item);
   const doorDefaults = doorFieldDefaultsFromItem(item);
+  const lineKind = catalogLineKindFromItem(item);
+  const lineDetails = catalogLineDetailsFromItem(item);
+  const lineDefaults = catalogLineFieldDefaultsFromItem(item);
+
+  if (lineKind) {
+    return (
+      <form action={updateQuoteItemAction.bind(null, quoteId, item.id)} className="mt-4 grid gap-3">
+        <input type="hidden" name="itemType" value={item.type} />
+        <NumberField
+          defaultValue={formatQuantity(lineDetails?.quantity ?? item.quantity)}
+          inputMode="decimal"
+          label="Cantitate"
+          min={0.01}
+          name="quantity"
+          step="0.01"
+        />
+        {lineKind === "accessory-line" ? (
+          <AccessoryLineCatalogFields
+            defaults={lineDefaults}
+            options={catalogOptions}
+          />
+        ) : (
+          <ServiceLineCatalogFields
+            defaults={lineDefaults}
+            label={catalogLineKindLabel(lineKind)}
+            options={catalogOptions}
+          />
+        )}
+        <TextField
+          label="Descriere pentru client"
+          name="customerDescription"
+          defaultValue={item.customerDescription ?? ""}
+        />
+        <TextAreaField
+          label="Note interne"
+          name="internalNotes"
+          defaultValue={item.internalNotes ?? ""}
+        />
+        <SubmitButton label="Salvează linia" />
+      </form>
+    );
+  }
 
   return (
     <form action={updateQuoteItemAction.bind(null, quoteId, item.id)} className="mt-4 grid gap-3">
@@ -1444,14 +1644,18 @@ function QuoteItemEditForm({
 
 function NumberField({
   defaultValue,
+  inputMode = "numeric",
   label,
   min,
   name,
+  step,
 }: {
   defaultValue?: string;
+  inputMode?: "decimal" | "numeric";
   label: string;
   min?: number;
   name: string;
+  step?: number | string;
 }) {
   return (
     <label className="block">
@@ -1460,9 +1664,10 @@ function NumberField({
         name={name}
         type="number"
         min={min}
+        step={step}
         required
         defaultValue={defaultValue}
-        inputMode="numeric"
+        inputMode={inputMode}
         className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
       />
     </label>
@@ -1660,6 +1865,88 @@ function isSelectableHardwareKit(record: HardwareKit): record is HardwareKit {
   return isSelectableCatalogRecord(record);
 }
 
+function isSelectableAccessory(record: Accessory): record is Accessory {
+  return isSelectableCatalogRecord(record);
+}
+
+function isSelectableServiceItem(record: ServiceItem): record is ServiceItem {
+  return isSelectableCatalogRecord(record);
+}
+
+function quoteItemDisplayTypeLabel(item: QuoteItem) {
+  const lineKind = catalogLineKindFromItem(item);
+
+  return lineKind ? catalogLineKindLabel(lineKind) : quoteItemTypeLabel(item.type);
+}
+
+type CatalogLineKind =
+  | "accessory-line"
+  | "service-line"
+  | "transport-line"
+  | "installation-line";
+
+function catalogLineKindFromItem(item: QuoteItem): CatalogLineKind | null {
+  const configuration = asRecord(item.configurationSnapshot);
+  const kind = stringFrom(configuration?.kind);
+
+  return isCatalogLineKind(kind) ? kind : null;
+}
+
+function isCatalogLineKind(value: string | undefined): value is CatalogLineKind {
+  return (
+    value === "accessory-line" ||
+    value === "service-line" ||
+    value === "transport-line" ||
+    value === "installation-line"
+  );
+}
+
+function catalogLineKindLabel(lineKind: CatalogLineKind) {
+  switch (lineKind) {
+    case "accessory-line":
+      return "Accesoriu";
+    case "service-line":
+      return "Serviciu";
+    case "transport-line":
+      return "Transport";
+    case "installation-line":
+      return "Montaj";
+  }
+}
+
+function catalogLineFieldDefaultsFromItem(item: QuoteItem): CatalogLineFieldDefaults {
+  const catalog = asRecord(item.catalogSnapshot);
+  const selectedCatalogIds = asRecord(catalog?.selectedCatalogIds);
+  const line = firstRecord(catalog?.line, catalog?.accessory, catalog?.serviceItem);
+
+  return {
+    accessoryId: stringFrom(selectedCatalogIds?.accessoryId, line?.id),
+    serviceItemId: stringFrom(selectedCatalogIds?.serviceItemId, line?.id),
+  };
+}
+
+function catalogLineDetailsFromItem(item: QuoteItem) {
+  const lineKind = catalogLineKindFromItem(item);
+
+  if (!lineKind) {
+    return null;
+  }
+
+  const configuration = asRecord(item.configurationSnapshot);
+  const catalog = asRecord(item.catalogSnapshot);
+  const line = firstRecord(catalog?.line, catalog?.accessory, catalog?.serviceItem);
+  const priceListItem = firstRecord(line?.priceListItem);
+  const quantity = numberFrom(configuration?.quantity, item.quantity) ?? item.quantity;
+  const unit = stringFrom(line?.calculationUnit, line?.unit, priceListItem?.calculationUnit, priceListItem?.unit);
+
+  return {
+    kind: lineKind,
+    quantity,
+    unitLabel: catalogUnitLabel(unit),
+    unitPriceMinor: numberFrom(line?.unitPriceMinor, priceListItem?.saleMinor),
+  };
+}
+
 function catalogFieldDefaultsFromItem(item: QuoteItem): FixedWindowCatalogFieldDefaults {
   const catalog = asRecord(item.catalogSnapshot);
 
@@ -1693,12 +1980,14 @@ function catalogSummaryFromItem(item: QuoteItem) {
   const configuration = asRecord(item.configurationSnapshot);
   const panel = firstRecord(configuration?.panel, catalog?.panel);
   const hardwareConfiguration = firstRecord(configuration?.hardware);
+  const lineKind = catalogLineKindFromItem(item);
 
   if (!catalog) {
     return [];
   }
 
   return [
+    lineKind ? catalogSummaryEntry(catalogLineKindLabel(lineKind), catalog.line) : null,
     catalogSummaryEntry("Sistem", catalog.profileSystem),
     catalogSummaryEntry("Profil toc", catalog.frameProfile),
     catalogSummaryEntry("Profil prag", catalog.thresholdProfile),
@@ -1921,26 +2210,58 @@ function arrayLength(value: unknown) {
   return Array.isArray(value) ? value.length : 0;
 }
 
-function numberFrom(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
+function numberFrom(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
 
-  if (typeof value === "bigint") {
-    return Number(value);
-  }
+    if (typeof value === "bigint") {
+      return Number(value);
+    }
 
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
+    if (typeof value === "string" && value.trim().length > 0) {
+      const parsed = Number(value);
 
-    return Number.isFinite(parsed) ? parsed : undefined;
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
   }
 
   return undefined;
 }
 
-function stringFrom(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+function stringFrom(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function catalogUnitLabel(value: string | undefined) {
+  switch (value) {
+    case "each":
+    case "EACH":
+      return "buc.";
+    case "linear-meter":
+    case "LINEAR_METER":
+      return "ml";
+    case "square-meter":
+    case "SQUARE_METER":
+      return "mp";
+    case "hour":
+    case "HOUR":
+      return "oră";
+    case "fixed":
+    case "FIXED":
+      return "lot";
+    default:
+      return value;
+  }
 }
 
 function minorInput(value: number) {
@@ -1958,6 +2279,12 @@ function formatBasisPointsLabel(value: number) {
 }
 
 function formatMeasurement(value: number) {
+  return new Intl.NumberFormat("ro-RO", {
+    maximumFractionDigits: 3,
+  }).format(value);
+}
+
+function formatQuantity(value: number) {
   return new Intl.NumberFormat("ro-RO", {
     maximumFractionDigits: 3,
   }).format(value);

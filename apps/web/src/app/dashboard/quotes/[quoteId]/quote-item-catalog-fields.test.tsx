@@ -1,4 +1,5 @@
 import {
+  type Accessory,
   CatalogMaterialType,
   CatalogUnit,
   PriceListStatus,
@@ -9,12 +10,15 @@ import {
   type PriceList,
   type ProfileItem,
   type ProfileSystem,
+  type ServiceItem,
 } from "@prisma/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+  AccessoryLineCatalogFields,
   DoorCatalogFields,
   FixedWindowCatalogFields,
+  ServiceLineCatalogFields,
   type FixedWindowCatalogFormOptions,
 } from "./quote-item-catalog-fields";
 
@@ -58,6 +62,23 @@ describe("FixedWindowCatalogFields", () => {
     expect(markup).toContain('name="colorFinishId"');
     expect(markup).toContain('name="hardwareKitId"');
   });
+
+  it("renders Romanian accessory and service line labels", () => {
+    const markup = renderToStaticMarkup(
+      <form>
+        <AccessoryLineCatalogFields options={catalogOptions()} />
+        <ServiceLineCatalogFields label="Transport" options={catalogOptions()} />
+        <ServiceLineCatalogFields label="Montaj" options={catalogOptions()} />
+      </form>,
+    );
+
+    expect(markup).toContain("Accesoriu");
+    expect(markup).toContain("Transport");
+    expect(markup).toContain("Montaj");
+    expect(markup).toContain("Glaf interior");
+    expect(markup).toContain("Serviciu montaj");
+    expect(markup.match(/name="catalogItemId"/g)).toHaveLength(3);
+  });
 });
 
 function catalogOptions(): FixedWindowCatalogFormOptions {
@@ -68,6 +89,8 @@ function catalogOptions(): FixedWindowCatalogFormOptions {
     glassPackages: [glassPackage()],
     colorFinishes: [colorFinish()],
     hardwareKits: [hardwareKit()],
+    accessories: [accessory()],
+    serviceItems: [serviceItem()],
     activePriceList: priceList(),
   };
 }
@@ -164,6 +187,40 @@ function hardwareKit() {
     createdAt: new Date("2026-06-25T00:00:00.000Z"),
     updatedAt: new Date("2026-06-25T00:00:00.000Z"),
   } as HardwareKit;
+}
+
+function accessory() {
+  return {
+    id: "accessory",
+    tenantId: "tenant-a",
+    supplierId: null,
+    name: "Glaf interior",
+    code: "GLAF",
+    category: "glaf",
+    unit: CatalogUnit.LINEAR_METER,
+    quantityRule: null,
+    configuration: null,
+    isActive: true,
+    deletedAt: null,
+    createdAt: new Date("2026-06-25T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-25T00:00:00.000Z"),
+  } as Accessory;
+}
+
+function serviceItem() {
+  return {
+    id: "service",
+    tenantId: "tenant-a",
+    name: "Serviciu montaj",
+    code: "MONTAJ",
+    category: "montaj",
+    unit: CatalogUnit.FIXED,
+    configuration: null,
+    isActive: true,
+    deletedAt: null,
+    createdAt: new Date("2026-06-25T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-25T00:00:00.000Z"),
+  } as ServiceItem;
 }
 
 function priceList() {

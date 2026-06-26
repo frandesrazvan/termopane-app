@@ -51,6 +51,51 @@ describe("Template A HTML preview", () => {
     );
   });
 
+  it("renders accessory, service, transport, and installation lines in Template A and B", () => {
+    const items = [
+      itemSnapshot({
+        id: "accessory",
+        sortOrder: 1,
+        itemTypeLabel: "Accesoriu",
+        customerDescription: "Glaf interior",
+        unitLabel: "ml",
+        quantity: 1.5,
+        unitPriceMinor: 2_400,
+        subtotalMinor: 3_600,
+        totalMinor: 3_600,
+      }),
+      itemSnapshot({
+        id: "service",
+        sortOrder: 2,
+        itemTypeLabel: "Serviciu",
+        customerDescription: "Demontare tamplarie",
+      }),
+      itemSnapshot({
+        id: "transport",
+        sortOrder: 3,
+        itemTypeLabel: "Transport",
+        customerDescription: "Transport",
+      }),
+      itemSnapshot({
+        id: "installation",
+        sortOrder: 4,
+        itemTypeLabel: "Montaj",
+        customerDescription: "Montaj",
+      }),
+    ];
+    const templateAHtml = buildTemplateAHtml(templateSnapshot({ items }));
+    const templateBHtml = buildTemplateBHtml(templateBSnapshot({ items }));
+
+    for (const html of [templateAHtml, templateBHtml]) {
+      expect(html).toContain("Accesoriu");
+      expect(html).toContain("Serviciu");
+      expect(html).toContain("Transport");
+      expect(html).toContain("Montaj");
+      expect(html).toContain("Glaf interior");
+      expect(html).toContain("24,00 RON");
+    }
+  });
+
   it("hides internal costs and trace-like fields", () => {
     const html = buildTemplateAHtml(
       templateSnapshot({

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   AuditAction,
+  CatalogUnit,
   DocumentType,
   QuoteItemType,
   QuoteStatus,
@@ -327,6 +328,75 @@ describe("quote PDF generation", () => {
     });
     expect(JSON.stringify(snapshot)).not.toContain("Supplier cost");
     expect(JSON.stringify(snapshot)).not.toContain("internalMaterialCostMinor");
+  });
+
+  it("includes accessory, service, transport, and installation catalog lines in preview snapshots", () => {
+    const snapshot = buildQuotePdfOfferSnapshot(
+      quote({ id: "quote-lines" }),
+      quoteVersion({ id: "version-lines", quoteId: "quote-lines" }),
+      [
+        catalogLineQuoteItem({
+          id: "line-accessory",
+          kind: "accessory-line",
+          label: "Glaf interior",
+          quantity: 1.5,
+          unit: CatalogUnit.LINEAR_METER,
+          saleMinor: 2_400,
+          totalMinor: 3_600,
+        }),
+        catalogLineQuoteItem({
+          id: "line-service",
+          kind: "service-line",
+          label: "Demontare tamplarie",
+          quantity: 1,
+          unit: CatalogUnit.FIXED,
+          saleMinor: 10_000,
+          totalMinor: 10_000,
+        }),
+        catalogLineQuoteItem({
+          id: "line-transport",
+          kind: "transport-line",
+          label: "Transport",
+          quantity: 1,
+          unit: CatalogUnit.FIXED,
+          saleMinor: 15_000,
+          totalMinor: 15_000,
+        }),
+        catalogLineQuoteItem({
+          id: "line-installation",
+          kind: "installation-line",
+          label: "Montaj",
+          quantity: 1,
+          unit: CatalogUnit.FIXED,
+          saleMinor: 20_000,
+          totalMinor: 20_000,
+        }),
+      ],
+    );
+
+    expect(snapshot.items).toEqual([
+      expect.objectContaining({
+        itemTypeLabel: "Accesoriu",
+        customerDescription: "Glaf interior",
+        quantity: 1.5,
+        unitLabel: "ml",
+        unitPriceMinor: 2_400,
+        totalMinor: 3_600,
+      }),
+      expect.objectContaining({
+        itemTypeLabel: "Serviciu",
+        unitLabel: "lot",
+        unitPriceMinor: 10_000,
+      }),
+      expect.objectContaining({
+        itemTypeLabel: "Transport",
+        customerDescription: "Transport",
+      }),
+      expect.objectContaining({
+        itemTypeLabel: "Montaj",
+        customerDescription: "Montaj",
+      }),
+    ]);
   });
 
   it("returns a storage write failure without creating Document metadata", async () => {
@@ -739,6 +809,57 @@ function quoteItem(overrides: Partial<QuoteItem> = {}) {
     updatedAt: new Date("2026-06-25T00:00:00.000Z"),
     ...overrides,
   } as unknown as QuoteItem;
+}
+
+function catalogLineQuoteItem({
+  id,
+  kind,
+  label,
+  quantity,
+  saleMinor,
+  totalMinor,
+  unit,
+}: {
+  id: string;
+  kind: "accessory-line" | "service-line" | "transport-line" | "installation-line";
+  label: string;
+  quantity: number;
+  saleMinor: number;
+  totalMinor: number;
+  unit: CatalogUnit;
+}) {
+  return quoteItem({
+    id,
+    customerDescription: label,
+    quantity: Math.max(1, Math.ceil(quantity)),
+    configurationSnapshot: {
+      kind,
+      quantity,
+      catalogSelection:
+        kind === "accessory-line"
+          ? { accessoryId: id }
+          : { serviceItemId: id },
+    },
+    catalogSnapshot: {
+      lineKind: kind,
+      line: {
+        id,
+        name: label,
+        label,
+        unit,
+        priceListItem: {
+          id: `price-${id}`,
+          unit,
+          saleMinor,
+        },
+      },
+    },
+    totalsSnapshot: {
+      subtotalMinor: totalMinor,
+      vatMinor: 0,
+      totalMinor,
+    },
+  });
 }
 
 function pdfHexText(value: string) {

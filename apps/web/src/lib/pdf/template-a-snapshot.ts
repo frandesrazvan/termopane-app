@@ -202,7 +202,6 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
   const manualPricing = firstRecord(configuration?.manualPricing, catalog?.manualPricing);
   const widthMm = numberFrom(item.widthMm, configuration?.widthMm);
   const heightMm = numberFrom(item.heightMm, configuration?.heightMm);
-  const quantity = numberFrom(item.quantity, configuration?.quantity) ?? 1;
   const profile = firstRecord(
     catalog?.frameProfile,
     catalog?.thresholdProfile,
@@ -226,18 +225,29 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
     configuration?.hardware,
     configuration?.hardwareKit,
   );
+  const catalogLine = firstRecord(catalog?.line, catalog?.accessory, catalog?.serviceItem);
+  const catalogLinePrice = firstRecord(catalogLine?.priceListItem);
+  const itemKind = stringFrom(configuration?.kind);
+  const quantity = catalogLine
+    ? numberFrom(configuration?.quantity, item.quantity) ?? 1
+    : numberFrom(item.quantity, configuration?.quantity) ?? 1;
 
   return {
     id: item.id,
     sortOrder: item.sortOrder,
-    itemTypeLabel: itemTypeLabel(item.type),
+    itemTypeLabel: itemTypeLabel(item.type, itemKind),
     customerDescription:
       item.customerDescription ??
       stringFrom(configuration?.customerDescription, configuration?.description) ??
+      stringFrom(catalogLine?.label, catalogLine?.name) ??
       "Poziție fără titlu",
     unitLabel:
       unitLabelFromSnapshot(
         stringFrom(
+          catalogLine?.calculationUnit,
+          catalogLine?.unit,
+          catalogLinePrice?.calculationUnit,
+          catalogLinePrice?.unit,
           configuration?.unitLabel,
           configuration?.unit,
           catalog?.unitLabel,
@@ -256,7 +266,12 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
       hardware?.category,
       hardware?.description,
     ),
-    unitPriceMinor: numberFrom(manualPricing?.unitPriceMinor, configuration?.unitPriceMinor),
+    unitPriceMinor: numberFrom(
+      manualPricing?.unitPriceMinor,
+      configuration?.unitPriceMinor,
+      catalogLine?.unitPriceMinor,
+      catalogLinePrice?.saleMinor,
+    ),
     subtotalMinor: numberFrom(totals?.subtotalMinor),
     vatMinor: numberFrom(totals?.vatMinor),
     totalMinor: numberFrom(totals?.totalMinor),
@@ -275,7 +290,18 @@ function glassPanelLabel(
   return compactText([glassLabel, panelLabel]).join(" / ") || undefined;
 }
 
-function itemTypeLabel(itemType: QuoteItemType) {
+function itemTypeLabel(itemType: QuoteItemType, itemKind?: string) {
+  switch (itemKind) {
+    case "accessory-line":
+      return "Accesoriu";
+    case "service-line":
+      return "Serviciu";
+    case "transport-line":
+      return "Transport";
+    case "installation-line":
+      return "Montaj";
+  }
+
   return quoteItemTypeLabel(itemType);
 }
 
@@ -285,7 +311,7 @@ function unitLabelFromSnapshot(value: string | null | undefined) {
   }
 
   const normalized = value.trim();
-  const upper = normalized.toUpperCase();
+  const upper = normalized.toUpperCase().replaceAll("-", "_");
 
   switch (upper) {
     case "EACH":
