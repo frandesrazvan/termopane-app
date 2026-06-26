@@ -17,6 +17,7 @@ import {
   ProfileSystem,
   type AuditLog,
   QuoteItemType,
+  QuoteNumberDatePattern,
   QuoteStatus,
   QuoteVersionStatus,
   ServiceItem,
@@ -29,8 +30,10 @@ import {
   type Quote,
   type QuoteCalculationResult,
   type QuoteItem,
+  type QuoteNumberSettings,
   type QuoteVersion,
   type SavedFilter,
+  type UserPreference,
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
@@ -675,8 +678,40 @@ function testClient(
         legalName: "Tenant A SRL",
         displayName: "Tenant A",
         defaultCurrency: "RON",
+        defaultPdfTemplate: "template-b",
+      },
+      {
+        id: "settings-b",
+        tenantId: "tenant-b",
+        legalName: "Tenant B SRL",
+        displayName: "Tenant B",
+        defaultCurrency: "EUR",
+        defaultPdfTemplate: "template-a",
       },
     ] as CompanySettings[]),
+    quoteNumberSettings: delegate(
+      [
+        {
+          id: "numbering-a",
+          tenantId: "tenant-a",
+          prefix: "A",
+          nextNumber: 2,
+          datePattern: QuoteNumberDatePattern.NONE,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+        {
+          id: "numbering-b",
+          tenantId: "tenant-b",
+          prefix: "B",
+          nextNumber: 7,
+          datePattern: QuoteNumberDatePattern.YEAR,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ] as QuoteNumberSettings[],
+      { unique: [["tenantId"]] },
+    ),
     savedFilter: delegate(
       [
         {
@@ -714,6 +749,21 @@ function testClient(
         },
       ] as SavedFilter[],
       { unique: [["tenantId", "userId", "name"]] },
+    ),
+    userPreference: delegate(
+      [
+        {
+          id: "preference-a",
+          tenantId: "tenant-a",
+          userId: "user-a",
+          defaultPdfTemplate: "template-b",
+          dashboardShortcuts: ["new-quote", "quotes"],
+          language: "ro",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ] as UserPreference[],
+      { unique: [["tenantId", "userId"]] },
     ),
   };
 
@@ -1333,6 +1383,117 @@ describe("tenant repositories", () => {
     ).resolves.toEqual([]);
   });
 
+  it("updates company settings inside the current tenant and writes an audit log", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+    const result = await data.updateTenantCompanySettings(
+      { tenantId: "tenant-a" },
+      "settings-a",
+      {
+        actorUserId: "owner-a",
+        legalName: "Tenant A Legal SRL",
+        displayName: "Tenant A Comercial",
+        taxIdentifier: "RO123456",
+        registrationNumber: "J40/123/2026",
+        addressLine1: "Strada Test 1",
+        city: "Bucuresti",
+        country: "Romania",
+        phone: "+40000000001",
+        email: "office-a@example.test",
+        website: "https://tenant-a.example.test",
+        defaultCurrency: "ron",
+        defaultPdfTemplate: "template-b",
+        vatRateBasisPoints: 2100,
+        offerValidityDays: 21,
+        paymentTermsText: "Plata prin transfer bancar.",
+        warrantyText: "Garantie sintetica.",
+        deliveryText: "Livrare sintetica.",
+        advancePaymentText: "Avans conform ofertei.",
+        pdfFooterText: "Footer sintetic.",
+      },
+    );
+
+    expect(result?.record).toMatchObject({
+      id: "settings-a",
+      tenantId: "tenant-a",
+      displayName: "Tenant A Comercial",
+      defaultCurrency: "RON",
+      defaultPdfTemplate: "template-b",
+      vatRateBasisPoints: 2100,
+    });
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0]).toMatchObject({
+      tenantId: "tenant-a",
+      actorUserId: "owner-a",
+      action: AuditAction.SETTINGS_UPDATED,
+      entityType: "CompanySettings",
+      entityId: "settings-a",
+      metadata: {
+        settingsType: "company",
+        defaultPdfTemplate: "template-b",
+      },
+    });
+  });
+
+  it("rejects cross-tenant settings updates", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+
+    await expect(
+      data.updateTenantCompanySettings({ tenantId: "tenant-a" }, "settings-b", {
+        legalName: "Blocked SRL",
+        displayName: "Blocked",
+        defaultCurrency: "RON",
+        defaultPdfTemplate: "template-a",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      data.updateTenantQuoteNumberSettings({ tenantId: "tenant-a" }, "numbering-b", {
+        prefix: "X",
+        nextNumber: 10,
+        datePattern: QuoteNumberDatePattern.NONE,
+      }),
+    ).resolves.toBeNull();
+    expect(auditLogs).toHaveLength(0);
+  });
+
+  it("updates quote numbering settings with a tenant-scoped audit log", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }), {
+      now: () => new Date("2026-06-26T10:00:00.000Z"),
+    });
+    const result = await data.updateTenantQuoteNumberSettings(
+      { tenantId: "tenant-a" },
+      "numbering-a",
+      {
+        actorUserId: "owner-a",
+        prefix: "oferta",
+        nextNumber: 42,
+        datePattern: QuoteNumberDatePattern.YEAR_MONTH,
+      },
+    );
+
+    expect(result?.record).toMatchObject({
+      id: "numbering-a",
+      tenantId: "tenant-a",
+      prefix: "OFERTA",
+      nextNumber: 42,
+      datePattern: QuoteNumberDatePattern.YEAR_MONTH,
+    });
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0]).toMatchObject({
+      tenantId: "tenant-a",
+      actorUserId: "owner-a",
+      action: AuditAction.QUOTE_NUMBERING_UPDATED,
+      entityType: "QuoteNumberSettings",
+      entityId: "numbering-a",
+      metadata: {
+        settingsType: "quote-numbering",
+        nextQuoteNumberPreview: "OFERTA-202606-0042",
+      },
+    });
+  });
+
   it("creates a draft quote shell with an initial tenant-scoped quote version", async () => {
     const data = createTenantDataAccess(testClient());
     const result = await data.createTenantQuoteDraft(
@@ -1370,23 +1531,18 @@ describe("tenant repositories", () => {
 
   it("creates a draft quote shell inside a transaction when the client supports it", async () => {
     let transactionCount = 0;
-    const data = createTenantDataAccess(
-      testClient({
-        onTransaction: () => {
-          transactionCount += 1;
-        },
-      }),
-      {
-        quoteNumberGenerator: () => "A-transaction",
+    const data = createTenantDataAccess(testClient({
+      onTransaction: () => {
+        transactionCount += 1;
       },
-    );
+    }));
 
     await expect(
       data.createTenantQuoteDraft({ tenantId: "tenant-a" }, { customerId: "customer-a" }),
     ).resolves.toMatchObject({
       quote: {
         tenantId: "tenant-a",
-        quoteNumber: "A-transaction",
+        quoteNumber: "A-0002",
       },
       currentVersion: {
         tenantId: "tenant-a",
@@ -1394,6 +1550,29 @@ describe("tenant repositories", () => {
       },
     });
     expect(transactionCount).toBe(1);
+  });
+
+  it("generates tenant-specific quote numbers from saved numbering settings", async () => {
+    const data = createTenantDataAccess(testClient(), {
+      now: () => new Date("2026-06-26T10:00:00.000Z"),
+    });
+
+    await expect(
+      data.createTenantQuoteDraft({ tenantId: "tenant-a" }, { customerId: "customer-a" }),
+    ).resolves.toMatchObject({
+      quote: {
+        tenantId: "tenant-a",
+        quoteNumber: "A-0002",
+      },
+    });
+    await expect(
+      data.createTenantQuoteDraft({ tenantId: "tenant-b" }, { customerId: "customer-b" }),
+    ).resolves.toMatchObject({
+      quote: {
+        tenantId: "tenant-b",
+        quoteNumber: "B-2026-0007",
+      },
+    });
   });
 
   it("rejects draft quote creation for a customer outside the tenant boundary", async () => {
@@ -1419,10 +1598,11 @@ describe("tenant repositories", () => {
   });
 
   it("retries generated quote numbers when a tenant-scoped collision occurs", async () => {
-    const generatedNumbers = ["A-001", "A-002"];
-    const data = createTenantDataAccess(testClient(), {
-      quoteNumberGenerator: () => generatedNumbers.shift() ?? "A-003",
-    });
+    const data = createTenantDataAccess(testClient());
+    await data.createTenantQuoteDraft(
+      { tenantId: "tenant-a" },
+      { customerId: "customer-a", quoteNumber: "A-0002" },
+    );
     const result = await data.createTenantQuoteDraft(
       { tenantId: "tenant-a" },
       { customerId: "customer-a", createdById: "user-a" },
@@ -1430,7 +1610,7 @@ describe("tenant repositories", () => {
 
     expect(result?.quote).toMatchObject({
       tenantId: "tenant-a",
-      quoteNumber: "A-002",
+      quoteNumber: "A-0003",
       currentVersionId: result?.currentVersion.id,
     });
     expect(result?.currentVersion).toMatchObject({

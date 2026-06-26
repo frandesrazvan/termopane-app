@@ -32,7 +32,7 @@ export function DashboardMobileNavigation() {
       aria-label="Navigare mobilă"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_24px_rgba(24,24,27,0.08)] lg:hidden"
     >
-      <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         {dashboardNavItems.map((item) => {
           const active = isDashboardNavItemActive(pathname, item);
 

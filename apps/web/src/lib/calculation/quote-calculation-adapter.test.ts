@@ -19,11 +19,13 @@ import {
   type Quote,
   type QuoteCalculationResult,
   type QuoteItem,
+  type QuoteNumberSettings,
   type QuoteVersion,
   type SavedFilter,
   type ServiceItem,
   type Supplier,
   type TaxRate,
+  type UserPreference,
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
@@ -140,10 +142,12 @@ function testState({
     document: delegate([] as Document[]),
     auditLog: delegate([] as AuditLog[]),
     companySettings: delegate([] as CompanySettings[]),
+    quoteNumberSettings: delegate([] as QuoteNumberSettings[]),
     savedFilter: delegate([] as SavedFilter[]),
     serviceItem: delegate([] as ServiceItem[]),
     supplier: delegate([] as Supplier[]),
     taxRate: delegate([] as TaxRate[]),
+    userPreference: delegate([] as UserPreference[]),
   };
 
   client.$transaction = async (operation) => {

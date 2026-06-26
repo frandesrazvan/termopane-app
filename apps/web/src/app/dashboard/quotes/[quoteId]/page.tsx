@@ -28,6 +28,7 @@ import {
   type QuoteItem,
   type QuoteVersion,
 } from "@prisma/client";
+import type { QuotePdfTemplateKey } from "@termopane/pdf";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -64,6 +65,7 @@ import {
   quoteStatusLabel,
   quoteVersionStatusLabel,
 } from "@/lib/i18n";
+import { defaultQuotePdfTemplateKeyFromVersion } from "@/lib/pdf/template-a-snapshot";
 import {
   addCustomLineItemAction,
   addFixedWindowItemAction,
@@ -146,6 +148,9 @@ export default async function QuoteDetailPage({
   const canViewInternalTrace = canViewInternalCosts(context.membership);
   const canApplyCommercialAdjustments =
     canEditItems && canApplyCommercialOverrides(context.membership);
+  const defaultTemplateKey = currentVersion
+    ? defaultQuotePdfTemplateKeyFromVersion(currentVersion)
+    : "template-a";
   const catalogOptions = canEditItems
     ? await loadFixedWindowCatalogOptions(context, quote.currency)
     : emptyFixedWindowCatalogFormOptions();
@@ -332,6 +337,7 @@ export default async function QuoteDetailPage({
           documentEvent={paramsValue.documentEvent}
           documents={documents}
           canGenerateDocuments={canGenerateDocuments}
+          defaultTemplateKey={defaultTemplateKey}
           quoteId={quote.id}
         />
 
@@ -392,6 +398,7 @@ export default async function QuoteDetailPage({
           canRecalculate={canEditItems}
           currentVersion={currentVersion}
           currency={quote.currency}
+          defaultTemplateKey={defaultTemplateKey}
           quoteId={quote.id}
         />
       </div>
@@ -510,6 +517,7 @@ function AddItemForms({
 function QuoteDocumentsCard({
   canGenerateDocuments,
   currentVersion,
+  defaultTemplateKey,
   documentError,
   documentEvent,
   documents,
@@ -517,6 +525,7 @@ function QuoteDocumentsCard({
 }: {
   canGenerateDocuments: boolean;
   currentVersion: QuoteVersion | null;
+  defaultTemplateKey: QuotePdfTemplateKey;
   documentError?: string;
   documentEvent?: string;
   documents: Document[];
@@ -544,7 +553,7 @@ function QuoteDocumentsCard({
             </label>
             <select
               className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm"
-              defaultValue="template-a"
+              defaultValue={defaultTemplateKey}
               id="quote-template-key"
               name="templateKey"
             >
@@ -712,6 +721,7 @@ function QuoteMobileActionBar({
   canRecalculate,
   currentVersion,
   currency,
+  defaultTemplateKey,
   quoteId,
 }: {
   canCreateRevision: boolean;
@@ -719,6 +729,7 @@ function QuoteMobileActionBar({
   canRecalculate: boolean;
   currentVersion: QuoteVersion | null;
   currency: string;
+  defaultTemplateKey: QuotePdfTemplateKey;
   quoteId: string;
 }) {
   const canGeneratePdfForVersion =
@@ -752,6 +763,7 @@ function QuoteMobileActionBar({
             canGeneratePdfForVersion={canGeneratePdfForVersion}
             canRecalculate={canRecalculate}
             currentVersion={currentVersion}
+            defaultTemplateKey={defaultTemplateKey}
             quoteId={quoteId}
           />
         </div>
@@ -765,12 +777,14 @@ function QuoteMobilePrimaryAction({
   canGeneratePdfForVersion,
   canRecalculate,
   currentVersion,
+  defaultTemplateKey,
   quoteId,
 }: {
   canCreateRevision: boolean;
   canGeneratePdfForVersion: boolean;
   canRecalculate: boolean;
   currentVersion: QuoteVersion | null;
+  defaultTemplateKey: QuotePdfTemplateKey;
   quoteId: string;
 }) {
   if (canRecalculate) {
@@ -787,7 +801,7 @@ function QuoteMobilePrimaryAction({
   if (currentVersion && canGeneratePdfForVersion) {
     return (
       <form action={generateQuotePdfAction.bind(null, quoteId, currentVersion.id)}>
-        <input name="templateKey" type="hidden" value="template-a" />
+        <input name="templateKey" type="hidden" value={defaultTemplateKey} />
         <button className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm active:bg-zinc-800">
           <Download aria-hidden="true" size={15} />
           Generează PDF

@@ -16,6 +16,7 @@ import { createConfiguredDocumentStorageProvider } from "./document-storage-prov
 import type { LocalDocumentStorageOptions } from "./local-document-storage";
 import {
   buildQuotePdfOfferSnapshot,
+  defaultQuotePdfTemplateKeyFromVersion,
   isQuoteVersionLockedForCustomerOutput,
   visibleTotalsSnapshotFromTemplate,
 } from "./template-a-snapshot";
@@ -72,7 +73,7 @@ export async function generateTenantQuotePdf(
   }
 
   const items = await data.listTenantQuoteItems(scope, quoteVersion.id);
-  const templateKey = options.templateKey ?? "template-a";
+  const templateKey = options.templateKey ?? defaultQuotePdfTemplateKeyFromVersion(quoteVersion);
   const snapshot = buildQuotePdfOfferSnapshot(quoteState.quote, quoteVersion, items, templateKey);
   const renderPdf = options.renderPdf ?? buildQuotePdf;
   const pdfBytes = renderPdf(snapshot);

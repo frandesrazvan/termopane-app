@@ -55,9 +55,17 @@ enum DocumentType {
   OTHER
 }
 
+enum QuoteNumberDatePattern {
+  NONE
+  YEAR
+  YEAR_MONTH
+}
+
 enum AuditAction {
   AUTH_LOGIN
   AUTH_LOGOUT
+  SETTINGS_UPDATED
+  QUOTE_NUMBERING_UPDATED
   PRICING_UPDATED
   PRICING_OVERRIDE_APPLIED
   CATALOG_CREATED
@@ -124,54 +132,57 @@ enum PricingRuleType {
 }
 
 model Tenant {
-  id              String                   @id @default(cuid())
-  name            String
-  slug            String                   @unique
-  status          TenantStatus             @default(ACTIVE)
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  accessories     Accessory[]
-  auditLogs       AuditLog[]
-  colorFinishes   ColorFinish[]
-  companySettings CompanySettings?
-  customers       Customer[]
-  documents       Document[]
-  glassPackages   GlassPackage[]
-  hardwareKits    HardwareKit[]
-  members         TenantMember[]
-  priceListItems  PriceListItem[]
-  priceLists      PriceList[]
-  pricingRules    PricingRule[]
-  profileItems    ProfileItem[]
-  profileSystems  ProfileSystem[]
-  projects        Project[]
-  quoteItems      QuoteItem[]
-  quoteResults    QuoteCalculationResult[]
-  quoteVersions   QuoteVersion[]
-  quotes          Quote[]
-  savedFilters    SavedFilter[]
-  serviceItems    ServiceItem[]
-  suppliers       Supplier[]
-  taxRates        TaxRate[]
+  id                  String                   @id @default(cuid())
+  name                String
+  slug                String                   @unique
+  status              TenantStatus             @default(ACTIVE)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  accessories         Accessory[]
+  auditLogs           AuditLog[]
+  colorFinishes       ColorFinish[]
+  companySettings     CompanySettings?
+  customers           Customer[]
+  documents           Document[]
+  glassPackages       GlassPackage[]
+  hardwareKits        HardwareKit[]
+  members             TenantMember[]
+  priceListItems      PriceListItem[]
+  priceLists          PriceList[]
+  pricingRules        PricingRule[]
+  profileItems        ProfileItem[]
+  profileSystems      ProfileSystem[]
+  projects            Project[]
+  quoteItems          QuoteItem[]
+  quoteNumberSettings QuoteNumberSettings?
+  quoteResults        QuoteCalculationResult[]
+  quoteVersions       QuoteVersion[]
+  quotes              Quote[]
+  savedFilters        SavedFilter[]
+  serviceItems        ServiceItem[]
+  suppliers           Supplier[]
+  taxRates            TaxRate[]
+  userPreferences     UserPreference[]
 
   @@index([status])
 }
 
 model User {
-  id                   String         @id @default(cuid())
-  email                String         @unique
+  id                   String           @id @default(cuid())
+  email                String           @unique
   displayName          String
   authProvider         String?
   authProviderSubject  String?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  assignedQuotes       Quote[]        @relation("QuoteAssignedTo")
-  auditLogs            AuditLog[]     @relation("AuditActor")
-  createdPriceLists    PriceList[]    @relation("PriceListCreatedBy")
-  createdQuotes        Quote[]        @relation("QuoteCreatedBy")
-  createdQuoteVersions QuoteVersion[] @relation("QuoteVersionCreatedBy")
-  generatedDocuments   Document[]     @relation("DocumentGeneratedBy")
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  assignedQuotes       Quote[]          @relation("QuoteAssignedTo")
+  auditLogs            AuditLog[]       @relation("AuditActor")
+  createdPriceLists    PriceList[]      @relation("PriceListCreatedBy")
+  createdQuotes        Quote[]          @relation("QuoteCreatedBy")
+  createdQuoteVersions QuoteVersion[]   @relation("QuoteVersionCreatedBy")
+  generatedDocuments   Document[]       @relation("DocumentGeneratedBy")
   memberships          TenantMember[]
+  preferences          UserPreference[]
   savedFilters         SavedFilter[]
 
   @@index([email])
@@ -214,6 +225,7 @@ model CompanySettings {
   website             String?
   logoUrl             String?
   defaultCurrency     String   @default("RON")
+  defaultPdfTemplate  String   @default("template-a")
   vatRateBasisPoints  Int?
   offerValidityDays   Int?
   paymentTermsText    String?
@@ -228,6 +240,35 @@ model CompanySettings {
   tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+}
+
+model QuoteNumberSettings {
+  id          String                 @id @default(cuid())
+  tenantId    String                 @unique
+  prefix      String                 @default("OF")
+  nextNumber  Int                    @default(1)
+  datePattern QuoteNumberDatePattern @default(YEAR)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model UserPreference {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  userId             String
+  defaultPdfTemplate String?
+  dashboardShortcuts Json?
+  language           String   @default("ro")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, userId])
 }
 
 model Supplier {

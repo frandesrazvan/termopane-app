@@ -68,3 +68,11 @@ offers for windows, doors, and custom items.
 3. Represent unknown business rules as tenant configuration or explicit TODOs.
 4. Prefer deterministic, testable calculation code over UI-only arithmetic.
 5. Keep documents and generated PDFs customer-safe by default.
+
+## COD-027 settings and numbering notes
+
+The MVP now includes `/dashboard/settings` for Romanian company settings, PDF defaults, quote
+numbering, and per-user dashboard preferences. Company and PDF defaults affect new quote-version
+snapshots only; locked historical versions continue to render from their stored snapshots. Tenant
+quote numbers are generated from tenant-owned numbering settings with collision retries instead of
+temporary random app-side numbers.

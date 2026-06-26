@@ -4,6 +4,8 @@ import {
   canApplyCommercialOverrides,
   canGeneratePdf,
   canManageCatalog,
+  canManageCompanySettings,
+  canManageQuoteNumbering,
   canManageUsers,
   canViewInternalCosts,
 } from "./permissions";
@@ -54,6 +56,8 @@ describe("tenant permission helpers", () => {
     expect(canViewInternalCosts(dealer)).toBe(false);
     expect(canGeneratePdf(dealer)).toBe(true);
     expect(canManageCatalog(dealer)).toBe(false);
+    expect(canManageCompanySettings(dealer)).toBe(false);
+    expect(canManageQuoteNumbering(dealer)).toBe(false);
     expect(canApplyCommercialOverrides(dealer)).toBe(false);
   });
 
@@ -71,12 +75,16 @@ describe("tenant permission helpers", () => {
 
     expect(canViewInternalCosts(owner)).toBe(true);
     expect(canManageCatalog(owner)).toBe(true);
+    expect(canManageCompanySettings(owner)).toBe(true);
+    expect(canManageQuoteNumbering(owner)).toBe(true);
     expect(canManageUsers(owner)).toBe(true);
     expect(canGeneratePdf(owner)).toBe(true);
     expect(canApplyCommercialOverrides(owner)).toBe(true);
 
     expect(canViewInternalCosts(admin)).toBe(true);
     expect(canManageCatalog(admin)).toBe(true);
+    expect(canManageCompanySettings(admin)).toBe(true);
+    expect(canManageQuoteNumbering(admin)).toBe(false);
     expect(canManageUsers(admin)).toBe(false);
     expect(canGeneratePdf(admin)).toBe(true);
     expect(canApplyCommercialOverrides(admin)).toBe(true);
@@ -99,6 +107,8 @@ describe("tenant permission helpers", () => {
 
     expect(canViewInternalCosts(owner)).toBe(false);
     expect(canManageCatalog(owner)).toBe(false);
+    expect(canManageCompanySettings(owner)).toBe(false);
+    expect(canManageQuoteNumbering(owner)).toBe(false);
     expect(canManageUsers(owner)).toBe(false);
     expect(canGeneratePdf(owner)).toBe(false);
     expect(canApplyCommercialOverrides(owner)).toBe(false);

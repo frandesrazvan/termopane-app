@@ -116,6 +116,13 @@ Mobile audit widths for this hardening pass are `360px`, `390px`, and `430px`. T
 that Romanian labels, totals, status badges, sticky actions, and bottom navigation remain readable
 without hover-only controls at those widths.
 
+## COD-027 settings UX notes
+
+`/dashboard/settings` is a mobile-first configuration screen for company/PDF defaults, quote
+numbering, and personal shortcuts. OWNER/ADMIN users can edit company settings, only OWNER users can
+edit numbering, and restricted roles see read-only controls for tenant-wide settings. The quote-number
+preview must remain visible near prefix/date/next-number inputs on small screens.
+
 ## Accessibility and responsiveness
 
 - Tap targets should be large enough for mobile use.

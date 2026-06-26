@@ -415,10 +415,10 @@ export async function generateQuotePdfAction(
   const templateKeyValue = formText(formData, "templateKey");
   const templateKey = isQuotePdfTemplateKey(templateKeyValue)
     ? templateKeyValue
-    : "template-a";
+    : undefined;
   const result = await generateTenantQuotePdf(context, quoteId, quoteVersionId, {
     actorUserId: context.user.id,
-    templateKey,
+    ...(templateKey ? { templateKey } : {}),
   });
 
   if (!result.ok) {

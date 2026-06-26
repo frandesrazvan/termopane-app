@@ -8,6 +8,7 @@ import {
   PriceListStatus,
   PricingRuleType,
   ProfileItemType,
+  QuoteNumberDatePattern,
   QuoteItemType,
   QuoteStatus,
   QuoteVersionStatus,
@@ -259,6 +260,7 @@ async function main() {
       legalName: "Synthetic Termopane SRL",
       displayName: "Synthetic Termopane",
       defaultCurrency: "RON",
+      defaultPdfTemplate: "template-a",
       vatRateBasisPoints: 1900,
       offerValidityDays: 14,
       paymentTermsText: "Synthetic payment terms for local development only.",
@@ -283,6 +285,7 @@ async function main() {
       email: "office@example.test",
       phone: "+40000000000",
       defaultCurrency: "RON",
+      defaultPdfTemplate: "template-a",
       vatRateBasisPoints: 1900,
       offerValidityDays: 14,
       paymentTermsText: "Synthetic payment terms for local development only.",
@@ -295,6 +298,44 @@ async function main() {
       calculationDefaults: {
         note: "Calculation settings require business validation before production use.",
       },
+    },
+  });
+
+  const quoteNumberSettings = await prisma.quoteNumberSettings.upsert({
+    where: { tenantId: tenant.id },
+    update: {
+      prefix: "SYN",
+      nextNumber: 2,
+      datePattern: QuoteNumberDatePattern.NONE,
+    },
+    create: {
+      id: "seed_quote_number_settings",
+      tenantId: tenant.id,
+      prefix: "SYN",
+      nextNumber: 2,
+      datePattern: QuoteNumberDatePattern.NONE,
+    },
+  });
+
+  await prisma.userPreference.upsert({
+    where: {
+      tenantId_userId: {
+        tenantId: tenant.id,
+        userId: owner.id,
+      },
+    },
+    update: {
+      defaultPdfTemplate: "template-a",
+      dashboardShortcuts: ["new-quote", "quotes"],
+      language: "ro",
+    },
+    create: {
+      id: "seed_user_preference_owner",
+      tenantId: tenant.id,
+      userId: owner.id,
+      defaultPdfTemplate: "template-a",
+      dashboardShortcuts: ["new-quote", "quotes"],
+      language: "ro",
     },
   });
 
@@ -807,6 +848,7 @@ async function main() {
       companySettingsSnapshot: {
         displayName: companySettings.displayName,
         defaultCurrency: companySettings.defaultCurrency,
+        defaultPdfTemplate: companySettings.defaultPdfTemplate,
         vatRateBasisPoints: companySettings.vatRateBasisPoints,
       },
       priceSnapshot: {
@@ -836,6 +878,7 @@ async function main() {
       companySettingsSnapshot: {
         displayName: companySettings.displayName,
         defaultCurrency: companySettings.defaultCurrency,
+        defaultPdfTemplate: companySettings.defaultPdfTemplate,
         vatRateBasisPoints: companySettings.vatRateBasisPoints,
       },
       priceSnapshot: {
@@ -1040,6 +1083,7 @@ async function main() {
       entityId: quote.id,
       metadata: {
         source: "synthetic-seed",
+        nextQuoteNumberPreview: `${quoteNumberSettings.prefix}-${String(quoteNumberSettings.nextNumber).padStart(4, "0")}`,
       },
     },
     create: {
