@@ -30,6 +30,9 @@ production formulas.
   discounts with a required reason. DEALER users remain blocked from these override actions.
 - Quote review screens separate calculated totals, quote discounts, manual adjustments, and final
   overridden totals before locking or generating customer-facing documents.
+- Saved-offer workflow filters now persist per user with `SavedFilter`, with Romanian quick filters
+  for draft/sent/accepted/rejected offers, expiring offers, generated PDFs, missing calculations,
+  and warnings.
 
 ## Stack
 

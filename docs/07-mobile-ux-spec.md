@@ -86,6 +86,16 @@ reason before submission. The review panel separates `Total calculat`, `Reducere
 `Ajustări manuale`, `Total înainte de override`, and final `Total` so mobile users can see what the
 calculator produced versus what was commercially adjusted before locking a version.
 
+## COD-022 saved offer workflow notes
+
+The saved-offers page now presents quick workflow filters for `Ciorne`, `Trimise`, `Acceptate`,
+`Respinsă`, `Expiră curând`, `Cu PDF generat`, `Fără calcul`, and `Cu avertizări`. Users can combine
+manual filters with workflow filters and save the current view as a user-specific `SavedFilter`.
+
+Offer cards show the quote status, current quote-version status, generated-PDF state, missing
+calculation state, and warning count in Romanian badges so mobile users can triage work without
+opening every offer.
+
 ## Accessibility and responsiveness
 
 - Tap targets should be large enough for mobile use.
