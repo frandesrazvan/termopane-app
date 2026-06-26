@@ -141,8 +141,9 @@ the current development/test behavior under ignored local storage. The S3-compat
 deployment configuration stub: it validates endpoint, region, bucket, and credential env values, then
 returns a controlled not-implemented storage error until an SDK-backed adapter is added.
 
-Generation distinguishes storage-write failures from `Document` metadata creation failures. If bytes
-are stored but the immutable `Document` row or audit metadata cannot be created, the app attempts to
-delete the just-written object so failed generations do not leave orphaned PDF files. Customer-facing
-PDF contents, tenant-scoped document access, quote-version binding, and hidden internal costs are
-unchanged.
+Generation distinguishes storage-write failures from `Document` metadata creation failures. The
+generated key remains the provider input, while the provider-returned storage key is persisted on the
+immutable `Document` row. If bytes are stored but the `Document` row or audit metadata cannot be
+created, the app attempts to delete the provider-returned object so failed generations do not leave
+orphaned PDF files. Customer-facing PDF contents, tenant-scoped document access, quote-version
+binding, and hidden internal costs are unchanged.

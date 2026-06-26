@@ -260,10 +260,11 @@ remains the default for development and tests, while the S3-compatible provider 
 stub that validates deployment environment values and fails with a controlled storage error until a
 real object-storage adapter is implemented.
 
-`Document` rows remain tenant-owned metadata bound to quote versions. PDF generation writes storage
-bytes first, then creates the immutable `Document` row and audit entry. If metadata creation fails
-after storage succeeds, generation attempts to delete the newly written storage object to avoid
-orphaned files; no customer PII is added to storage logs or configuration.
+`Document` rows remain tenant-owned metadata bound to quote versions. PDF generation passes a
+requested storage key to the provider, persists the provider-returned key on the immutable
+`Document` row, and includes that key in audit metadata. If metadata creation fails after storage
+succeeds, generation attempts to delete the provider-returned storage object to avoid orphaned files;
+no customer PII is added to storage logs or configuration.
 
 ## COD-020 manual commercial override notes
 
