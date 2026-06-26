@@ -110,6 +110,19 @@ totals and checksum metadata, and writes an `AuditLog` entry with `DOCUMENT_GENE
 does not overwrite existing document records or files; production object storage remains a future
 deployment concern.
 
+## COD-031 send/download workflow notes
+
+The customer send workflow requires an existing generated quote PDF for the current locked version.
+Sending does not regenerate or rewrite the PDF; it records `QUOTE_SENT`, sets the quote version
+`sentAt`, updates the quote shell to `SENT`, and stores the selected `documentId` plus optional
+intended recipient fields in audit metadata. The email path is a stub until a real provider is
+explicitly configured in a future task.
+
+The send confirmation screen is customer-safe: it renders explicit document metadata and visible
+customer totals only, and it does not print raw snapshots, supplier costs, margins, or calculation
+trace details. Corrections after send require a new quote revision rather than mutating the sent
+version or rebinding the sent document.
+
 ## COD-029 accessory/service line output notes
 
 Template A and Template B customer-facing snapshots include catalog-backed accessory, service,

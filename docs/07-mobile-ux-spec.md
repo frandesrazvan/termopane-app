@@ -101,6 +101,16 @@ automatic formula execution, or changes to locked historical quote snapshots.
 - After generation, provide preview/download/share actions according to platform capability.
 - Make it clear whether the generated PDF is for a draft, sent version, or revised version.
 
+## COD-031 customer delivery UX notes
+
+Generated PDFs on a locked version expose a Romanian `Trimite către client` action with optional
+recipient name/email fields. The current MVP records this as a stub only; the UI must not imply that
+a real email provider sent the message.
+
+After send, users land on a confirmation screen with the quote number, version, sent timestamp,
+download action, and customer-visible totals. The screen avoids internal costs and trace details, and
+the quote detail page explains that a revision is the only way to change a sent offer.
+
 ## COD-020 commercial adjustment UX notes
 
 The quote detail workflow exposes Romanian commercial controls only on mutable drafts. Authorized

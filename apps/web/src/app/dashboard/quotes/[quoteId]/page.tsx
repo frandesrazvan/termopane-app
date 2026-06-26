@@ -3,13 +3,16 @@ import {
   ArrowLeft,
   CalendarDays,
   Calculator,
+  CheckCircle2,
   Download,
   FileText,
   Lock,
+  Mail,
   Pencil,
   Plus,
   RefreshCw,
   Ruler,
+  Send,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -85,6 +88,7 @@ import {
   generateQuotePdfAction,
   lockCurrentQuoteVersionAction,
   recalculateCurrentQuoteVersionAction,
+  sendQuoteToCustomerAction,
   updateQuoteItemAction,
 } from "./actions";
 import {
@@ -155,8 +159,12 @@ export default async function QuoteDetailPage({
     ]);
   }
 
-  const canEditItems = currentVersion ? isDraftVersionMutable(currentVersion) : false;
-  const canCreateRevision = currentVersion ? isLockedOrSentVersion(currentVersion) : false;
+  const canEditItems = currentVersion
+    ? isDraftVersionMutable(currentVersion)
+    : false;
+  const canCreateRevision = currentVersion
+    ? isLockedOrSentVersion(currentVersion)
+    : false;
   const canGenerateDocuments = canGeneratePdf(context.membership);
   const canViewInternalTrace = canViewInternalCosts(context.membership);
   const canApplyCommercialAdjustments =
@@ -214,18 +222,20 @@ export default async function QuoteDetailPage({
               <div className="flex size-10 items-center justify-center rounded-md bg-sky-50 text-sky-800">
                 <FileText aria-hidden="true" size={19} />
               </div>
-              <h2 className="text-base font-semibold text-zinc-950">Structură ofertă</h2>
+              <h2 className="text-base font-semibold text-zinc-950">
+                Structură ofertă
+              </h2>
             </div>
 
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               <Detail label="Client" value={customer.displayName} />
               <Detail label="Proiect" value={project?.name ?? "Fără proiect"} />
               <Detail label="Monedă" value={quote.currency} />
-              <Detail label="Autor" value={quote.createdById ?? commonLabel("notSet")} />
               <Detail
-                label="Creată"
-                value={formatDateRo(quote.createdAt)}
+                label="Autor"
+                value={quote.createdById ?? commonLabel("notSet")}
               />
+              <Detail label="Creată" value={formatDateRo(quote.createdAt)} />
               <Detail
                 label="Actualizată"
                 value={formatDateRo(quote.updatedAt)}
@@ -258,12 +268,18 @@ export default async function QuoteDetailPage({
           </aside>
         </div>
 
-        <section id="items" className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
+        <section
+          id="items"
+          className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm"
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-zinc-950">Poziții ofertă</h2>
+              <h2 className="text-lg font-semibold text-zinc-950">
+                Poziții ofertă
+              </h2>
               <p className="mt-1 text-sm text-zinc-600">
-                Conținutul ciornei pentru versiunea {currentVersion?.versionNumber ?? "-"}
+                Conținutul ciornei pentru versiunea{" "}
+                {currentVersion?.versionNumber ?? "-"}
               </p>
             </div>
             <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-sm font-medium text-zinc-600">
@@ -299,7 +315,8 @@ export default async function QuoteDetailPage({
             />
           ) : (
             <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
-              Pozițiile sunt doar pentru citire deoarece versiunea curentă este blocată, trimisă sau lipsește.
+              Pozițiile sunt doar pentru citire deoarece versiunea curentă este
+              blocată, trimisă sau lipsește.
             </p>
           )}
 
@@ -322,9 +339,12 @@ export default async function QuoteDetailPage({
               <div className="mx-auto flex size-11 items-center justify-center rounded-md bg-white text-zinc-700">
                 <FileText aria-hidden="true" size={20} />
               </div>
-              <h3 className="mt-4 text-base font-semibold text-zinc-950">Nu există poziții încă</h3>
+              <h3 className="mt-4 text-base font-semibold text-zinc-950">
+                Nu există poziții încă
+              </h3>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
-                Adaugă o fereastră fixă, o ușă sau o poziție personalizată pentru a începe oferta.
+                Adaugă o fereastră fixă, o ușă sau o poziție personalizată
+                pentru a începe oferta.
               </p>
             </div>
           )}
@@ -357,7 +377,9 @@ export default async function QuoteDetailPage({
         <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-zinc-950">Versiuni</h2>
-            <span className="text-sm font-medium text-zinc-500">{versions.length}</span>
+            <span className="text-sm font-medium text-zinc-500">
+              {versions.length}
+            </span>
           </div>
 
           {versions.length > 0 ? (
@@ -375,7 +397,10 @@ export default async function QuoteDetailPage({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <VersionBadge status={version.status} isLocked={version.isLocked} />
+                      <VersionBadge
+                        status={version.status}
+                        isLocked={version.isLocked}
+                      />
                       {version.isLocked ? (
                         <span className="inline-flex items-center gap-1 rounded-md bg-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-800">
                           <Lock aria-hidden="true" size={13} />
@@ -445,7 +470,9 @@ async function loadFixedWindowCatalogOptions(
     listTenantPriceLists(context),
   ]);
 
-  const selectableProfileSystems = profileSystems.filter(isSelectableProfileSystem);
+  const selectableProfileSystems = profileSystems.filter(
+    isSelectableProfileSystem,
+  );
 
   return {
     profileSystems: selectableProfileSystems,
@@ -453,20 +480,26 @@ async function loadFixedWindowCatalogOptions(
       (profileItem): profileItem is ProfileItem =>
         isSelectableCatalogRecord(profileItem) &&
         profileItem.type === ProfileItemType.FRAME &&
-        selectableProfileSystems.some((profileSystem) => profileSystem.id === profileItem.profileSystemId),
+        selectableProfileSystems.some(
+          (profileSystem) => profileSystem.id === profileItem.profileSystemId,
+        ),
     ),
     thresholdProfiles: profileItems.filter(
       (profileItem): profileItem is ProfileItem =>
         isSelectableCatalogRecord(profileItem) &&
         profileItem.type === ProfileItemType.THRESHOLD &&
-        selectableProfileSystems.some((profileSystem) => profileSystem.id === profileItem.profileSystemId),
+        selectableProfileSystems.some(
+          (profileSystem) => profileSystem.id === profileItem.profileSystemId,
+        ),
     ),
     glassPackages: glassPackages.filter(isSelectableGlassPackage),
     colorFinishes: colorFinishes.filter(
       (colorFinish): colorFinish is ColorFinish =>
         isSelectableCatalogRecord(colorFinish) &&
         (!colorFinish.profileSystemId ||
-          selectableProfileSystems.some((profileSystem) => profileSystem.id === colorFinish.profileSystemId)),
+          selectableProfileSystems.some(
+            (profileSystem) => profileSystem.id === colorFinish.profileSystemId,
+          )),
     ),
     hardwareKits: hardwareKits.filter(isSelectableHardwareKit),
     accessories: accessories.filter(isSelectableAccessory),
@@ -491,9 +524,17 @@ function AddItemForms({
           <Plus aria-hidden="true" size={17} />
           Fereastră fixă
         </summary>
-        <form action={addFixedWindowItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+        <form
+          action={addFixedWindowItemAction.bind(null, quoteId)}
+          className="mt-4 grid gap-3"
+        >
           <div className="grid gap-3 sm:grid-cols-3">
-            <NumberField label="Cantitate" name="quantity" min={1} defaultValue="1" />
+            <NumberField
+              label="Cantitate"
+              name="quantity"
+              min={1}
+              defaultValue="1"
+            />
             <NumberField label="Lățime mm" name="widthMm" min={1} />
             <NumberField label="Înălțime mm" name="heightMm" min={1} />
           </div>
@@ -504,7 +545,10 @@ function AddItemForms({
             required
           />
           <TextAreaField label="Note interne" name="internalNotes" />
-          <FixedWindowCatalogFields currency={currency} options={catalogOptions} />
+          <FixedWindowCatalogFields
+            currency={currency}
+            options={catalogOptions}
+          />
           <SubmitButton label="Adaugă fereastră fixă" />
         </form>
       </details>
@@ -514,9 +558,17 @@ function AddItemForms({
           <Plus aria-hidden="true" size={17} />
           Ușă
         </summary>
-        <form action={addDoorItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+        <form
+          action={addDoorItemAction.bind(null, quoteId)}
+          className="mt-4 grid gap-3"
+        >
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-            <NumberField label="Cantitate" name="quantity" min={1} defaultValue="1" />
+            <NumberField
+              label="Cantitate"
+              name="quantity"
+              min={1}
+              defaultValue="1"
+            />
             <NumberField label="Lățime mm" name="widthMm" min={1} />
             <NumberField label="Înălțime mm" name="heightMm" min={1} />
           </div>
@@ -554,9 +606,17 @@ function AddItemForms({
           <Plus aria-hidden="true" size={17} />
           Poziție personalizată
         </summary>
-        <form action={addCustomLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+        <form
+          action={addCustomLineItemAction.bind(null, quoteId)}
+          className="mt-4 grid gap-3"
+        >
           <div className="grid gap-3 sm:grid-cols-2">
-            <NumberField label="Cantitate" name="quantity" min={1} defaultValue="1" />
+            <NumberField
+              label="Cantitate"
+              name="quantity"
+              min={1}
+              defaultValue="1"
+            />
             <TextField
               label={`Preț unitar (${currency})`}
               name="unitPrice"
@@ -580,8 +640,14 @@ function AddItemForms({
           <Plus aria-hidden="true" size={17} />
           Accesoriu
         </summary>
-        <form action={addAccessoryLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
-          <CatalogLinePriceNotice activePriceList={catalogOptions.activePriceList} currency={currency} />
+        <form
+          action={addAccessoryLineItemAction.bind(null, quoteId)}
+          className="mt-4 grid gap-3"
+        >
+          <CatalogLinePriceNotice
+            activePriceList={catalogOptions.activePriceList}
+            currency={currency}
+          />
           <AccessoryLineCatalogFields options={catalogOptions} />
           <NumberField
             defaultValue="1"
@@ -606,8 +672,14 @@ function AddItemForms({
           <Plus aria-hidden="true" size={17} />
           Serviciu
         </summary>
-        <form action={addServiceLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
-          <CatalogLinePriceNotice activePriceList={catalogOptions.activePriceList} currency={currency} />
+        <form
+          action={addServiceLineItemAction.bind(null, quoteId)}
+          className="mt-4 grid gap-3"
+        >
+          <CatalogLinePriceNotice
+            activePriceList={catalogOptions.activePriceList}
+            currency={currency}
+          />
           <ServiceLineCatalogFields options={catalogOptions} />
           <NumberField
             defaultValue="1"
@@ -632,8 +704,14 @@ function AddItemForms({
           <Plus aria-hidden="true" size={17} />
           Transport
         </summary>
-        <form action={addTransportLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
-          <CatalogLinePriceNotice activePriceList={catalogOptions.activePriceList} currency={currency} />
+        <form
+          action={addTransportLineItemAction.bind(null, quoteId)}
+          className="mt-4 grid gap-3"
+        >
+          <CatalogLinePriceNotice
+            activePriceList={catalogOptions.activePriceList}
+            currency={currency}
+          />
           <ServiceLineCatalogFields
             label="Serviciu transport"
             options={catalogOptions}
@@ -662,8 +740,14 @@ function AddItemForms({
           <Plus aria-hidden="true" size={17} />
           Montaj
         </summary>
-        <form action={addInstallationLineItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
-          <CatalogLinePriceNotice activePriceList={catalogOptions.activePriceList} currency={currency} />
+        <form
+          action={addInstallationLineItemAction.bind(null, quoteId)}
+          className="mt-4 grid gap-3"
+        >
+          <CatalogLinePriceNotice
+            activePriceList={catalogOptions.activePriceList}
+            currency={currency}
+          />
           <ServiceLineCatalogFields
             label="Serviciu montaj"
             options={catalogOptions}
@@ -707,7 +791,8 @@ function CatalogLinePriceNotice({
 
   return (
     <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
-      Nu există listă de prețuri activă pentru {currency}; calculul va marca preț lipsă.
+      Nu există listă de prețuri activă pentru {currency}; calculul va marca
+      preț lipsă.
     </p>
   );
 }
@@ -730,20 +815,35 @@ function QuoteDocumentsCard({
   quoteId: string;
 }) {
   const canGeneratePdfForVersion =
-    canGenerateDocuments && currentVersion ? isLockedOrSentVersion(currentVersion) : false;
+    canGenerateDocuments && currentVersion
+      ? isLockedOrSentVersion(currentVersion)
+      : false;
+  const canSendDocuments =
+    canGenerateDocuments && currentVersion
+      ? isLockedVersionReadyForSend(currentVersion)
+      : false;
+  const sentAt = currentVersion?.sentAt;
 
   return (
-    <section id="documents" className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
+    <section
+      id="documents"
+      className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Documente</h2>
           <p className="mt-1 text-sm text-zinc-600">
-            PDF-uri imutabile Template A/B pentru versiunea {currentVersion?.versionNumber ?? "-"}
+            PDF-uri imutabile Template A/B pentru versiunea{" "}
+            {currentVersion?.versionNumber ?? "-"}
           </p>
         </div>
         {currentVersion && canGeneratePdfForVersion ? (
           <form
-            action={generateQuotePdfAction.bind(null, quoteId, currentVersion.id)}
+            action={generateQuotePdfAction.bind(
+              null,
+              quoteId,
+              currentVersion.id,
+            )}
             className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
           >
             <label className="sr-only" htmlFor="quote-template-key">
@@ -756,7 +856,9 @@ function QuoteDocumentsCard({
               name="templateKey"
             >
               <option value="template-a">Template A - ofertă detaliată</option>
-              <option value="template-b">Template B - propunere compactă</option>
+              <option value="template-b">
+                Template B - propunere compactă
+              </option>
             </select>
             <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
               <FileText aria-hidden="true" size={15} />
@@ -765,7 +867,9 @@ function QuoteDocumentsCard({
           </form>
         ) : (
           <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-sm font-medium text-zinc-600">
-            {canGenerateDocuments ? "Blochează versiunea întâi" : "Generare PDF nepermisă"}
+            {canGenerateDocuments
+              ? "Blochează versiunea întâi"
+              : "Generare PDF nepermisă"}
           </span>
         )}
       </div>
@@ -775,18 +879,38 @@ function QuoteDocumentsCard({
           Documentul PDF a fost generat și stocat pentru această versiune.
         </p>
       ) : null}
+      {sentAt ? (
+        <p className="mt-4 flex items-start gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+          <CheckCircle2
+            className="mt-0.5 shrink-0"
+            aria-hidden="true"
+            size={16}
+          />
+          <span>
+            Oferta a fost marcată ca trimisă la {formatDateTimeRo(sentAt)}.
+            Orice schimbare se face printr-o revizie nouă.
+          </span>
+        </p>
+      ) : null}
       {documentError ? (
         <p className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
           {documentError === "locked"
             ? "Blochează versiunea înainte de a genera un PDF pentru client."
-            : "PDF-ul nu a putut fi generat. Verifică versiunea ofertei și stocarea locală."}
+            : documentError === "recipient"
+              ? "Completează o adresă email validă sau lasă câmpul gol pentru confirmare fără email."
+              : documentError === "send"
+                ? "Oferta nu a putut fi trimisă. Verifică dacă versiunea este blocată și PDF-ul aparține acestei oferte."
+                : "PDF-ul nu a putut fi generat. Verifică versiunea ofertei și stocarea locală."}
         </p>
       ) : null}
 
       {documents.length > 0 ? (
         <div className="mt-5 grid gap-3">
           {documents.map((document) => (
-            <div key={document.id} className="rounded-md border border-zinc-200 bg-stone-50 p-4">
+            <div
+              key={document.id}
+              className="rounded-md border border-zinc-200 bg-stone-50 p-4"
+            >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <h3 className="break-words text-sm font-semibold text-zinc-950">
@@ -812,6 +936,46 @@ function QuoteDocumentsCard({
                   Descarcă
                 </Link>
               </div>
+              {canSendDocuments ? (
+                <form
+                  action={sendQuoteToCustomerAction.bind(null, quoteId)}
+                  className="mt-4 grid gap-3 border-t border-zinc-200 pt-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                >
+                  <input name="documentId" type="hidden" value={document.id} />
+                  <label className="grid gap-1 text-xs font-semibold text-zinc-700">
+                    Email destinatar (opțional)
+                    <span className="relative">
+                      <Mail
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                        aria-hidden="true"
+                        size={14}
+                      />
+                      <input
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white pl-9 pr-3 text-sm font-medium text-zinc-900 shadow-sm"
+                        name="intendedRecipientEmail"
+                        placeholder="client@example.test"
+                        type="email"
+                      />
+                    </span>
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-zinc-700">
+                    Nume destinatar (opțional)
+                    <input
+                      className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-900 shadow-sm"
+                      name="intendedRecipientName"
+                      placeholder="Contact client"
+                    />
+                  </label>
+                  <button className="inline-flex h-10 w-full items-center justify-center gap-2 self-end rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
+                    <Send aria-hidden="true" size={15} />
+                    Trimite către client
+                  </button>
+                  <p className="text-xs text-zinc-500 sm:col-span-3">
+                    Stub email: se înregistrează destinatarul intenționat și
+                    documentul; nu se trimite email real.
+                  </p>
+                </form>
+              ) : null}
             </div>
           ))}
         </div>
@@ -895,10 +1059,15 @@ function VersionLifecyclePanel({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-zinc-950">
-              Versiunea {currentVersion.versionNumber} este blocată
+              Versiunea {currentVersion.versionNumber} este{" "}
+              {currentVersion.status === QuoteVersionStatus.SENT ||
+              currentVersion.sentAt
+                ? "trimisă"
+                : "blocată"}
             </h2>
             <p className="mt-1 text-sm text-zinc-600">
-              Creează o revizie înainte de a edita poziții, totaluri sau snapshot-uri de calcul.
+              Revizia este singura cale de a edita poziții, totaluri sau
+              snapshot-uri de calcul după blocare sau trimitere.
             </p>
           </div>
           <form action={createQuoteRevisionAction.bind(null, quoteId)}>
@@ -931,14 +1100,18 @@ function QuoteMobileActionBar({
   quoteId: string;
 }) {
   const canGeneratePdfForVersion =
-    canGenerateDocuments && currentVersion ? isLockedOrSentVersion(currentVersion) : false;
+    canGenerateDocuments && currentVersion
+      ? isLockedOrSentVersion(currentVersion)
+      : false;
 
   return (
     <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-30 lg:hidden">
       <div className="mx-auto max-w-md rounded-md border border-zinc-200 bg-white/95 p-3 shadow-[0_12px_36px_rgba(24,24,27,0.18)] backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase text-zinc-500">Total curent</p>
+            <p className="text-xs font-medium uppercase text-zinc-500">
+              Total curent
+            </p>
             <p className="mt-1 truncate text-base font-semibold text-zinc-950">
               {formatMinor(currentVersion?.totalMinor, currency)}
             </p>
@@ -998,7 +1171,9 @@ function QuoteMobilePrimaryAction({
 
   if (currentVersion && canGeneratePdfForVersion) {
     return (
-      <form action={generateQuotePdfAction.bind(null, quoteId, currentVersion.id)}>
+      <form
+        action={generateQuotePdfAction.bind(null, quoteId, currentVersion.id)}
+      >
         <input name="templateKey" type="hidden" value={defaultTemplateKey} />
         <button className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm active:bg-zinc-800">
           <Download aria-hidden="true" size={15} />
@@ -1053,29 +1228,43 @@ function CalculationReviewCard({
 }) {
   const output = asRecord(calculationResult?.outputSnapshot);
   const metrics = calculationMetrics(output);
-  const warnings = calculationWarnings(currentVersion, calculationResult, output);
+  const warnings = calculationWarnings(
+    currentVersion,
+    calculationResult,
+    output,
+  );
   const traceSummary = asRecord(currentVersion?.traceSummary);
-  const traceCount = numberFrom(traceSummary?.traceEntryCount) ?? arrayLength(calculationResult?.trace);
+  const traceCount =
+    numberFrom(traceSummary?.traceEntryCount) ??
+    arrayLength(calculationResult?.trace);
   const traceSteps = traceStepNames(calculationResult);
   const commercialTotals = commercialTotalsFromVersion(currentVersion);
   const quoteDiscount = quoteDiscountFromVersion(currentVersion);
 
   return (
-    <section id="calculation" className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
+    <section
+      id="calculation"
+      className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-800">
             <Calculator aria-hidden="true" size={19} />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-zinc-950">Verificare calcul</h2>
+            <h2 className="text-lg font-semibold text-zinc-950">
+              Verificare calcul
+            </h2>
             <p className="mt-1 text-sm text-zinc-600">
-              Totaluri și avertizări stocate pentru versiunea {currentVersion?.versionNumber ?? "-"}
+              Totaluri și avertizări stocate pentru versiunea{" "}
+              {currentVersion?.versionNumber ?? "-"}
             </p>
           </div>
         </div>
         {canRecalculate ? (
-          <form action={recalculateCurrentQuoteVersionAction.bind(null, quoteId)}>
+          <form
+            action={recalculateCurrentQuoteVersionAction.bind(null, quoteId)}
+          >
             <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
               <RefreshCw aria-hidden="true" size={15} />
               Recalculează
@@ -1090,7 +1279,8 @@ function CalculationReviewCard({
 
       {calculationError ? (
         <p className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
-          Această versiune este blocată sau trimisă, deci nu poate fi recalculată în loc.
+          Această versiune este blocată sau trimisă, deci nu poate fi
+          recalculată în loc.
         </p>
       ) : null}
       {wasCalculated ? (
@@ -1123,17 +1313,33 @@ function CalculationReviewCard({
         />
         <Metric
           label="Ajustări manuale"
-          value={formatSignedMinor(commercialTotals.manualAdjustmentMinor, currency)}
+          value={formatSignedMinor(
+            commercialTotals.manualAdjustmentMinor,
+            currency,
+          )}
         />
-        <Metric label="Total" value={formatMinor(currentVersion?.totalMinor, currency)} emphasized />
+        <Metric
+          label="Total"
+          value={formatMinor(currentVersion?.totalMinor, currency)}
+          emphasized
+        />
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <Metric label="Subtotal" value={formatMinor(currentVersion?.subtotalMinor, currency)} />
-        <Metric label="TVA" value={formatMinor(currentVersion?.vatMinor, currency)} />
+        <Metric
+          label="Subtotal"
+          value={formatMinor(currentVersion?.subtotalMinor, currency)}
+        />
+        <Metric
+          label="TVA"
+          value={formatMinor(currentVersion?.vatMinor, currency)}
+        />
         <Metric
           label="Total înainte de override"
-          value={formatMinor(commercialTotals.totalBeforeManualOverrideMinor, currency)}
+          value={formatMinor(
+            commercialTotals.totalBeforeManualOverrideMinor,
+            currency,
+          )}
         />
       </div>
 
@@ -1146,9 +1352,15 @@ function CalculationReviewCard({
       />
 
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <Metric label="Necesar materiale" value={String(metrics.materialRequirementsCount)} />
+        <Metric
+          label="Necesar materiale"
+          value={String(metrics.materialRequirementsCount)}
+        />
         <Metric label="Cote sticlă" value={String(metrics.glassCutsCount)} />
-        <Metric label="Metri liniari profil" value={`${formatMeasurement(metrics.profileMeters)} m`} />
+        <Metric
+          label="Metri liniari profil"
+          value={`${formatMeasurement(metrics.profileMeters)} m`}
+        />
       </div>
 
       {!calculationResult ? (
@@ -1165,7 +1377,10 @@ function CalculationReviewCard({
           </div>
           <ul className="mt-3 grid gap-2">
             {warnings.map((warning, index) => (
-              <li key={`${warning.code}-${warning.path ?? index}`} className="text-sm text-amber-900">
+              <li
+                key={`${warning.code}-${warning.path ?? index}`}
+                className="text-sm text-amber-900"
+              >
                 <span className="font-semibold">{warning.code}</span>
                 {warning.message ? ` - ${warning.message}` : ""}
               </li>
@@ -1181,7 +1396,9 @@ function CalculationReviewCard({
       {traceCount > 0 ? (
         canViewInternalTrace ? (
           <div className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
-            <p className="font-semibold text-zinc-900">Intrări urmă calcul: {traceCount}</p>
+            <p className="font-semibold text-zinc-900">
+              Intrări urmă calcul: {traceCount}
+            </p>
             {traceSteps.length > 0 ? (
               <p className="mt-2 break-words">
                 Pași: {traceSteps.slice(0, 8).join(", ")}
@@ -1248,7 +1465,10 @@ function QuoteDiscountControls({
           . Motiv: {quoteDiscount.reason}
         </p>
       ) : null}
-      <form action={applyQuoteDiscountAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+      <form
+        action={applyQuoteDiscountAction.bind(null, quoteId)}
+        className="mt-4 grid gap-3"
+      >
         <div className="grid gap-3 sm:grid-cols-2">
           <SelectField
             defaultValue={defaultType}
@@ -1292,7 +1512,9 @@ function Metric({
   return (
     <div className="rounded-md bg-stone-100 p-3">
       <p className="text-xs font-medium uppercase text-zinc-500">{label}</p>
-      <p className={`mt-2 break-words text-sm font-semibold ${emphasized ? "text-zinc-950" : "text-zinc-800"}`}>
+      <p
+        className={`mt-2 break-words text-sm font-semibold ${emphasized ? "text-zinc-950" : "text-zinc-800"}`}
+      >
         {value}
       </p>
     </div>
@@ -1336,8 +1558,11 @@ function QuoteItemCard({
               </h3>
             </div>
             <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-xs font-semibold text-zinc-700">
-              Cant. {formatQuantity(catalogLineDetails?.quantity ?? item.quantity)}
-              {catalogLineDetails?.unitLabel ? ` ${catalogLineDetails.unitLabel}` : ""}
+              Cant.{" "}
+              {formatQuantity(catalogLineDetails?.quantity ?? item.quantity)}
+              {catalogLineDetails?.unitLabel
+                ? ` ${catalogLineDetails.unitLabel}`
+                : ""}
             </span>
           </div>
 
@@ -1356,15 +1581,19 @@ function QuoteItemCard({
             {catalogLineDetails?.unitPriceMinor !== null &&
             catalogLineDetails?.unitPriceMinor !== undefined ? (
               <span className="rounded-md bg-stone-100 px-2 py-1">
-                Preț catalog unitar {formatMinor(catalogLineDetails.unitPriceMinor, currency)}
+                Preț catalog unitar{" "}
+                {formatMinor(catalogLineDetails.unitPriceMinor, currency)}
               </span>
             ) : null}
             <span className="rounded-md bg-stone-100 px-2 py-1">
-              {itemTotals ? `Total ${formatMinor(itemTotals.totalMinor, currency)}` : "Total în așteptare"}
+              {itemTotals
+                ? `Total ${formatMinor(itemTotals.totalMinor, currency)}`
+                : "Total în așteptare"}
             </span>
             {itemTotals ? (
               <span className="rounded-md bg-white px-2 py-1 ring-1 ring-zinc-200">
-                Calculat {formatMinor(itemTotals.calculatedTotalMinor, currency)}
+                Calculat{" "}
+                {formatMinor(itemTotals.calculatedTotalMinor, currency)}
               </span>
             ) : null}
             {itemTotals?.hasManualOverride ? (
@@ -1377,7 +1606,8 @@ function QuoteItemCard({
           {manualOverride ? (
             <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
               <p className="font-semibold">
-                Override manual: {formatMinor(manualOverride.amountMinor, currency)}
+                Override manual:{" "}
+                {formatMinor(manualOverride.amountMinor, currency)}
               </p>
               <p className="mt-1 break-words">Motiv: {manualOverride.reason}</p>
             </div>
@@ -1392,8 +1622,13 @@ function QuoteItemCard({
           {catalogSummary.length > 0 ? (
             <dl className="mt-3 grid gap-2 sm:grid-cols-2">
               {catalogSummary.map((entry) => (
-                <div key={entry.label} className="rounded-md bg-stone-50 px-3 py-2">
-                  <dt className="text-xs font-semibold uppercase text-zinc-500">{entry.label}</dt>
+                <div
+                  key={entry.label}
+                  className="rounded-md bg-stone-50 px-3 py-2"
+                >
+                  <dt className="text-xs font-semibold uppercase text-zinc-500">
+                    {entry.label}
+                  </dt>
                   <dd className="mt-1 break-words text-sm font-medium text-zinc-800">
                     {entry.value}
                   </dd>
@@ -1524,7 +1759,10 @@ function QuoteItemEditForm({
 
   if (lineKind) {
     return (
-      <form action={updateQuoteItemAction.bind(null, quoteId, item.id)} className="mt-4 grid gap-3">
+      <form
+        action={updateQuoteItemAction.bind(null, quoteId, item.id)}
+        className="mt-4 grid gap-3"
+      >
         <input type="hidden" name="itemType" value={item.type} />
         <NumberField
           defaultValue={formatQuantity(lineDetails?.quantity ?? item.quantity)}
@@ -1562,11 +1800,20 @@ function QuoteItemEditForm({
   }
 
   return (
-    <form action={updateQuoteItemAction.bind(null, quoteId, item.id)} className="mt-4 grid gap-3">
+    <form
+      action={updateQuoteItemAction.bind(null, quoteId, item.id)}
+      className="mt-4 grid gap-3"
+    >
       <input type="hidden" name="itemType" value={item.type} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <NumberField label="Cantitate" name="quantity" min={1} defaultValue={String(item.quantity)} />
-        {item.type === QuoteItemType.WINDOW || item.type === QuoteItemType.DOOR ? (
+        <NumberField
+          label="Cantitate"
+          name="quantity"
+          min={1}
+          defaultValue={String(item.quantity)}
+        />
+        {item.type === QuoteItemType.WINDOW ||
+        item.type === QuoteItemType.DOOR ? (
           <>
             <NumberField
               label="Lățime mm"
@@ -1586,7 +1833,11 @@ function QuoteItemEditForm({
             label={`Preț unitar (${currency})`}
             name="unitPrice"
             inputMode="decimal"
-            defaultValue={manualUnitPriceMinor === null ? "" : minorInput(manualUnitPriceMinor)}
+            defaultValue={
+              manualUnitPriceMinor === null
+                ? ""
+                : minorInput(manualUnitPriceMinor)
+            }
             required
           />
         ) : null}
@@ -1597,7 +1848,11 @@ function QuoteItemEditForm({
         defaultValue={item.customerDescription ?? ""}
         required
       />
-      <TextAreaField label="Note interne" name="internalNotes" defaultValue={item.internalNotes ?? ""} />
+      <TextAreaField
+        label="Note interne"
+        name="internalNotes"
+        defaultValue={item.internalNotes ?? ""}
+      />
       {item.type === QuoteItemType.WINDOW ? (
         <FixedWindowCatalogFields
           currency={currency}
@@ -1797,7 +2052,9 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
           : "bg-sky-100 text-sky-800";
 
   return (
-    <span className={`inline-flex rounded-md px-3 py-2 text-sm font-semibold ${tone}`}>
+    <span
+      className={`inline-flex rounded-md px-3 py-2 text-sm font-semibold ${tone}`}
+    >
       {quoteStatusLabel(status)}
     </span>
   );
@@ -1818,7 +2075,9 @@ function VersionBadge({
         : "bg-zinc-200 text-zinc-800";
 
   return (
-    <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${tone}`}>
+    <span
+      className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${tone}`}
+    >
       {quoteVersionStatusLabel(status)}
     </span>
   );
@@ -1853,11 +2112,29 @@ function isLockedOrSentVersion(quoteVersion: {
   );
 }
 
-function isSelectableProfileSystem(record: ProfileSystem): record is ProfileSystem {
+function isLockedVersionReadyForSend(quoteVersion: {
+  status: QuoteVersionStatus;
+  isLocked: boolean;
+  lockedAt: Date | null;
+  sentAt: Date | null;
+}) {
+  return (
+    quoteVersion.status === QuoteVersionStatus.LOCKED &&
+    quoteVersion.isLocked &&
+    Boolean(quoteVersion.lockedAt) &&
+    !quoteVersion.sentAt
+  );
+}
+
+function isSelectableProfileSystem(
+  record: ProfileSystem,
+): record is ProfileSystem {
   return isSelectableCatalogRecord(record);
 }
 
-function isSelectableGlassPackage(record: GlassPackage): record is GlassPackage {
+function isSelectableGlassPackage(
+  record: GlassPackage,
+): record is GlassPackage {
   return isSelectableCatalogRecord(record);
 }
 
@@ -1876,7 +2153,9 @@ function isSelectableServiceItem(record: ServiceItem): record is ServiceItem {
 function quoteItemDisplayTypeLabel(item: QuoteItem) {
   const lineKind = catalogLineKindFromItem(item);
 
-  return lineKind ? catalogLineKindLabel(lineKind) : quoteItemTypeLabel(item.type);
+  return lineKind
+    ? catalogLineKindLabel(lineKind)
+    : quoteItemTypeLabel(item.type);
 }
 
 type CatalogLineKind =
@@ -1892,7 +2171,9 @@ function catalogLineKindFromItem(item: QuoteItem): CatalogLineKind | null {
   return isCatalogLineKind(kind) ? kind : null;
 }
 
-function isCatalogLineKind(value: string | undefined): value is CatalogLineKind {
+function isCatalogLineKind(
+  value: string | undefined,
+): value is CatalogLineKind {
   return (
     value === "accessory-line" ||
     value === "service-line" ||
@@ -1914,10 +2195,16 @@ function catalogLineKindLabel(lineKind: CatalogLineKind) {
   }
 }
 
-function catalogLineFieldDefaultsFromItem(item: QuoteItem): CatalogLineFieldDefaults {
+function catalogLineFieldDefaultsFromItem(
+  item: QuoteItem,
+): CatalogLineFieldDefaults {
   const catalog = asRecord(item.catalogSnapshot);
   const selectedCatalogIds = asRecord(catalog?.selectedCatalogIds);
-  const line = firstRecord(catalog?.line, catalog?.accessory, catalog?.serviceItem);
+  const line = firstRecord(
+    catalog?.line,
+    catalog?.accessory,
+    catalog?.serviceItem,
+  );
 
   return {
     accessoryId: stringFrom(selectedCatalogIds?.accessoryId, line?.id),
@@ -1934,10 +2221,20 @@ function catalogLineDetailsFromItem(item: QuoteItem) {
 
   const configuration = asRecord(item.configurationSnapshot);
   const catalog = asRecord(item.catalogSnapshot);
-  const line = firstRecord(catalog?.line, catalog?.accessory, catalog?.serviceItem);
+  const line = firstRecord(
+    catalog?.line,
+    catalog?.accessory,
+    catalog?.serviceItem,
+  );
   const priceListItem = firstRecord(line?.priceListItem);
-  const quantity = numberFrom(configuration?.quantity, item.quantity) ?? item.quantity;
-  const unit = stringFrom(line?.calculationUnit, line?.unit, priceListItem?.calculationUnit, priceListItem?.unit);
+  const quantity =
+    numberFrom(configuration?.quantity, item.quantity) ?? item.quantity;
+  const unit = stringFrom(
+    line?.calculationUnit,
+    line?.unit,
+    priceListItem?.calculationUnit,
+    priceListItem?.unit,
+  );
 
   return {
     kind: lineKind,
@@ -1947,7 +2244,9 @@ function catalogLineDetailsFromItem(item: QuoteItem) {
   };
 }
 
-function catalogFieldDefaultsFromItem(item: QuoteItem): FixedWindowCatalogFieldDefaults {
+function catalogFieldDefaultsFromItem(
+  item: QuoteItem,
+): FixedWindowCatalogFieldDefaults {
   const catalog = asRecord(item.catalogSnapshot);
 
   return {
@@ -1987,7 +2286,9 @@ function catalogSummaryFromItem(item: QuoteItem) {
   }
 
   return [
-    lineKind ? catalogSummaryEntry(catalogLineKindLabel(lineKind), catalog.line) : null,
+    lineKind
+      ? catalogSummaryEntry(catalogLineKindLabel(lineKind), catalog.line)
+      : null,
     catalogSummaryEntry("Sistem", catalog.profileSystem),
     catalogSummaryEntry("Profil toc", catalog.frameProfile),
     catalogSummaryEntry("Profil prag", catalog.thresholdProfile),
@@ -1995,7 +2296,10 @@ function catalogSummaryFromItem(item: QuoteItem) {
     textSummaryEntry("Panou", stringFrom(panel?.description)),
     catalogSummaryEntry("Culoare", catalog.colorFinish),
     catalogSummaryEntry("Feronerie", catalog.hardwareKit),
-    textSummaryEntry("Feronerie placeholder", stringFrom(hardwareConfiguration?.description)),
+    textSummaryEntry(
+      "Feronerie placeholder",
+      stringFrom(hardwareConfiguration?.description),
+    ),
   ].flatMap((entry) => (entry ? [entry] : []));
 }
 
@@ -2043,7 +2347,8 @@ type CalculationWarningView = {
 
 function calculationMetrics(output: Record<string, unknown> | null) {
   const profileMeters = recordsFromArray(output?.profileLinearMeters).reduce(
-    (sum, profileGroup) => sum + (numberFrom(profileGroup.totalLinearMeters) ?? 0),
+    (sum, profileGroup) =>
+      sum + (numberFrom(profileGroup.totalLinearMeters) ?? 0),
     0,
   );
 
@@ -2109,7 +2414,11 @@ function totalsFromItem(item: QuoteItem) {
   const totalBeforeManualOverrideMinor =
     numberFrom(totals?.totalBeforeManualOverrideMinor) ?? totalMinor;
 
-  if (!totals || totals.pendingCalculation === true || totalMinor === undefined) {
+  if (
+    !totals ||
+    totals.pendingCalculation === true ||
+    totalMinor === undefined
+  ) {
     return null;
   }
 
@@ -2163,7 +2472,8 @@ function quoteDiscountFromVersion(quoteVersion: QuoteVersion | null) {
 
 function commercialTotalsFromVersion(quoteVersion: QuoteVersion | null) {
   const totals = asRecord(quoteVersion?.totalsSnapshot);
-  const totalMinor = numberFrom(quoteVersion?.totalMinor) ?? numberFrom(totals?.totalMinor);
+  const totalMinor =
+    numberFrom(quoteVersion?.totalMinor) ?? numberFrom(totals?.totalMinor);
   const manualAdjustmentMinor = numberFrom(totals?.manualAdjustmentMinor) ?? 0;
   const quoteDiscountMinor = numberFrom(totals?.quoteDiscountMinor) ?? 0;
   const totalBeforeManualOverrideMinor =
@@ -2300,7 +2610,10 @@ function formatSignedMinor(value: number | null | undefined, currency = "RON") {
   return `${value > 0 ? "+" : "-"}${formatted}`;
 }
 
-function formatMinor(value: bigint | number | null | undefined, currency = "RON") {
+function formatMinor(
+  value: bigint | number | null | undefined,
+  currency = "RON",
+) {
   if (value === null || value === undefined) {
     return commonLabel("totalPending");
   }

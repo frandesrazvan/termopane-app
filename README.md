@@ -13,6 +13,10 @@ production formulas.
   present.
 - PDF generation, local document storage, immutable `Document` records, selected template keys, and
   audit logging are present for generated quote documents.
+- Locked quote versions with generated PDFs can be marked as sent. The workflow records `QUOTE_SENT`,
+  `sentAt`, the intended recipient/document stub metadata, and shows a Romanian customer-safe
+  confirmation/download screen. Real email delivery is still stubbed unless a future provider is
+  explicitly added.
 - Document storage now goes through a provider interface. The local provider remains the default
   for dev/test, and an SDK-backed S3-compatible provider is available for deployable object storage.
 - Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
@@ -235,7 +239,7 @@ pnpm verify
 ## Not Done Yet
 
 - Real bucket integration tests and deployment-specific storage smoke tests.
-- Email sending or customer delivery workflow.
+- Real email-provider integration for customer delivery.
 - Advanced pricing-rule selection inside the quote builder.
 - Production-ready door formulas for panels, locks, thresholds, reinforcement, and fabrication.
 - Real production formulas or supplier-specific pricing rules.

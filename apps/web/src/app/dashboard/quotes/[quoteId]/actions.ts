@@ -9,7 +9,11 @@ import {
 import { isQuotePdfTemplateKey } from "@termopane/pdf";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { canApplyCommercialOverrides, canGeneratePdf, requireTenant } from "@/lib/auth";
+import {
+  canApplyCommercialOverrides,
+  canGeneratePdf,
+  requireTenant,
+} from "@/lib/auth";
 import { recalculateTenantCurrentQuoteVersion } from "@/lib/calculation/quote-calculation-adapter";
 import {
   buildAccessoryLineCatalogSnapshot,
@@ -38,6 +42,7 @@ import {
   listTenantPriceListItems,
   listTenantPriceLists,
   lockTenantQuoteVersion,
+  sendTenantQuote,
   updateTenantQuoteItem,
   type TenantQuoteItemUpdateInput,
   type TenantQuoteItemWriteInput,
@@ -66,6 +71,15 @@ const optionalCatalogIdSchema = z
   .trim()
   .max(191)
   .transform((value) => (value.length > 0 ? value : null));
+const optionalEmailSchema = z
+  .string()
+  .trim()
+  .max(254)
+  .transform((value) => (value.length > 0 ? value : null))
+  .refine(
+    (value) => value === null || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+    "Invalid email address.",
+  );
 const optionalMoneySchema = z
   .string()
   .trim()
@@ -210,6 +224,12 @@ const quoteDiscountSchema = z
     };
   });
 
+const quoteSendSchema = z.object({
+  documentId: catalogIdSchema,
+  intendedRecipientEmail: optionalEmailSchema,
+  intendedRecipientName: optionalText(120),
+});
+
 type TenantActionContext = Awaited<ReturnType<typeof requireTenant>>;
 
 function formText(formData: FormData, field: string) {
@@ -218,7 +238,10 @@ function formText(formData: FormData, field: string) {
   return typeof value === "string" ? value : "";
 }
 
-export async function addFixedWindowItemAction(quoteId: string, formData: FormData) {
+export async function addFixedWindowItemAction(
+  quoteId: string,
+  formData: FormData,
+) {
   const context = await requireTenant();
   const quoteState = await requireMutableCurrentQuote(context, quoteId);
   const parsed = fixedWindowSchema.safeParse({
@@ -300,7 +323,10 @@ export async function addDoorItemAction(quoteId: string, formData: FormData) {
   redirectToQuoteItems(quoteId);
 }
 
-export async function addCustomLineItemAction(quoteId: string, formData: FormData) {
+export async function addCustomLineItemAction(
+  quoteId: string,
+  formData: FormData,
+) {
   const context = await requireTenant();
   const quoteState = await requireMutableCurrentQuote(context, quoteId);
   const parsed = customLineSchema.safeParse({
@@ -327,19 +353,31 @@ export async function addCustomLineItemAction(quoteId: string, formData: FormDat
   redirectToQuoteItems(quoteId);
 }
 
-export async function addAccessoryLineItemAction(quoteId: string, formData: FormData) {
+export async function addAccessoryLineItemAction(
+  quoteId: string,
+  formData: FormData,
+) {
   return addCatalogLineItemAction(quoteId, "accessory-line", formData);
 }
 
-export async function addServiceLineItemAction(quoteId: string, formData: FormData) {
+export async function addServiceLineItemAction(
+  quoteId: string,
+  formData: FormData,
+) {
   return addCatalogLineItemAction(quoteId, "service-line", formData);
 }
 
-export async function addTransportLineItemAction(quoteId: string, formData: FormData) {
+export async function addTransportLineItemAction(
+  quoteId: string,
+  formData: FormData,
+) {
   return addCatalogLineItemAction(quoteId, "transport-line", formData);
 }
 
-export async function addInstallationLineItemAction(quoteId: string, formData: FormData) {
+export async function addInstallationLineItemAction(
+  quoteId: string,
+  formData: FormData,
+) {
   return addCatalogLineItemAction(quoteId, "installation-line", formData);
 }
 
@@ -352,7 +390,10 @@ export async function updateQuoteItemAction(
   const quoteState = await requireMutableCurrentQuote(context, quoteId);
   const existingItem = await getTenantQuoteItem(context, quoteItemId);
 
-  if (!existingItem || existingItem.quoteVersionId !== quoteState.currentVersion.id) {
+  if (
+    !existingItem ||
+    existingItem.quoteVersionId !== quoteState.currentVersion.id
+  ) {
     redirect("/forbidden");
   }
 
@@ -383,7 +424,10 @@ export async function deleteQuoteItemAction(
   const quoteState = await requireMutableCurrentQuote(context, quoteId);
   const existingItem = await getTenantQuoteItem(context, quoteItemId);
 
-  if (!existingItem || existingItem.quoteVersionId !== quoteState.currentVersion.id) {
+  if (
+    !existingItem ||
+    existingItem.quoteVersionId !== quoteState.currentVersion.id
+  ) {
     redirect("/forbidden");
   }
 
@@ -436,11 +480,15 @@ export async function applyItemManualOverrideAction(
     redirectWithCommercialError(quoteId, "validation", "items");
   }
 
-  const result = await applyTenantQuoteItemManualOverride(context, quoteItemId, {
-    amountMinor: parsed.data.amountMinor,
-    reason: parsed.data.reason,
-    actorUserId: context.user.id,
-  });
+  const result = await applyTenantQuoteItemManualOverride(
+    context,
+    quoteItemId,
+    {
+      amountMinor: parsed.data.amountMinor,
+      reason: parsed.data.reason,
+      actorUserId: context.user.id,
+    },
+  );
 
   if (!result) {
     redirectWithCommercialError(quoteId, "locked", "items");
@@ -450,7 +498,10 @@ export async function applyItemManualOverrideAction(
   redirectWithCommercialEvent(quoteId, "item-override", "items");
 }
 
-export async function applyQuoteDiscountAction(quoteId: string, formData: FormData) {
+export async function applyQuoteDiscountAction(
+  quoteId: string,
+  formData: FormData,
+) {
   const context = await requireTenant();
 
   if (!canApplyCommercialOverrides(context.membership)) {
@@ -531,10 +582,15 @@ export async function generateQuotePdfAction(
   const templateKey = isQuotePdfTemplateKey(templateKeyValue)
     ? templateKeyValue
     : undefined;
-  const result = await generateTenantQuotePdf(context, quoteId, quoteVersionId, {
-    actorUserId: context.user.id,
-    ...(templateKey ? { templateKey } : {}),
-  });
+  const result = await generateTenantQuotePdf(
+    context,
+    quoteId,
+    quoteVersionId,
+    {
+      actorUserId: context.user.id,
+      ...(templateKey ? { templateKey } : {}),
+    },
+  );
 
   if (!result.ok) {
     if (result.reason === "not_locked") {
@@ -545,6 +601,43 @@ export async function generateQuotePdfAction(
   }
 
   redirectWithDocumentEvent(quoteId, "generated");
+}
+
+export async function sendQuoteToCustomerAction(
+  quoteId: string,
+  formData: FormData,
+) {
+  const context = await requireTenant();
+
+  if (!canGeneratePdf(context.membership)) {
+    redirectWithDocumentError(quoteId, "send");
+  }
+
+  const parsed = quoteSendSchema.safeParse({
+    documentId: formText(formData, "documentId"),
+    intendedRecipientEmail: formText(formData, "intendedRecipientEmail"),
+    intendedRecipientName: formText(formData, "intendedRecipientName"),
+  });
+
+  if (!parsed.success) {
+    redirectWithDocumentError(quoteId, "recipient");
+  }
+
+  const result = await sendTenantQuote(context, quoteId, {
+    actorUserId: context.user.id,
+    documentId: parsed.data.documentId,
+    intendedRecipientEmail: parsed.data.intendedRecipientEmail,
+    intendedRecipientName: parsed.data.intendedRecipientName,
+    emailProviderConfigured: false,
+  });
+
+  if (!result) {
+    redirectWithDocumentError(quoteId, "send");
+  }
+
+  redirect(
+    `${quotePath(quoteId)}/send-confirmation?documentId=${encodeURIComponent(result.document.id)}`,
+  );
 }
 
 async function addCatalogLineItemAction(
@@ -575,7 +668,12 @@ async function addCatalogLineItemAction(
   const item = await createTenantQuoteItem(
     context,
     quoteId,
-    catalogLineInput(parsed.data, lineKind, quoteState.quote.currency, catalogSnapshot),
+    catalogLineInput(
+      parsed.data,
+      lineKind,
+      quoteState.quote.currency,
+      catalogSnapshot,
+    ),
   );
 
   if (!item) {
@@ -695,7 +793,10 @@ async function parseItemUpdateInput(
   redirectWithItemError(quoteId, "validation");
 }
 
-async function requireMutableCurrentQuote(context: TenantActionContext, quoteId: string) {
+async function requireMutableCurrentQuote(
+  context: TenantActionContext,
+  quoteId: string,
+) {
   const quoteState = await getTenantQuoteWithCurrentVersion(context, quoteId);
 
   if (!quoteState?.currentVersion) {
@@ -730,7 +831,9 @@ async function resolveFixedWindowCatalogSnapshot(
     getTenantProfileItem(context, data.frameProfileId),
     getTenantGlassPackage(context, data.glassPackageId),
     getTenantColorFinish(context, data.colorFinishId),
-    data.hardwareKitId ? getTenantHardwareKit(context, data.hardwareKitId) : Promise.resolve(null),
+    data.hardwareKitId
+      ? getTenantHardwareKit(context, data.hardwareKitId)
+      : Promise.resolve(null),
     listTenantPriceLists(context),
   ]);
 
@@ -745,12 +848,16 @@ async function resolveFixedWindowCatalogSnapshot(
     !isSelectableCatalogRecord(colorFinish) ||
     frameProfile.type !== ProfileItemType.FRAME ||
     frameProfile.profileSystemId !== profileSystem.id ||
-    (colorFinish.profileSystemId && colorFinish.profileSystemId !== profileSystem.id)
+    (colorFinish.profileSystemId &&
+      colorFinish.profileSystemId !== profileSystem.id)
   ) {
     redirectWithItemError(quoteId, "validation");
   }
 
-  if (data.hardwareKitId && (!hardwareKit || !isSelectableCatalogRecord(hardwareKit))) {
+  if (
+    data.hardwareKitId &&
+    (!hardwareKit || !isSelectableCatalogRecord(hardwareKit))
+  ) {
     redirectWithItemError(quoteId, "validation");
   }
 
@@ -786,13 +893,19 @@ async function resolveDoorCatalogSnapshot(
     priceLists,
   ] = await Promise.all([
     getTenantProfileSystem(context, data.profileSystemId),
-    data.frameProfileId ? getTenantProfileItem(context, data.frameProfileId) : Promise.resolve(null),
+    data.frameProfileId
+      ? getTenantProfileItem(context, data.frameProfileId)
+      : Promise.resolve(null),
     data.thresholdProfileId
       ? getTenantProfileItem(context, data.thresholdProfileId)
       : Promise.resolve(null),
-    data.glassPackageId ? getTenantGlassPackage(context, data.glassPackageId) : Promise.resolve(null),
+    data.glassPackageId
+      ? getTenantGlassPackage(context, data.glassPackageId)
+      : Promise.resolve(null),
     getTenantColorFinish(context, data.colorFinishId),
-    data.hardwareKitId ? getTenantHardwareKit(context, data.hardwareKitId) : Promise.resolve(null),
+    data.hardwareKitId
+      ? getTenantHardwareKit(context, data.hardwareKitId)
+      : Promise.resolve(null),
     listTenantPriceLists(context),
   ]);
 
@@ -801,7 +914,8 @@ async function resolveDoorCatalogSnapshot(
     !colorFinish ||
     !isSelectableCatalogRecord(profileSystem) ||
     !isSelectableCatalogRecord(colorFinish) ||
-    (colorFinish.profileSystemId && colorFinish.profileSystemId !== profileSystem.id)
+    (colorFinish.profileSystemId &&
+      colorFinish.profileSystemId !== profileSystem.id)
   ) {
     redirectWithItemError(quoteId, "validation");
   }
@@ -833,7 +947,10 @@ async function resolveDoorCatalogSnapshot(
     redirectWithItemError(quoteId, "validation");
   }
 
-  if (data.hardwareKitId && (!hardwareKit || !isSelectableCatalogRecord(hardwareKit))) {
+  if (
+    data.hardwareKitId &&
+    (!hardwareKit || !isSelectableCatalogRecord(hardwareKit))
+  ) {
     redirectWithItemError(quoteId, "validation");
   }
 
@@ -1123,7 +1240,9 @@ function catalogLineKindFromItem(item: QuoteItem): CatalogLineKind | null {
   return isCatalogLineKind(kind) ? kind : null;
 }
 
-function isCatalogLineKind(value: string | undefined): value is CatalogLineKind {
+function isCatalogLineKind(
+  value: string | undefined,
+): value is CatalogLineKind {
   return (
     value === "accessory-line" ||
     value === "service-line" ||
@@ -1218,7 +1337,10 @@ function redirectToCalculation(quoteId: string): never {
   redirect(`${quotePath(quoteId)}?calculated=1#calculation`);
 }
 
-function redirectWithItemError(quoteId: string, error: "locked" | "validation"): never {
+function redirectWithItemError(
+  quoteId: string,
+  error: "locked" | "validation",
+): never {
   redirect(`${quotePath(quoteId)}?itemError=${error}#items`);
 }
 
@@ -1231,7 +1353,9 @@ function redirectWithCommercialEvent(
   event: "item-override" | "quote-discount",
   anchor: "items" | "calculation",
 ): never {
-  redirect(`${quotePath(quoteId)}?calculated=1&commercialEvent=${event}#${anchor}`);
+  redirect(
+    `${quotePath(quoteId)}?calculated=1&commercialEvent=${event}#${anchor}`,
+  );
 }
 
 function redirectWithCommercialError(
@@ -1242,11 +1366,17 @@ function redirectWithCommercialError(
   redirect(`${quotePath(quoteId)}?commercialError=${error}#${anchor}`);
 }
 
-function redirectWithVersionEvent(quoteId: string, event: "locked" | "revision"): never {
+function redirectWithVersionEvent(
+  quoteId: string,
+  event: "locked" | "revision",
+): never {
   redirect(`${quotePath(quoteId)}?versionEvent=${event}#versions`);
 }
 
-function redirectWithVersionError(quoteId: string, error: "lock" | "revision"): never {
+function redirectWithVersionError(
+  quoteId: string,
+  error: "lock" | "revision",
+): never {
   redirect(`${quotePath(quoteId)}?versionError=${error}#versions`);
 }
 
@@ -1254,6 +1384,9 @@ function redirectWithDocumentEvent(quoteId: string, event: "generated"): never {
   redirect(`${quotePath(quoteId)}?documentEvent=${event}#documents`);
 }
 
-function redirectWithDocumentError(quoteId: string, error: "locked" | "generate"): never {
+function redirectWithDocumentError(
+  quoteId: string,
+  error: "locked" | "generate" | "recipient" | "send",
+): never {
   redirect(`${quotePath(quoteId)}?documentError=${error}#documents`);
 }

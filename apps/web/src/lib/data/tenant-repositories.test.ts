@@ -84,7 +84,13 @@ function delegate<TRecord extends TenantRecord>(
 
       return record;
     },
-    async update({ where, data }: { where: { id: string }; data: Record<string, unknown> }) {
+    async update({
+      where,
+      data,
+    }: {
+      where: { id: string };
+      data: Record<string, unknown>;
+    }) {
       const record = records.find((candidate) => candidate.id === where.id);
 
       if (!record) {
@@ -96,7 +102,9 @@ function delegate<TRecord extends TenantRecord>(
       return record;
     },
     async delete({ where }: { where: { id: string } }) {
-      const recordIndex = records.findIndex((candidate) => candidate.id === where.id);
+      const recordIndex = records.findIndex(
+        (candidate) => candidate.id === where.id,
+      );
 
       if (recordIndex === -1) {
         throw new Error(`Record ${where.id} was not found.`);
@@ -110,10 +118,13 @@ function delegate<TRecord extends TenantRecord>(
 }
 
 function uniqueConstraintError(target: string[]) {
-  return Object.assign(new Error(`Unique constraint failed on ${target.join(", ")}`), {
-    code: "P2002",
-    meta: { target },
-  });
+  return Object.assign(
+    new Error(`Unique constraint failed on ${target.join(", ")}`),
+    {
+      code: "P2002",
+      meta: { target },
+    },
+  );
 }
 
 function matchesWhere<TRecord extends TenantRecord>(
@@ -136,7 +147,10 @@ function matchesWhere<TRecord extends TenantRecord>(
     }
 
     if (isRangeFilter(value)) {
-      const comparableValue = recordValue instanceof Date ? recordValue.getTime() : Number(recordValue);
+      const comparableValue =
+        recordValue instanceof Date
+          ? recordValue.getTime()
+          : Number(recordValue);
       const gte = value.gte instanceof Date ? value.gte.getTime() : value.gte;
       const lte = value.lte instanceof Date ? value.lte.getTime() : value.lte;
 
@@ -154,12 +168,14 @@ function isContainsFilter(value: unknown): value is { contains: string } {
   return Boolean(value && typeof value === "object" && "contains" in value);
 }
 
-function isRangeFilter(value: unknown): value is { gte?: Date | number; lte?: Date | number } {
+function isRangeFilter(
+  value: unknown,
+): value is { gte?: Date | number; lte?: Date | number } {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      ("gte" in value || "lte" in value) &&
-      !("contains" in value),
+    typeof value === "object" &&
+    ("gte" in value || "lte" in value) &&
+    !("contains" in value),
   );
 }
 
@@ -493,56 +509,74 @@ function testClient(
       },
     ] as Customer[]),
     project: delegate([
-      { id: "project-a", tenantId: "tenant-a", customerId: "customer-a", name: "A Project" },
-      { id: "project-b", tenantId: "tenant-b", customerId: "customer-b", name: "B Project" },
-      { id: "project-c", tenantId: "tenant-a", customerId: "customer-c", name: "C Project" },
-    ] as Project[]),
-    quote: delegate([
       {
-        id: "quote-a",
+        id: "project-a",
         tenantId: "tenant-a",
         customerId: "customer-a",
-        projectId: "project-a",
-        quoteNumber: "A-001",
-        status: QuoteStatus.DRAFT,
-        createdById: "user-a",
-        currentVersionId: "version-a",
-        createdAt: new Date("2026-01-10T00:00:00.000Z"),
+        name: "A Project",
       },
       {
-        id: "quote-b",
+        id: "project-b",
         tenantId: "tenant-b",
         customerId: "customer-b",
-        projectId: "project-b",
-        quoteNumber: "B-001",
-        status: QuoteStatus.SENT,
-        createdById: "user-b",
-        currentVersionId: "version-b",
-        createdAt: new Date("2026-01-11T00:00:00.000Z"),
+        name: "B Project",
       },
       {
-        id: "quote-locked",
+        id: "project-c",
         tenantId: "tenant-a",
-        customerId: "customer-a",
-        projectId: "project-a",
-        quoteNumber: "A-locked",
-        status: QuoteStatus.SENT,
-        createdById: "user-a",
-        currentVersionId: "version-locked",
-        createdAt: new Date("2026-01-12T00:00:00.000Z"),
+        customerId: "customer-c",
+        name: "C Project",
       },
-      {
-        id: "quote-mismatch",
-        tenantId: "tenant-a",
-        customerId: "customer-a",
-        projectId: "project-c",
-        quoteNumber: "A-mismatch",
-        status: QuoteStatus.DRAFT,
-        createdById: "user-a",
-        currentVersionId: "version-mismatch",
-        createdAt: new Date("2026-01-13T00:00:00.000Z"),
-      },
-    ] as Quote[], { unique: [["tenantId", "quoteNumber"]] }),
+    ] as Project[]),
+    quote: delegate(
+      [
+        {
+          id: "quote-a",
+          tenantId: "tenant-a",
+          customerId: "customer-a",
+          projectId: "project-a",
+          quoteNumber: "A-001",
+          status: QuoteStatus.DRAFT,
+          createdById: "user-a",
+          currentVersionId: "version-a",
+          createdAt: new Date("2026-01-10T00:00:00.000Z"),
+        },
+        {
+          id: "quote-b",
+          tenantId: "tenant-b",
+          customerId: "customer-b",
+          projectId: "project-b",
+          quoteNumber: "B-001",
+          status: QuoteStatus.SENT,
+          createdById: "user-b",
+          currentVersionId: "version-b",
+          createdAt: new Date("2026-01-11T00:00:00.000Z"),
+        },
+        {
+          id: "quote-locked",
+          tenantId: "tenant-a",
+          customerId: "customer-a",
+          projectId: "project-a",
+          quoteNumber: "A-locked",
+          status: QuoteStatus.SENT,
+          createdById: "user-a",
+          currentVersionId: "version-locked",
+          createdAt: new Date("2026-01-12T00:00:00.000Z"),
+        },
+        {
+          id: "quote-mismatch",
+          tenantId: "tenant-a",
+          customerId: "customer-a",
+          projectId: "project-c",
+          quoteNumber: "A-mismatch",
+          status: QuoteStatus.DRAFT,
+          createdById: "user-a",
+          currentVersionId: "version-mismatch",
+          createdAt: new Date("2026-01-13T00:00:00.000Z"),
+        },
+      ] as Quote[],
+      { unique: [["tenantId", "quoteNumber"]] },
+    ),
     quoteVersion: delegate([
       {
         id: "version-a",
@@ -798,12 +832,21 @@ describe("tenant repositories", () => {
     const suppliers = await data.listTenantSuppliers({ tenantId: "tenant-a" });
 
     expect(suppliers).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "supplier-a", tenantId: "tenant-a" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "supplier-a", tenantId: "tenant-a" }),
+      ]),
     );
-    expect(suppliers).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: "supplier-b" })]));
-    await expect(data.getTenantSupplier({ tenantId: "tenant-a" }, "supplier-b")).resolves.toBeNull();
+    expect(suppliers).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "supplier-b" })]),
+    );
     await expect(
-      data.createTenantSupplier({ tenantId: "tenant-a" }, { name: "New Supplier", code: "SUP-NEW" }),
+      data.getTenantSupplier({ tenantId: "tenant-a" }, "supplier-b"),
+    ).resolves.toBeNull();
+    await expect(
+      data.createTenantSupplier(
+        { tenantId: "tenant-a" },
+        { name: "New Supplier", code: "SUP-NEW" },
+      ),
     ).resolves.toMatchObject({
       tenantId: "tenant-a",
       name: "New Supplier",
@@ -816,18 +859,31 @@ describe("tenant repositories", () => {
         name: "Updated Supplier",
         code: "SUP-A",
       }),
-    ).resolves.toMatchObject({ id: "supplier-a", tenantId: "tenant-a", name: "Updated Supplier" });
+    ).resolves.toMatchObject({
+      id: "supplier-a",
+      tenantId: "tenant-a",
+      name: "Updated Supplier",
+    });
     await expect(
       data.updateTenantSupplier({ tenantId: "tenant-a" }, "supplier-b", {
         name: "Blocked Supplier",
       }),
     ).resolves.toBeNull();
 
-    const archived = await data.archiveTenantSupplier({ tenantId: "tenant-a" }, "supplier-a");
+    const archived = await data.archiveTenantSupplier(
+      { tenantId: "tenant-a" },
+      "supplier-a",
+    );
 
-    expect(archived).toMatchObject({ id: "supplier-a", tenantId: "tenant-a", isActive: false });
+    expect(archived).toMatchObject({
+      id: "supplier-a",
+      tenantId: "tenant-a",
+      isActive: false,
+    });
     expect(archived?.deletedAt).toBeInstanceOf(Date);
-    await expect(data.getTenantSupplier({ tenantId: "tenant-a" }, "supplier-a")).resolves.toMatchObject({
+    await expect(
+      data.getTenantSupplier({ tenantId: "tenant-a" }, "supplier-a"),
+    ).resolves.toMatchObject({
       id: "supplier-a",
       isActive: false,
       deletedAt: expect.any(Date),
@@ -837,8 +893,15 @@ describe("tenant repositories", () => {
   it("manages profile systems and profile items with tenant-scoped parent validation", async () => {
     const data = createTenantDataAccess(testClient());
 
-    await expect(data.listTenantProfileSystems({ tenantId: "tenant-a" })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "profile-system-a", tenantId: "tenant-a" })]),
+    await expect(
+      data.listTenantProfileSystems({ tenantId: "tenant-a" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "profile-system-a",
+          tenantId: "tenant-a",
+        }),
+      ]),
     );
     await expect(
       data.getTenantProfileSystem({ tenantId: "tenant-a" }, "profile-system-b"),
@@ -894,10 +957,16 @@ describe("tenant repositories", () => {
       ),
     ).resolves.toBeNull();
 
-    await expect(data.listTenantProfileItems({ tenantId: "tenant-a" })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "profile-item-a", tenantId: "tenant-a" })]),
+    await expect(
+      data.listTenantProfileItems({ tenantId: "tenant-a" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "profile-item-a", tenantId: "tenant-a" }),
+      ]),
     );
-    await expect(data.getTenantProfileItem({ tenantId: "tenant-a" }, "profile-item-b")).resolves.toBeNull();
+    await expect(
+      data.getTenantProfileItem({ tenantId: "tenant-a" }, "profile-item-b"),
+    ).resolves.toBeNull();
     await expect(
       data.createTenantProfileItem(
         { tenantId: "tenant-a" },
@@ -930,18 +999,14 @@ describe("tenant repositories", () => {
       type: ProfileItemType.SASH,
     });
     await expect(
-      data.updateTenantProfileItem(
-        { tenantId: "tenant-a" },
-        "profile-item-a",
-        {
-          profileSystemId: "profile-system-a",
-          supplierId: "supplier-a",
-          name: "Frame A Updated",
-          code: "FRAME-A",
-          type: ProfileItemType.FRAME,
-          unit: CatalogUnit.LINEAR_METER,
-        },
-      ),
+      data.updateTenantProfileItem({ tenantId: "tenant-a" }, "profile-item-a", {
+        profileSystemId: "profile-system-a",
+        supplierId: "supplier-a",
+        name: "Frame A Updated",
+        code: "FRAME-A",
+        type: ProfileItemType.FRAME,
+        unit: CatalogUnit.LINEAR_METER,
+      }),
     ).resolves.toMatchObject({ id: "profile-item-a", name: "Frame A Updated" });
 
     const archivedSystem = await data.archiveTenantProfileSystem(
@@ -963,10 +1028,16 @@ describe("tenant repositories", () => {
   it("manages glass packages, accessories, services, and tax rates with soft archives", async () => {
     const data = createTenantDataAccess(testClient());
 
-    await expect(data.listTenantGlassPackages({ tenantId: "tenant-a" })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "glass-a", tenantId: "tenant-a" })]),
+    await expect(
+      data.listTenantGlassPackages({ tenantId: "tenant-a" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "glass-a", tenantId: "tenant-a" }),
+      ]),
     );
-    await expect(data.getTenantGlassPackage({ tenantId: "tenant-a" }, "glass-b")).resolves.toBeNull();
+    await expect(
+      data.getTenantGlassPackage({ tenantId: "tenant-a" }, "glass-b"),
+    ).resolves.toBeNull();
     await expect(
       data.createTenantGlassPackage(
         { tenantId: "tenant-a" },
@@ -988,25 +1059,37 @@ describe("tenant repositories", () => {
           unit: CatalogUnit.SQUARE_METER,
         },
       ),
-    ).resolves.toMatchObject({ tenantId: "tenant-a", supplierId: "supplier-a" });
+    ).resolves.toMatchObject({
+      tenantId: "tenant-a",
+      supplierId: "supplier-a",
+    });
     await expect(
-      data.updateTenantGlassPackage(
-        { tenantId: "tenant-a" },
-        "glass-a",
-        {
-          supplierId: "supplier-a",
-          name: "Glass A Updated",
-          code: "GL-A",
-          unit: CatalogUnit.SQUARE_METER,
-        },
-      ),
+      data.updateTenantGlassPackage({ tenantId: "tenant-a" }, "glass-a", {
+        supplierId: "supplier-a",
+        name: "Glass A Updated",
+        code: "GL-A",
+        unit: CatalogUnit.SQUARE_METER,
+      }),
     ).resolves.toMatchObject({ id: "glass-a", name: "Glass A Updated" });
-    expect((await data.archiveTenantGlassPackage({ tenantId: "tenant-a" }, "glass-a"))?.deletedAt).toBeInstanceOf(Date);
+    expect(
+      (
+        await data.archiveTenantGlassPackage(
+          { tenantId: "tenant-a" },
+          "glass-a",
+        )
+      )?.deletedAt,
+    ).toBeInstanceOf(Date);
 
-    await expect(data.listTenantAccessories({ tenantId: "tenant-a" })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "accessory-a", tenantId: "tenant-a" })]),
+    await expect(
+      data.listTenantAccessories({ tenantId: "tenant-a" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "accessory-a", tenantId: "tenant-a" }),
+      ]),
     );
-    await expect(data.getTenantAccessory({ tenantId: "tenant-a" }, "accessory-b")).resolves.toBeNull();
+    await expect(
+      data.getTenantAccessory({ tenantId: "tenant-a" }, "accessory-b"),
+    ).resolves.toBeNull();
     await expect(
       data.createTenantAccessory(
         { tenantId: "tenant-a" },
@@ -1019,23 +1102,32 @@ describe("tenant repositories", () => {
       ),
     ).resolves.toMatchObject({ tenantId: "tenant-a", name: "Trim A" });
     await expect(
-      data.updateTenantAccessory(
-        { tenantId: "tenant-a" },
-        "accessory-a",
-        {
-          supplierId: "supplier-a",
-          name: "Sill A Updated",
-          code: "SILL-A",
-          unit: CatalogUnit.LINEAR_METER,
-        },
-      ),
+      data.updateTenantAccessory({ tenantId: "tenant-a" }, "accessory-a", {
+        supplierId: "supplier-a",
+        name: "Sill A Updated",
+        code: "SILL-A",
+        unit: CatalogUnit.LINEAR_METER,
+      }),
     ).resolves.toMatchObject({ id: "accessory-a", name: "Sill A Updated" });
-    expect((await data.archiveTenantAccessory({ tenantId: "tenant-a" }, "accessory-a"))?.deletedAt).toBeInstanceOf(Date);
+    expect(
+      (
+        await data.archiveTenantAccessory(
+          { tenantId: "tenant-a" },
+          "accessory-a",
+        )
+      )?.deletedAt,
+    ).toBeInstanceOf(Date);
 
-    await expect(data.listTenantServiceItems({ tenantId: "tenant-a" })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "service-a", tenantId: "tenant-a" })]),
+    await expect(
+      data.listTenantServiceItems({ tenantId: "tenant-a" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "service-a", tenantId: "tenant-a" }),
+      ]),
     );
-    await expect(data.getTenantServiceItem({ tenantId: "tenant-a" }, "service-b")).resolves.toBeNull();
+    await expect(
+      data.getTenantServiceItem({ tenantId: "tenant-a" }, "service-b"),
+    ).resolves.toBeNull();
     await expect(
       data.createTenantServiceItem(
         { tenantId: "tenant-a" },
@@ -1043,18 +1135,34 @@ describe("tenant repositories", () => {
       ),
     ).resolves.toMatchObject({ tenantId: "tenant-a", name: "Transport A" });
     await expect(
-      data.updateTenantServiceItem(
-        { tenantId: "tenant-a" },
-        "service-a",
-        { name: "Installation A Updated", code: "INSTALL-A", unit: CatalogUnit.FIXED },
-      ),
-    ).resolves.toMatchObject({ id: "service-a", name: "Installation A Updated" });
-    expect((await data.archiveTenantServiceItem({ tenantId: "tenant-a" }, "service-a"))?.deletedAt).toBeInstanceOf(Date);
+      data.updateTenantServiceItem({ tenantId: "tenant-a" }, "service-a", {
+        name: "Installation A Updated",
+        code: "INSTALL-A",
+        unit: CatalogUnit.FIXED,
+      }),
+    ).resolves.toMatchObject({
+      id: "service-a",
+      name: "Installation A Updated",
+    });
+    expect(
+      (
+        await data.archiveTenantServiceItem(
+          { tenantId: "tenant-a" },
+          "service-a",
+        )
+      )?.deletedAt,
+    ).toBeInstanceOf(Date);
 
-    await expect(data.listTenantTaxRates({ tenantId: "tenant-a" })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "tax-a", tenantId: "tenant-a" })]),
+    await expect(
+      data.listTenantTaxRates({ tenantId: "tenant-a" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "tax-a", tenantId: "tenant-a" }),
+      ]),
     );
-    await expect(data.getTenantTaxRate({ tenantId: "tenant-a" }, "tax-b")).resolves.toBeNull();
+    await expect(
+      data.getTenantTaxRate({ tenantId: "tenant-a" }, "tax-b"),
+    ).resolves.toBeNull();
     await expect(
       data.createTenantTaxRate(
         { tenantId: "tenant-a" },
@@ -1062,34 +1170,60 @@ describe("tenant repositories", () => {
       ),
     ).resolves.toMatchObject({ tenantId: "tenant-a", rateBasisPoints: 900 });
     await expect(
-      data.updateTenantTaxRate(
-        { tenantId: "tenant-a" },
-        "tax-a",
-        { name: "VAT A Updated", code: "VAT-A", rateBasisPoints: 1900, isDefault: true },
-      ),
-    ).resolves.toMatchObject({ id: "tax-a", name: "VAT A Updated", isDefault: true });
-    expect((await data.archiveTenantTaxRate({ tenantId: "tenant-a" }, "tax-a"))?.deletedAt).toBeInstanceOf(Date);
+      data.updateTenantTaxRate({ tenantId: "tenant-a" }, "tax-a", {
+        name: "VAT A Updated",
+        code: "VAT-A",
+        rateBasisPoints: 1900,
+        isDefault: true,
+      }),
+    ).resolves.toMatchObject({
+      id: "tax-a",
+      name: "VAT A Updated",
+      isDefault: true,
+    });
+    expect(
+      (await data.archiveTenantTaxRate({ tenantId: "tenant-a" }, "tax-a"))
+        ?.deletedAt,
+    ).toBeInstanceOf(Date);
   });
 
   it("manages price-list items and lists price lists and pricing rules inside the tenant", async () => {
     const data = createTenantDataAccess(testClient());
 
-    await expect(data.listTenantPriceLists({ tenantId: "tenant-a" })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "price-list-a", tenantId: "tenant-a" })]),
+    await expect(
+      data.listTenantPriceLists({ tenantId: "tenant-a" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "price-list-a", tenantId: "tenant-a" }),
+      ]),
     );
-    await expect(data.listTenantPriceLists({ tenantId: "tenant-a" })).resolves.not.toEqual(
+    await expect(
+      data.listTenantPriceLists({ tenantId: "tenant-a" }),
+    ).resolves.not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: "price-list-b" })]),
     );
     await expect(
-      data.listTenantPricingRules({ tenantId: "tenant-a" }, { priceListId: "price-list-a" }),
+      data.listTenantPricingRules(
+        { tenantId: "tenant-a" },
+        { priceListId: "price-list-a" },
+      ),
     ).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "pricing-rule-a", tenantId: "tenant-a" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "pricing-rule-a", tenantId: "tenant-a" }),
+      ]),
     );
     await expect(
-      data.listTenantPricingRules({ tenantId: "tenant-a" }, { priceListId: "price-list-b" }),
+      data.listTenantPricingRules(
+        { tenantId: "tenant-a" },
+        { priceListId: "price-list-b" },
+      ),
     ).resolves.toEqual([]);
-    await expect(data.listTenantPriceListItems({ tenantId: "tenant-a" })).resolves.toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "price-item-a", tenantId: "tenant-a" })]),
+    await expect(
+      data.listTenantPriceListItems({ tenantId: "tenant-a" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "price-item-a", tenantId: "tenant-a" }),
+      ]),
     );
     await expect(
       data.getTenantPriceListItem({ tenantId: "tenant-a" }, "price-item-b"),
@@ -1135,19 +1269,15 @@ describe("tenant repositories", () => {
       currency: "RON",
     });
     await expect(
-      data.updateTenantPriceListItem(
-        { tenantId: "tenant-a" },
-        "price-item-a",
-        {
-          priceListId: "price-list-a",
-          itemType: PriceListItemType.ACCESSORY,
-          catalogItemId: "accessory-a",
-          unit: CatalogUnit.LINEAR_METER,
-          costMinor: 120,
-          saleMinor: 180,
-          currency: "RON",
-        },
-      ),
+      data.updateTenantPriceListItem({ tenantId: "tenant-a" }, "price-item-a", {
+        priceListId: "price-list-a",
+        itemType: PriceListItemType.ACCESSORY,
+        catalogItemId: "accessory-a",
+        unit: CatalogUnit.LINEAR_METER,
+        costMinor: 120,
+        saleMinor: 180,
+        currency: "RON",
+      }),
     ).resolves.toMatchObject({ id: "price-item-a", saleMinor: 180 });
 
     const archived = await data.archiveTenantPriceListItem(
@@ -1166,11 +1296,22 @@ describe("tenant repositories", () => {
     const data = createTenantDataAccess(testClient());
     const customers = await data.listTenantCustomers({ tenantId: "tenant-a" });
 
-    await expect(data.getTenantCustomer({ tenantId: "tenant-a" }, "customer-b")).resolves.toBeNull();
+    await expect(
+      data.getTenantCustomer({ tenantId: "tenant-a" }, "customer-b"),
+    ).resolves.toBeNull();
     expect(customers).toEqual(
-      expect.arrayContaining([{ id: "customer-a", tenantId: "tenant-a", displayName: "A Customer", contactName: "Alice Contact" }]),
+      expect.arrayContaining([
+        {
+          id: "customer-a",
+          tenantId: "tenant-a",
+          displayName: "A Customer",
+          contactName: "Alice Contact",
+        },
+      ]),
     );
-    expect(customers).not.toEqual(expect.arrayContaining([{ id: "customer-b" }]));
+    expect(customers).not.toEqual(
+      expect.arrayContaining([{ id: "customer-b" }]),
+    );
   });
 
   it("searches customer name and contact fields inside the tenant boundary", async () => {
@@ -1201,13 +1342,18 @@ describe("tenant repositories", () => {
       data.updateTenantCustomer({ tenantId: "tenant-a" }, "customer-a", {
         displayName: "Updated Customer",
       }),
-    ).resolves.toMatchObject({ displayName: "Updated Customer", tenantId: "tenant-a" });
+    ).resolves.toMatchObject({
+      displayName: "Updated Customer",
+      tenantId: "tenant-a",
+    });
     await expect(
       data.updateTenantCustomer({ tenantId: "tenant-a" }, "customer-b", {
         displayName: "Blocked Customer",
       }),
     ).resolves.toBeNull();
-    await expect(data.getTenantCustomer({ tenantId: "tenant-b" }, "customer-b")).resolves.toMatchObject({
+    await expect(
+      data.getTenantCustomer({ tenantId: "tenant-b" }, "customer-b"),
+    ).resolves.toMatchObject({
       displayName: "B Customer",
     });
   });
@@ -1216,9 +1362,18 @@ describe("tenant repositories", () => {
     const data = createTenantDataAccess(testClient());
     const projects = await data.listTenantProjects({ tenantId: "tenant-a" });
 
-    await expect(data.getTenantProject({ tenantId: "tenant-a" }, "project-b")).resolves.toBeNull();
+    await expect(
+      data.getTenantProject({ tenantId: "tenant-a" }, "project-b"),
+    ).resolves.toBeNull();
     expect(projects).toEqual(
-      expect.arrayContaining([{ id: "project-a", tenantId: "tenant-a", customerId: "customer-a", name: "A Project" }]),
+      expect.arrayContaining([
+        {
+          id: "project-a",
+          tenantId: "tenant-a",
+          customerId: "customer-a",
+          name: "A Project",
+        },
+      ]),
     );
     expect(projects).not.toEqual(expect.arrayContaining([{ id: "project-b" }]));
   });
@@ -1227,10 +1382,16 @@ describe("tenant repositories", () => {
     const data = createTenantDataAccess(testClient());
 
     await expect(
-      data.listTenantProjects({ tenantId: "tenant-a" }, { customerId: "customer-a" }),
+      data.listTenantProjects(
+        { tenantId: "tenant-a" },
+        { customerId: "customer-a" },
+      ),
     ).resolves.toMatchObject([{ id: "project-a", tenantId: "tenant-a" }]);
     await expect(
-      data.listTenantProjects({ tenantId: "tenant-a" }, { customerId: "customer-b" }),
+      data.listTenantProjects(
+        { tenantId: "tenant-a" },
+        { customerId: "customer-b" },
+      ),
     ).resolves.toEqual([]);
   });
 
@@ -1282,10 +1443,16 @@ describe("tenant repositories", () => {
     const data = createTenantDataAccess(testClient());
     const quotes = await data.listTenantQuotes({ tenantId: "tenant-a" });
 
-    await expect(data.getTenantQuote({ tenantId: "tenant-a" }, "quote-b")).resolves.toBeNull();
+    await expect(
+      data.getTenantQuote({ tenantId: "tenant-a" }, "quote-b"),
+    ).resolves.toBeNull();
     expect(quotes).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: "quote-a", tenantId: "tenant-a", customerId: "customer-a" }),
+        expect.objectContaining({
+          id: "quote-a",
+          tenantId: "tenant-a",
+          customerId: "customer-a",
+        }),
       ]),
     );
     expect(quotes).not.toEqual(expect.arrayContaining([{ id: "quote-b" }]));
@@ -1300,15 +1467,27 @@ describe("tenant repositories", () => {
 
     expect(customerQuotes).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: "quote-a", tenantId: "tenant-a", customerId: "customer-a" }),
+        expect.objectContaining({
+          id: "quote-a",
+          tenantId: "tenant-a",
+          customerId: "customer-a",
+        }),
       ]),
     );
-    expect(customerQuotes).not.toEqual(expect.arrayContaining([{ id: "quote-b" }]));
+    expect(customerQuotes).not.toEqual(
+      expect.arrayContaining([{ id: "quote-b" }]),
+    );
     await expect(
-      data.listTenantQuotes({ tenantId: "tenant-a" }, { status: QuoteStatus.SENT }),
+      data.listTenantQuotes(
+        { tenantId: "tenant-a" },
+        { status: QuoteStatus.SENT },
+      ),
     ).resolves.toMatchObject([{ id: "quote-locked", tenantId: "tenant-a" }]);
     await expect(
-      data.listTenantQuotes({ tenantId: "tenant-a" }, { createdById: "user-a" }),
+      data.listTenantQuotes(
+        { tenantId: "tenant-a" },
+        { createdById: "user-a" },
+      ),
     ).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "quote-a", tenantId: "tenant-a" }),
@@ -1341,7 +1520,9 @@ describe("tenant repositories", () => {
         filter: { status: QuoteStatus.DRAFT },
       }),
     ]);
-    await expect(data.getTenantSavedFilter({ tenantId: "tenant-a" }, "filter-b")).resolves.toBeNull();
+    await expect(
+      data.getTenantSavedFilter({ tenantId: "tenant-a" }, "filter-b"),
+    ).resolves.toBeNull();
   });
 
   it("upserts saved quote filters without leaking across tenants or users", async () => {
@@ -1448,11 +1629,15 @@ describe("tenant repositories", () => {
       }),
     ).resolves.toBeNull();
     await expect(
-      data.updateTenantQuoteNumberSettings({ tenantId: "tenant-a" }, "numbering-b", {
-        prefix: "X",
-        nextNumber: 10,
-        datePattern: QuoteNumberDatePattern.NONE,
-      }),
+      data.updateTenantQuoteNumberSettings(
+        { tenantId: "tenant-a" },
+        "numbering-b",
+        {
+          prefix: "X",
+          nextNumber: 10,
+          datePattern: QuoteNumberDatePattern.NONE,
+        },
+      ),
     ).resolves.toBeNull();
     expect(auditLogs).toHaveLength(0);
   });
@@ -1531,14 +1716,19 @@ describe("tenant repositories", () => {
 
   it("creates a draft quote shell inside a transaction when the client supports it", async () => {
     let transactionCount = 0;
-    const data = createTenantDataAccess(testClient({
-      onTransaction: () => {
-        transactionCount += 1;
-      },
-    }));
+    const data = createTenantDataAccess(
+      testClient({
+        onTransaction: () => {
+          transactionCount += 1;
+        },
+      }),
+    );
 
     await expect(
-      data.createTenantQuoteDraft({ tenantId: "tenant-a" }, { customerId: "customer-a" }),
+      data.createTenantQuoteDraft(
+        { tenantId: "tenant-a" },
+        { customerId: "customer-a" },
+      ),
     ).resolves.toMatchObject({
       quote: {
         tenantId: "tenant-a",
@@ -1558,7 +1748,10 @@ describe("tenant repositories", () => {
     });
 
     await expect(
-      data.createTenantQuoteDraft({ tenantId: "tenant-a" }, { customerId: "customer-a" }),
+      data.createTenantQuoteDraft(
+        { tenantId: "tenant-a" },
+        { customerId: "customer-a" },
+      ),
     ).resolves.toMatchObject({
       quote: {
         tenantId: "tenant-a",
@@ -1566,7 +1759,10 @@ describe("tenant repositories", () => {
       },
     });
     await expect(
-      data.createTenantQuoteDraft({ tenantId: "tenant-b" }, { customerId: "customer-b" }),
+      data.createTenantQuoteDraft(
+        { tenantId: "tenant-b" },
+        { customerId: "customer-b" },
+      ),
     ).resolves.toMatchObject({
       quote: {
         tenantId: "tenant-b",
@@ -1592,7 +1788,11 @@ describe("tenant repositories", () => {
     await expect(
       data.createTenantQuoteDraft(
         { tenantId: "tenant-a" },
-        { customerId: "customer-a", projectId: "project-b", quoteNumber: "A-004" },
+        {
+          customerId: "customer-a",
+          projectId: "project-b",
+          quoteNumber: "A-004",
+        },
       ),
     ).resolves.toBeNull();
   });
@@ -1645,17 +1845,24 @@ describe("tenant repositories", () => {
   it("lists quote versions only after the parent quote is tenant-scoped", async () => {
     const data = createTenantDataAccess(testClient());
 
-    await expect(data.listTenantQuoteVersions({ tenantId: "tenant-a" }, "quote-a")).resolves.toMatchObject([
+    await expect(
+      data.listTenantQuoteVersions({ tenantId: "tenant-a" }, "quote-a"),
+    ).resolves.toMatchObject([
       { id: "version-a", tenantId: "tenant-a", quoteId: "quote-a" },
     ]);
-    await expect(data.listTenantQuoteVersions({ tenantId: "tenant-a" }, "quote-b")).resolves.toEqual([]);
+    await expect(
+      data.listTenantQuoteVersions({ tenantId: "tenant-a" }, "quote-b"),
+    ).resolves.toEqual([]);
   });
 
   it("returns a tenant quote with its current version after validating customer and project links", async () => {
     const data = createTenantDataAccess(testClient());
 
     await expect(
-      data.getTenantQuoteWithCurrentVersion({ tenantId: "tenant-a" }, "quote-a"),
+      data.getTenantQuoteWithCurrentVersion(
+        { tenantId: "tenant-a" },
+        "quote-a",
+      ),
     ).resolves.toMatchObject({
       quote: {
         id: "quote-a",
@@ -1668,10 +1875,16 @@ describe("tenant repositories", () => {
       },
     });
     await expect(
-      data.getTenantQuoteWithCurrentVersion({ tenantId: "tenant-a" }, "quote-b"),
+      data.getTenantQuoteWithCurrentVersion(
+        { tenantId: "tenant-a" },
+        "quote-b",
+      ),
     ).resolves.toBeNull();
     await expect(
-      data.getTenantQuoteWithCurrentVersion({ tenantId: "tenant-a" }, "quote-mismatch"),
+      data.getTenantQuoteWithCurrentVersion(
+        { tenantId: "tenant-a" },
+        "quote-mismatch",
+      ),
     ).resolves.toBeNull();
   });
 
@@ -1713,7 +1926,9 @@ describe("tenant repositories", () => {
         totalMinor: 0,
       },
     });
-    await expect(data.listTenantQuoteItems({ tenantId: "tenant-a" }, "version-a")).resolves.toHaveLength(2);
+    await expect(
+      data.listTenantQuoteItems({ tenantId: "tenant-a" }, "version-a"),
+    ).resolves.toHaveLength(2);
   });
 
   it("edits an item in the same tenant and current draft version", async () => {
@@ -1792,7 +2007,9 @@ describe("tenant repositories", () => {
         },
       },
     });
-    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, created!.id)).resolves.toMatchObject({
+    await expect(
+      data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, created!.id),
+    ).resolves.toMatchObject({
       id: created?.id,
       type: QuoteItemType.DOOR,
     });
@@ -1810,7 +2027,9 @@ describe("tenant repositories", () => {
         actorUserId: "user-a",
       },
     );
-    const manualOverride = asRecord(asRecord(result?.record.configurationSnapshot)?.manualOverride);
+    const manualOverride = asRecord(
+      asRecord(result?.record.configurationSnapshot)?.manualOverride,
+    );
 
     expect(result?.record).toMatchObject({
       id: "item-a",
@@ -1858,7 +2077,9 @@ describe("tenant repositories", () => {
         actorUserId: "user-a",
       },
     );
-    const quoteDiscount = asRecord(asRecord(result?.record.priceSnapshot)?.quoteDiscount);
+    const quoteDiscount = asRecord(
+      asRecord(result?.record.priceSnapshot)?.quoteDiscount,
+    );
 
     expect(result?.record).toMatchObject({
       id: "version-a",
@@ -1902,25 +2123,23 @@ describe("tenant repositories", () => {
       id: "item-a",
       tenantId: "tenant-a",
     });
-    await expect(data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-a")).resolves.toBeNull();
+    await expect(
+      data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-a"),
+    ).resolves.toBeNull();
   });
 
   it("rejects item mutations on locked or sent quote versions", async () => {
     const data = createTenantDataAccess(testClient());
 
     await expect(
-      data.createTenantQuoteItem(
-        { tenantId: "tenant-a" },
-        "quote-locked",
-        {
-          type: QuoteItemType.DOOR,
-          quantity: 1,
-          widthMm: 900,
-          heightMm: 2100,
-          customerDescription: "Blocked door line",
-          configurationSnapshot: { kind: "door" },
-        },
-      ),
+      data.createTenantQuoteItem({ tenantId: "tenant-a" }, "quote-locked", {
+        type: QuoteItemType.DOOR,
+        quantity: 1,
+        widthMm: 900,
+        heightMm: 2100,
+        customerDescription: "Blocked door line",
+        configurationSnapshot: { kind: "door" },
+      }),
     ).resolves.toBeNull();
     await expect(
       data.updateTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked", {
@@ -1931,11 +2150,15 @@ describe("tenant repositories", () => {
       data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked"),
     ).resolves.toBeNull();
     await expect(
-      data.applyTenantQuoteItemManualOverride({ tenantId: "tenant-a" }, "item-locked", {
-        amountMinor: 12_000,
-        reason: "Blocked locked override",
-        actorUserId: "user-a",
-      }),
+      data.applyTenantQuoteItemManualOverride(
+        { tenantId: "tenant-a" },
+        "item-locked",
+        {
+          amountMinor: 12_000,
+          reason: "Blocked locked override",
+          actorUserId: "user-a",
+        },
+      ),
     ).resolves.toBeNull();
     await expect(
       data.applyTenantQuoteDiscount({ tenantId: "tenant-a" }, "quote-locked", {
@@ -1972,16 +2195,22 @@ describe("tenant repositories", () => {
         customerDescription: "Blocked after lock",
       }),
     ).resolves.toBeNull();
-    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-a")).resolves.toBeNull();
     await expect(
-      data.updateTenantQuoteVersionCalculation({ tenantId: "tenant-a" }, "version-a", {
-        subtotalMinor: 100,
-        vatMinor: 19,
-        totalMinor: 119,
-        totalsSnapshot: { totalMinor: 119 },
-        warningsSnapshot: [],
-        traceSummary: { source: "blocked-test" },
-      }),
+      data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-a"),
+    ).resolves.toBeNull();
+    await expect(
+      data.updateTenantQuoteVersionCalculation(
+        { tenantId: "tenant-a" },
+        "version-a",
+        {
+          subtotalMinor: 100,
+          vatMinor: 19,
+          totalMinor: 119,
+          totalsSnapshot: { totalMinor: 119 },
+          warningsSnapshot: [],
+          traceSummary: { source: "blocked-test" },
+        },
+      ),
     ).resolves.toBeNull();
     expect(auditLogs).toHaveLength(1);
     expect(auditLogs[0]).toMatchObject({
@@ -1997,6 +2226,147 @@ describe("tenant repositories", () => {
     });
   });
 
+  it("sends a locked quote with a generated document and keeps the sent version immutable", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }), {
+      now: () => new Date("2026-06-26T09:30:00.000Z"),
+    });
+
+    await data.lockTenantQuoteVersion({ tenantId: "tenant-a" }, "quote-a", {
+      actorUserId: "user-a",
+    });
+    const document = await data.createTenantQuoteDocument(
+      { tenantId: "tenant-a" },
+      "version-a",
+      {
+        actorUserId: "user-a",
+        templateKey: "template-a",
+        fileName: "A-001-v1.pdf",
+        storageKey: "documents/tenant-a/version-a/sent.pdf",
+        mimeType: "application/pdf",
+        checksum: "sent-checksum",
+        visibleTotalsSnapshot: {
+          subtotalMinor: 0,
+          vatMinor: 0,
+          totalMinor: 0,
+          currency: "RON",
+        },
+      },
+    );
+    const result = await data.sendTenantQuote(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      {
+        actorUserId: "user-a",
+        documentId: document!.id,
+        intendedRecipientEmail: "client.sintetic@example.test",
+        intendedRecipientName: "Contact sintetic",
+      },
+    );
+
+    expect(result).toMatchObject({
+      quote: {
+        id: "quote-a",
+        status: QuoteStatus.SENT,
+      },
+      currentVersion: {
+        id: "version-a",
+        status: QuoteVersionStatus.SENT,
+        isLocked: true,
+        sentAt: new Date("2026-06-26T09:30:00.000Z"),
+      },
+      document: {
+        id: document?.id,
+        quoteVersionId: "version-a",
+      },
+    });
+    await expect(
+      data.getTenantQuoteDocument(
+        { tenantId: "tenant-a" },
+        "quote-a",
+        document!.id,
+      ),
+    ).resolves.toMatchObject({
+      document: {
+        id: document?.id,
+        quoteVersionId: "version-a",
+      },
+      quoteVersion: {
+        id: "version-a",
+        status: QuoteVersionStatus.SENT,
+      },
+    });
+    await expect(
+      data.updateTenantQuoteItem({ tenantId: "tenant-a" }, "item-a", {
+        customerDescription: "Blocked after send",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      data.updateTenantQuoteVersionCalculation(
+        { tenantId: "tenant-a" },
+        "version-a",
+        {
+          subtotalMinor: 100,
+          vatMinor: 19,
+          totalMinor: 119,
+          totalsSnapshot: { totalMinor: 119 },
+          warningsSnapshot: [],
+          traceSummary: { source: "blocked-sent-test" },
+        },
+      ),
+    ).resolves.toBeNull();
+
+    expect(auditLogs).toHaveLength(3);
+    expect(auditLogs[2]).toMatchObject({
+      tenantId: "tenant-a",
+      actorUserId: "user-a",
+      action: AuditAction.QUOTE_SENT,
+      entityType: "QuoteVersion",
+      entityId: "version-a",
+      metadata: {
+        quoteId: "quote-a",
+        targetStatus: QuoteVersionStatus.SENT,
+        documentId: document?.id,
+        intendedRecipientEmail: "client.sintetic@example.test",
+        providerStatus: "stub_recorded",
+      },
+    });
+  });
+
+  it("rejects sending with a document from another tenant", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+
+    await data.lockTenantQuoteVersion({ tenantId: "tenant-a" }, "quote-a", {
+      actorUserId: "user-a",
+    });
+    await data.lockTenantQuoteVersion({ tenantId: "tenant-b" }, "quote-b", {
+      actorUserId: "user-b",
+    });
+    const tenantBDocument = await data.createTenantQuoteDocument(
+      { tenantId: "tenant-b" },
+      "version-b",
+      {
+        actorUserId: "user-b",
+        templateKey: "template-a",
+        fileName: "B-001-v1.pdf",
+        storageKey: "documents/tenant-b/version-b/sent.pdf",
+        mimeType: "application/pdf",
+        checksum: "tenant-b-checksum",
+        visibleTotalsSnapshot: {},
+      },
+    );
+    const auditCountBeforeSend = auditLogs.length;
+
+    await expect(
+      data.sendTenantQuote({ tenantId: "tenant-a" }, "quote-a", {
+        actorUserId: "user-a",
+        documentId: tenantBDocument!.id,
+      }),
+    ).resolves.toBeNull();
+    expect(auditLogs).toHaveLength(auditCountBeforeSend);
+  });
+
   it("rejects door item edits and deletes after the draft version is locked", async () => {
     const data = createTenantDataAccess(testClient());
     const created = await data.createTenantQuoteItem(
@@ -2006,24 +2376,30 @@ describe("tenant repositories", () => {
     );
 
     expect(created).not.toBeNull();
-    await data.lockTenantQuoteVersion(
-      { tenantId: "tenant-a" },
-      "quote-a",
-      { actorUserId: "user-a" },
-    );
+    await data.lockTenantQuoteVersion({ tenantId: "tenant-a" }, "quote-a", {
+      actorUserId: "user-a",
+    });
     await expect(
       data.updateTenantQuoteItem({ tenantId: "tenant-a" }, created!.id, {
         customerDescription: "Blocked locked door edit",
       }),
     ).resolves.toBeNull();
-    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, created!.id)).resolves.toBeNull();
+    await expect(
+      data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, created!.id),
+    ).resolves.toBeNull();
   });
 
   it("creates a revision from a locked version while preserving the old version and copying item snapshots", async () => {
     const auditLogs: AuditLog[] = [];
     const data = createTenantDataAccess(testClient({ auditLogs }));
-    const sourceVersionBefore = await data.getTenantQuoteVersion({ tenantId: "tenant-a" }, "version-locked");
-    const sourceItemBefore = await data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked");
+    const sourceVersionBefore = await data.getTenantQuoteVersion(
+      { tenantId: "tenant-a" },
+      "version-locked",
+    );
+    const sourceItemBefore = await data.getTenantQuoteItem(
+      { tenantId: "tenant-a" },
+      "item-locked",
+    );
     const result = await data.createTenantQuoteRevision(
       { tenantId: "tenant-a" },
       "quote-locked",
@@ -2064,11 +2440,14 @@ describe("tenant repositories", () => {
     await expect(
       data.getTenantQuoteVersion({ tenantId: "tenant-a" }, "version-locked"),
     ).resolves.toEqual(sourceVersionBefore);
-    await expect(data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked")).resolves.toEqual(
-      sourceItemBefore,
-    );
     await expect(
-      data.getTenantQuoteWithCurrentVersion({ tenantId: "tenant-a" }, "quote-locked"),
+      data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked"),
+    ).resolves.toEqual(sourceItemBefore);
+    await expect(
+      data.getTenantQuoteWithCurrentVersion(
+        { tenantId: "tenant-a" },
+        "quote-locked",
+      ),
     ).resolves.toMatchObject({
       quote: {
         currentVersionId: result?.currentVersion.id,
@@ -2114,20 +2493,30 @@ describe("tenant repositories", () => {
   it("rejects cross-tenant quote item access and mutations", async () => {
     const data = createTenantDataAccess(testClient());
 
-    await expect(data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-b")).resolves.toBeNull();
-    await expect(data.listTenantQuoteItems({ tenantId: "tenant-a" }, "version-b")).resolves.toEqual([]);
+    await expect(
+      data.getTenantQuoteItem({ tenantId: "tenant-a" }, "item-b"),
+    ).resolves.toBeNull();
+    await expect(
+      data.listTenantQuoteItems({ tenantId: "tenant-a" }, "version-b"),
+    ).resolves.toEqual([]);
     await expect(
       data.updateTenantQuoteItem({ tenantId: "tenant-a" }, "item-b", {
         customerDescription: "Blocked edit",
       }),
     ).resolves.toBeNull();
-    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-b")).resolves.toBeNull();
     await expect(
-      data.applyTenantQuoteItemManualOverride({ tenantId: "tenant-a" }, "item-b", {
-        amountMinor: 20_000,
-        reason: "Blocked cross-tenant override",
-        actorUserId: "user-a",
-      }),
+      data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-b"),
+    ).resolves.toBeNull();
+    await expect(
+      data.applyTenantQuoteItemManualOverride(
+        { tenantId: "tenant-a" },
+        "item-b",
+        {
+          amountMinor: 20_000,
+          reason: "Blocked cross-tenant override",
+          actorUserId: "user-a",
+        },
+      ),
     ).resolves.toBeNull();
     await expect(
       data.applyTenantQuoteDiscount({ tenantId: "tenant-a" }, "quote-b", {
@@ -2150,32 +2539,40 @@ describe("tenant repositories", () => {
       tenantId: "tenant-b",
       type: QuoteItemType.DOOR,
     });
-    await expect(data.getTenantQuoteItem({ tenantId: "tenant-a" }, tenantBDoor!.id)).resolves.toBeNull();
+    await expect(
+      data.getTenantQuoteItem({ tenantId: "tenant-a" }, tenantBDoor!.id),
+    ).resolves.toBeNull();
     await expect(
       data.updateTenantQuoteItem({ tenantId: "tenant-a" }, tenantBDoor!.id, {
         customerDescription: "Blocked cross-tenant door edit",
       }),
     ).resolves.toBeNull();
-    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, tenantBDoor!.id)).resolves.toBeNull();
+    await expect(
+      data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, tenantBDoor!.id),
+    ).resolves.toBeNull();
   });
 
   it("creates tenant-scoped quote PDF document metadata with an audit entry", async () => {
     const auditLogs: AuditLog[] = [];
     const data = createTenantDataAccess(testClient({ auditLogs }));
-    const document = await data.createTenantQuoteDocument({ tenantId: "tenant-a" }, "version-locked", {
-      actorUserId: "user-a",
-      templateKey: "template-a",
-      fileName: "A-locked-v1.pdf",
-      storageKey: "documents/tenant-a/version-locked/example.pdf",
-      mimeType: "application/pdf",
-      checksum: "abc123",
-      visibleTotalsSnapshot: {
-        subtotalMinor: 0,
-        vatMinor: 0,
-        totalMinor: 0,
-        currency: "RON",
+    const document = await data.createTenantQuoteDocument(
+      { tenantId: "tenant-a" },
+      "version-locked",
+      {
+        actorUserId: "user-a",
+        templateKey: "template-a",
+        fileName: "A-locked-v1.pdf",
+        storageKey: "documents/tenant-a/version-locked/example.pdf",
+        mimeType: "application/pdf",
+        checksum: "abc123",
+        visibleTotalsSnapshot: {
+          subtotalMinor: 0,
+          vatMinor: 0,
+          totalMinor: 0,
+          currency: "RON",
+        },
       },
-    });
+    );
 
     expect(document).toMatchObject({
       tenantId: "tenant-a",
