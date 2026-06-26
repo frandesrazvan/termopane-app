@@ -30,6 +30,7 @@ import {
   type QuoteCalculationResult,
   type QuoteItem,
   type QuoteVersion,
+  type SavedFilter,
 } from "@prisma/client";
 import type { TenantContext } from "../auth/tenant-context";
 import { prisma } from "../prisma";
@@ -99,6 +100,7 @@ export type TenantDataClient = {
   document: TenantWritableModelDelegate<Document>;
   auditLog: TenantWritableModelDelegate<AuditLog>;
   companySettings: TenantModelDelegate<CompanySettings>;
+  savedFilter: TenantWritableModelDelegate<SavedFilter>;
   serviceItem: TenantWritableModelDelegate<ServiceItem>;
   supplier: TenantWritableModelDelegate<Supplier>;
   taxRate: TenantWritableModelDelegate<TaxRate>;
@@ -153,6 +155,19 @@ export type ListTenantQuotesOptions = {
   createdById?: string | null;
   createdFrom?: Date | null;
   createdTo?: Date | null;
+};
+
+export type ListTenantSavedFiltersOptions = {
+  entityType?: string;
+  userId?: string | null;
+};
+
+export type TenantSavedFilterWriteInput = {
+  userId?: string | null;
+  name: string;
+  entityType?: string;
+  filter: Record<string, unknown>;
+  isDefault?: boolean;
 };
 
 export type TenantQuoteDraftInput = {
@@ -1288,6 +1303,61 @@ export function createTenantDataAccess(
       });
     },
 
+    listTenantSavedFilters(
+      scope: TenantDataScope,
+      options: ListTenantSavedFiltersOptions = {},
+    ) {
+      return client.savedFilter.findMany({
+        where: tenantWhere(scope, {
+          entityType: options.entityType ?? "Quote",
+          ...(options.userId !== undefined ? { userId: options.userId } : {}),
+        }),
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+      });
+    },
+
+    getTenantSavedFilter(scope: TenantDataScope, savedFilterId: string) {
+      return client.savedFilter.findFirst({
+        where: tenantWhere(scope, { id: savedFilterId }),
+      });
+    },
+
+    async upsertTenantSavedFilter(
+      scope: TenantDataScope,
+      data: TenantSavedFilterWriteInput,
+    ) {
+      const entityType = data.entityType ?? "Quote";
+      const userId = data.userId ?? null;
+      const existing = await client.savedFilter.findFirst({
+        where: tenantWhere(scope, {
+          entityType,
+          userId,
+          name: data.name,
+        }),
+      });
+
+      if (existing) {
+        return client.savedFilter.update({
+          where: { id: existing.id },
+          data: {
+            filter: data.filter,
+            isDefault: data.isDefault ?? existing.isDefault,
+          },
+        });
+      }
+
+      return client.savedFilter.create({
+        data: {
+          tenantId: tenantIdFromScope(scope),
+          userId,
+          name: data.name,
+          entityType,
+          filter: data.filter,
+          isDefault: data.isDefault ?? false,
+        },
+      });
+    },
+
     async createTenantQuoteDraft(
       scope: TenantDataScope,
       data: TenantQuoteDraftInput,
@@ -2197,6 +2267,24 @@ export function getTenantQuoteWithCurrentVersion(scope: TenantDataScope, quoteId
 
 export function listTenantQuotes(scope: TenantDataScope, options?: ListTenantQuotesOptions) {
   return tenantDataAccess.listTenantQuotes(scope, options);
+}
+
+export function listTenantSavedFilters(
+  scope: TenantDataScope,
+  options?: ListTenantSavedFiltersOptions,
+) {
+  return tenantDataAccess.listTenantSavedFilters(scope, options);
+}
+
+export function getTenantSavedFilter(scope: TenantDataScope, savedFilterId: string) {
+  return tenantDataAccess.getTenantSavedFilter(scope, savedFilterId);
+}
+
+export function upsertTenantSavedFilter(
+  scope: TenantDataScope,
+  data: TenantSavedFilterWriteInput,
+) {
+  return tenantDataAccess.upsertTenantSavedFilter(scope, data);
 }
 
 export function createTenantQuoteDraft(scope: TenantDataScope, data: TenantQuoteDraftInput) {

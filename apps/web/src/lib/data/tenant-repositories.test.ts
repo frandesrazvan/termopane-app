@@ -30,6 +30,7 @@ import {
   type QuoteCalculationResult,
   type QuoteItem,
   type QuoteVersion,
+  type SavedFilter,
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
@@ -676,6 +677,44 @@ function testClient(
         defaultCurrency: "RON",
       },
     ] as CompanySettings[]),
+    savedFilter: delegate(
+      [
+        {
+          id: "filter-a",
+          tenantId: "tenant-a",
+          userId: "user-a",
+          name: "Ciorne proprii",
+          entityType: "Quote",
+          filter: { status: QuoteStatus.DRAFT },
+          isDefault: false,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+        {
+          id: "filter-other-user",
+          tenantId: "tenant-a",
+          userId: "user-other",
+          name: "Alt utilizator",
+          entityType: "Quote",
+          filter: { status: QuoteStatus.SENT },
+          isDefault: false,
+          createdAt: new Date("2026-01-02T00:00:00.000Z"),
+          updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+        },
+        {
+          id: "filter-b",
+          tenantId: "tenant-b",
+          userId: "user-b",
+          name: "Tenant B",
+          entityType: "Quote",
+          filter: { status: QuoteStatus.SENT },
+          isDefault: false,
+          createdAt: new Date("2026-01-03T00:00:00.000Z"),
+          updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+        },
+      ] as SavedFilter[],
+      { unique: [["tenantId", "userId", "name"]] },
+    ),
   };
 
   if (options.onTransaction) {
@@ -1234,6 +1273,64 @@ describe("tenant repositories", () => {
         },
       ),
     ).resolves.toMatchObject([{ id: "quote-a", tenantId: "tenant-a" }]);
+  });
+
+  it("lists and reads saved quote filters inside tenant and user boundaries", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(
+      data.listTenantSavedFilters(
+        { tenantId: "tenant-a" },
+        { entityType: "Quote", userId: "user-a" },
+      ),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: "filter-a",
+        tenantId: "tenant-a",
+        userId: "user-a",
+        filter: { status: QuoteStatus.DRAFT },
+      }),
+    ]);
+    await expect(data.getTenantSavedFilter({ tenantId: "tenant-a" }, "filter-b")).resolves.toBeNull();
+  });
+
+  it("upserts saved quote filters without leaking across tenants or users", async () => {
+    const data = createTenantDataAccess(testClient());
+    const created = await data.upsertTenantSavedFilter(
+      { tenantId: "tenant-a" },
+      {
+        userId: "user-a",
+        name: "Trimise",
+        entityType: "Quote",
+        filter: { status: QuoteStatus.SENT },
+      },
+    );
+
+    expect(created).toMatchObject({
+      tenantId: "tenant-a",
+      userId: "user-a",
+      name: "Trimise",
+      filter: { status: QuoteStatus.SENT },
+    });
+
+    const updated = await data.upsertTenantSavedFilter(
+      { tenantId: "tenant-a" },
+      {
+        userId: "user-a",
+        name: "Trimise",
+        entityType: "Quote",
+        filter: { status: QuoteStatus.ACCEPTED },
+      },
+    );
+
+    expect(updated.id).toBe(created.id);
+    expect(updated.filter).toEqual({ status: QuoteStatus.ACCEPTED });
+    await expect(
+      data.listTenantSavedFilters(
+        { tenantId: "tenant-a" },
+        { entityType: "Quote", userId: "user-b" },
+      ),
+    ).resolves.toEqual([]);
   });
 
   it("creates a draft quote shell with an initial tenant-scoped quote version", async () => {

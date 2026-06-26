@@ -108,6 +108,27 @@ Template B compact proposal previews and PDFs use Romanian customer-facing label
 The quote document UI exposes the template choices as `Template A - ofertă detaliată` and
 `Template B - propunere compactă`.
 
+## COD-022 Saved Offer Workflow Labels
+
+The saved-offers workflow uses these Romanian labels:
+
+- `Filtre rapide`;
+- `Filtre salvate`;
+- `Ciorne`;
+- `Trimise`;
+- `Acceptate`;
+- `Respinsă`;
+- `Expiră curând`;
+- `Cu PDF generat`;
+- `Fără calcul`;
+- `Cu avertizări`;
+- `Nume filtru salvat`;
+- `Salvează filtrul`;
+- `Versiune Ciornă`;
+- `Versiune Blocată`;
+- `Versiune Trimisă`;
+- `Versiune Înlocuită`.
+
 ## Testing Expectations
 
 When a task changes user-facing offer output, update package/app tests so Romanian labels remain

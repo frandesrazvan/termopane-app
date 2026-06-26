@@ -267,3 +267,15 @@ Both write paths require a reason, reject locked/sent versions, create `AuditLog
 `PRICING_OVERRIDE_APPLIED`, and mark calculation snapshots pending until the draft version is
 recalculated. Stored totals preserve calculated values separately from manual adjustments so quote
 review can show base totals, discounts, overrides, and final totals.
+
+## COD-022 saved offer filter notes
+
+Saved offer views now use tenant-owned `SavedFilter` records for user-specific quote filters. The
+persisted filter JSON stores only supported customer, status, author, date range, total range, and
+quick-filter keys. Applying a saved filter first validates tenant and user scope through repository
+helpers, then resolves it into the same normalized filter shape used by the saved-offers URL.
+
+Quick workflow filters such as generated PDFs, missing calculations, warnings, and expiring offers
+are evaluated from the quote's current version, document rows, calculation result, warning
+snapshots, and company offer-validity snapshot. They do not mutate quote versions or depend on live
+catalog/pricing data.

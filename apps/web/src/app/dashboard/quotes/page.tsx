@@ -1,15 +1,35 @@
-import { ArrowLeft, CalendarDays, FileText, Plus, Search } from "lucide-react";
-import { QuoteStatus } from "@prisma/client";
+import { ArrowLeft, Bookmark, CalendarDays, FileText, Filter, Plus, Save, Search } from "lucide-react";
+import { QuoteStatus, QuoteVersionStatus } from "@prisma/client";
 import Link from "next/link";
 import { requireTenant } from "@/lib/auth";
 import {
   getTenantProject,
+  getTenantQuoteCalculationResult,
   getTenantQuoteVersion,
   listTenantCustomers,
   listTenantProjects,
+  listTenantQuoteDocuments,
   listTenantQuotes,
+  listTenantSavedFilters,
 } from "@/lib/data";
-import { formatMoneyMinorRo, quoteStatusLabel } from "@/lib/i18n";
+import {
+  formatMoneyMinorRo,
+  quoteStatusLabel,
+  quoteVersionStatusLabel,
+} from "@/lib/i18n";
+import {
+  hasSavedOfferFilter,
+  matchesSavedOfferWorkflowFilter,
+  quoteListOptionsFromSavedOfferFilter,
+  savedOfferFilterFromJson,
+  savedOfferFilterFromSearchParams,
+  savedOfferFilterToSearchParams,
+  savedOfferQuickFilters,
+  warningCount,
+  type SavedOfferFilter,
+  type SavedOfferQuickFilterKey,
+} from "@/lib/quotes/saved-offer-filters";
+import { saveQuoteFilterAction } from "./actions";
 
 const quoteStatuses = Object.values(QuoteStatus);
 
@@ -22,43 +42,48 @@ export default async function QuotesPage({
 }) {
   const context = await requireTenant();
   const params = await searchParams;
-  const customerId = params.customerId?.trim() || null;
-  const status = quoteStatuses.includes(params.status as QuoteStatus)
-    ? (params.status as QuoteStatus)
-    : null;
-  const authorId = params.authorId?.trim() || null;
-  const createdFrom = parseDateStart(params.createdFrom);
-  const createdTo = parseDateEnd(params.createdTo);
-  const totalMinMinor = parseMinor(params.totalMinMinor);
-  const totalMaxMinor = parseMinor(params.totalMaxMinor);
+  const savedFilters = await listTenantSavedFilters(context, {
+    entityType: "Quote",
+    userId: context.user.id,
+  });
+  const activeSavedFilter =
+    savedFilters.find((filter) => filter.id === params.savedFilterId) ?? null;
+  const activeFilter = activeSavedFilter
+    ? savedOfferFilterFromJson(activeSavedFilter.filter)
+    : savedOfferFilterFromSearchParams(params);
+  const quoteListOptions = quoteListOptionsFromSavedOfferFilter(activeFilter);
   const [customers, projects, quotes] = await Promise.all([
     listTenantCustomers(context),
     listTenantProjects(context),
-    listTenantQuotes(context, {
-      customerId,
-      status,
-      createdById: authorId,
-      createdFrom,
-      createdTo,
-    }),
+    listTenantQuotes(context, quoteListOptions),
   ]);
   const customerNames = new Map(customers.map((customer) => [customer.id, customer.displayName]));
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
   const rows = await Promise.all(
-    quotes.map(async (quote) => ({
-      quote,
-      currentVersion: quote.currentVersionId
+    quotes.map(async (quote) => {
+      const currentVersion = quote.currentVersionId
         ? await getTenantQuoteVersion(context, quote.currentVersionId)
-        : null,
-      project: quote.projectId ? await getTenantProject(context, quote.projectId) : null,
-    })),
+        : null;
+      const [project, calculationResult, documents] = await Promise.all([
+        quote.projectId ? getTenantProject(context, quote.projectId) : null,
+        currentVersion ? getTenantQuoteCalculationResult(context, currentVersion.id) : null,
+        currentVersion ? listTenantQuoteDocuments(context, currentVersion.id) : [],
+      ]);
+
+      return {
+        quote,
+        currentVersion,
+        project,
+        documentCount: documents.length,
+        hasCalculation: Boolean(calculationResult),
+        calculationWarningCount: warningCount(calculationResult?.warnings),
+      };
+    }),
   );
-  const filteredRows = rows.filter(({ currentVersion }) =>
-    matchesTotalRange(currentVersion?.totalMinor, totalMinMinor, totalMaxMinor),
+  const filteredRows = rows.filter((row) =>
+    matchesSavedOfferWorkflowFilter(row, activeFilter),
   );
-  const hasFilters = Boolean(
-    customerId || status || authorId || createdFrom || createdTo || totalMinMinor || totalMaxMinor,
-  );
+  const hasFilters = hasSavedOfferFilter(activeFilter);
 
   return (
     <main className="min-h-screen bg-stone-50 px-4 py-5 sm:px-6 lg:px-8">
@@ -86,13 +111,66 @@ export default async function QuotesPage({
           </Link>
         </div>
 
+        {params.saved === "1" ? (
+          <p className="mt-5 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+            Filtrul a fost salvat pentru ofertele tale.
+          </p>
+        ) : null}
+        {params.filterError ? (
+          <p className="mt-5 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
+            Completează un nume și cel puțin un criteriu înainte de salvare.
+          </p>
+        ) : null}
+
+        <section className="mt-6 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+            <Filter aria-hidden="true" size={17} />
+            Filtre rapide
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {savedOfferQuickFilters.map((filter) => (
+              <QuickFilterLink
+                active={activeFilter.quickFilter === filter.key}
+                filterKey={filter.key}
+                key={filter.key}
+                label={filter.label}
+              />
+            ))}
+          </div>
+        </section>
+
+        {savedFilters.length > 0 ? (
+          <section className="mt-4 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+              <Bookmark aria-hidden="true" size={17} />
+              Filtre salvate
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {savedFilters.map((filter) => (
+                <Link
+                  aria-current={activeSavedFilter?.id === filter.id ? "page" : undefined}
+                  className={
+                    activeSavedFilter?.id === filter.id
+                      ? "inline-flex h-9 items-center rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white"
+                      : "inline-flex h-9 items-center rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 hover:bg-stone-50"
+                  }
+                  href={`/dashboard/quotes?savedFilterId=${filter.id}`}
+                  key={filter.id}
+                >
+                  {filter.name}
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <form action="/dashboard/quotes" className="mt-6 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="block">
               <span className="text-sm font-medium text-zinc-800">Client</span>
               <select
                 name="customerId"
-                defaultValue={customerId ?? ""}
+                defaultValue={activeFilter.customerId ?? ""}
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               >
                 <option value="">Toți clienții</option>
@@ -108,7 +186,7 @@ export default async function QuotesPage({
               <span className="text-sm font-medium text-zinc-800">Status</span>
               <select
                 name="status"
-                defaultValue={status ?? ""}
+                defaultValue={activeFilter.status ?? ""}
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               >
                 <option value="">Toate statusurile</option>
@@ -124,7 +202,7 @@ export default async function QuotesPage({
               <span className="text-sm font-medium text-zinc-800">Autor</span>
               <input
                 name="authorId"
-                defaultValue={authorId ?? ""}
+                defaultValue={activeFilter.createdById ?? ""}
                 placeholder="ID utilizator"
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               />
@@ -135,7 +213,7 @@ export default async function QuotesPage({
               <input
                 name="createdFrom"
                 type="date"
-                defaultValue={params.createdFrom ?? ""}
+                defaultValue={activeFilter.createdFrom ?? ""}
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               />
             </label>
@@ -145,7 +223,7 @@ export default async function QuotesPage({
               <input
                 name="createdTo"
                 type="date"
-                defaultValue={params.createdTo ?? ""}
+                defaultValue={activeFilter.createdTo ?? ""}
                 className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
               />
             </label>
@@ -158,7 +236,7 @@ export default async function QuotesPage({
                   type="number"
                   min="0"
                   step="1"
-                  defaultValue={params.totalMinMinor ?? ""}
+                  defaultValue={activeFilter.totalMinMinor ?? ""}
                   placeholder="bani"
                   className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
                 />
@@ -170,7 +248,7 @@ export default async function QuotesPage({
                   type="number"
                   min="0"
                   step="1"
-                  defaultValue={params.totalMaxMinor ?? ""}
+                  defaultValue={activeFilter.totalMaxMinor ?? ""}
                   placeholder="bani"
                   className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
                 />
@@ -194,13 +272,49 @@ export default async function QuotesPage({
           </div>
         </form>
 
+        {hasFilters ? (
+          <form
+            action={saveQuoteFilterAction}
+            className="mt-3 rounded-md border border-zinc-200 bg-white p-4 shadow-sm"
+          >
+            <SavedFilterHiddenInputs filter={activeFilter} />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="block flex-1">
+                <span className="text-sm font-medium text-zinc-800">Nume filtru salvat</span>
+                <input
+                  className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
+                  defaultValue={activeSavedFilter?.name ?? ""}
+                  maxLength={80}
+                  name="filterName"
+                  placeholder="Ex. Oferte cu avertizări"
+                  required
+                />
+              </label>
+              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-800">
+                <Save aria-hidden="true" size={17} />
+                Salvează filtrul
+              </button>
+            </div>
+          </form>
+        ) : null}
+
         <section className="mt-6">
           {filteredRows.length > 0 ? (
             <div className="grid gap-3">
-              {filteredRows.map(({ quote, currentVersion, project }) => {
+              {filteredRows.map(
+                ({
+                  quote,
+                  currentVersion,
+                  project,
+                  documentCount,
+                  hasCalculation,
+                  calculationWarningCount,
+                }) => {
                 const projectLabel = quote.projectId
                   ? (project?.name ?? projectNames.get(quote.projectId) ?? "Proiect")
                   : null;
+                const warnings =
+                  warningCount(currentVersion?.warningsSnapshot) + calculationWarningCount;
 
                 return (
                   <Link
@@ -224,7 +338,12 @@ export default async function QuotesPage({
                               {projectLabel ? ` · ${projectLabel}` : ""}
                             </p>
                           </div>
-                          <StatusBadge status={quote.status} />
+                          <div className="flex flex-wrap gap-2">
+                            <StatusBadge status={quote.status} />
+                            {currentVersion ? (
+                              <VersionStatusBadge status={currentVersion.status} />
+                            ) : null}
+                          </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-zinc-600">
                           <span className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2 py-1">
@@ -237,12 +356,28 @@ export default async function QuotesPage({
                           <span className="rounded-md bg-stone-100 px-2 py-1">
                             {formatMinor(currentVersion?.totalMinor)}
                           </span>
+                          {documentCount > 0 ? (
+                            <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-800">
+                              PDF generat
+                            </span>
+                          ) : null}
+                          {!hasCalculation ? (
+                            <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-800">
+                              Fără calcul
+                            </span>
+                          ) : null}
+                          {warnings > 0 ? (
+                            <span className="rounded-md bg-rose-50 px-2 py-1 text-rose-800">
+                              {warnings} avertizări
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>
                   </Link>
                 );
-              })}
+              },
+              )}
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-zinc-300 bg-white p-6 text-center">
@@ -291,48 +426,70 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
   );
 }
 
-function parseDateStart(value: string | undefined) {
-  if (!value) {
-    return null;
-  }
+function VersionStatusBadge({ status }: { status: QuoteVersionStatus }) {
+  const tone =
+    status === QuoteVersionStatus.DRAFT
+      ? "bg-amber-50 text-amber-800"
+      : status === QuoteVersionStatus.SENT
+        ? "bg-emerald-50 text-emerald-800"
+        : status === QuoteVersionStatus.SUPERSEDED
+          ? "bg-zinc-100 text-zinc-700"
+          : "bg-sky-50 text-sky-800";
 
-  const date = new Date(`${value}T00:00:00.000Z`);
-
-  return Number.isNaN(date.getTime()) ? null : date;
+  return (
+    <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${tone}`}>
+      Versiune {quoteVersionStatusLabel(status)}
+    </span>
+  );
 }
 
-function parseDateEnd(value: string | undefined) {
-  if (!value) {
-    return null;
-  }
+function QuickFilterLink({
+  active,
+  filterKey,
+  label,
+}: {
+  active: boolean;
+  filterKey: SavedOfferQuickFilterKey;
+  label: string;
+}) {
+  const params = savedOfferFilterToSearchParams({ quickFilter: filterKey });
 
-  const date = new Date(`${value}T23:59:59.999Z`);
-
-  return Number.isNaN(date.getTime()) ? null : date;
+  return (
+    <Link
+      aria-current={active ? "page" : undefined}
+      className={
+        active
+          ? "inline-flex h-9 items-center rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white"
+          : "inline-flex h-9 items-center rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-700 hover:bg-stone-50"
+      }
+      href={`/dashboard/quotes?${params.toString()}`}
+    >
+      {label}
+    </Link>
+  );
 }
 
-function parseMinor(value: string | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
-}
-
-function matchesTotalRange(value: bigint | number | null | undefined, min: number | null, max: number | null) {
-  if (min === null && max === null) {
-    return true;
-  }
-
-  if (value === null || value === undefined) {
-    return false;
-  }
-
-  const total = typeof value === "bigint" ? Number(value) : value;
-
-  return (min === null || total >= min) && (max === null || total <= max);
+function SavedFilterHiddenInputs({ filter }: { filter: SavedOfferFilter }) {
+  return (
+    <>
+      <input name="quickFilter" type="hidden" value={filter.quickFilter ?? ""} />
+      <input name="customerId" type="hidden" value={filter.customerId ?? ""} />
+      <input name="status" type="hidden" value={filter.status ?? ""} />
+      <input name="createdById" type="hidden" value={filter.createdById ?? ""} />
+      <input name="createdFrom" type="hidden" value={filter.createdFrom ?? ""} />
+      <input name="createdTo" type="hidden" value={filter.createdTo ?? ""} />
+      <input
+        name="totalMinMinor"
+        type="hidden"
+        value={filter.totalMinMinor ?? ""}
+      />
+      <input
+        name="totalMaxMinor"
+        type="hidden"
+        value={filter.totalMaxMinor ?? ""}
+      />
+    </>
+  );
 }
 
 function formatMinor(value: bigint | number | null | undefined) {
