@@ -223,6 +223,51 @@ describe("quote PDF generation", () => {
     });
   });
 
+  it("creates Template B documents with compact customer-safe PDF output", async () => {
+    const state = testState();
+    const result = await generateTenantQuotePdf(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      "version-a",
+      {
+        ...generatorOptions(state.client, "template-b"),
+        templateKey: "template-b",
+        renderPdf: undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+
+    if (!result.ok) {
+      throw new Error(result.reason);
+    }
+
+    expect(result.document).toMatchObject({
+      tenantId: "tenant-a",
+      quoteVersionId: "version-a",
+      type: DocumentType.QUOTE_PDF,
+      templateKey: "template-b",
+      fileName: "Q-001-v1-template-b.pdf",
+      mimeType: "application/pdf",
+    });
+    expect(state.documents[0]?.visibleTotalsSnapshot).toMatchObject({
+      source: "template-b-pdf",
+      templateKey: "template-b",
+      totalMinor: 11_900,
+      itemCount: 1,
+    });
+
+    const pdfText = await readFile(
+      resolveLocalDocumentPath(result.storageKey, { rootDir: storageRoot }),
+      "utf8",
+    );
+
+    expect(pdfText).toContain(pdfHexText("Template B compact"));
+    expect(pdfText).toContain(pdfHexText("Valoare totală document"));
+    expect(pdfText).not.toContain("Internal cost note");
+    expect(pdfText).not.toContain("materialCostMinor");
+  });
+
   it("rejects cross-tenant generation", async () => {
     const state = testState();
     const result = await generateTenantQuotePdf(
@@ -417,4 +462,14 @@ function quoteItem(overrides: Partial<QuoteItem> = {}) {
     updatedAt: new Date("2026-06-25T00:00:00.000Z"),
     ...overrides,
   } as unknown as QuoteItem;
+}
+
+function pdfHexText(value: string) {
+  let hex = "FEFF";
+
+  for (let index = 0; index < value.length; index += 1) {
+    hex += value.charCodeAt(index).toString(16).padStart(4, "0").toUpperCase();
+  }
+
+  return `<${hex}>`;
 }

@@ -1,9 +1,10 @@
 "use server";
 
 import { ProfileItemType, QuoteItemType, QuoteVersionStatus } from "@prisma/client";
+import { isQuotePdfTemplateKey } from "@termopane/pdf";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireTenant } from "@/lib/auth";
+import { canGeneratePdf, requireTenant } from "@/lib/auth";
 import { recalculateTenantCurrentQuoteVersion } from "@/lib/calculation/quote-calculation-adapter";
 import {
   buildFixedWindowCatalogSnapshot,
@@ -263,11 +264,19 @@ export async function generateQuotePdfAction(
   quoteVersionId: string,
   formData: FormData,
 ) {
-  void formData;
-
   const context = await requireTenant();
+
+  if (!canGeneratePdf(context.membership)) {
+    redirectWithDocumentError(quoteId, "generate");
+  }
+
+  const templateKeyValue = formText(formData, "templateKey");
+  const templateKey = isQuotePdfTemplateKey(templateKeyValue)
+    ? templateKeyValue
+    : "template-a";
   const result = await generateTenantQuotePdf(context, quoteId, quoteVersionId, {
     actorUserId: context.user.id,
+    templateKey,
   });
 
   if (!result.ok) {

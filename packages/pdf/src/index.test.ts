@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildQuoteHtml,
+  buildQuotePdf,
   buildTemplateAPdf,
   buildTemplateAHtml,
+  buildTemplateBPdf,
+  buildTemplateBHtml,
   getPdfPackageInfo,
+  type TemplateBOfferSnapshot,
   type TemplateAOfferSnapshot,
 } from "./index.js";
 
@@ -123,7 +128,7 @@ describe("Template A HTML preview", () => {
     const info = getPdfPackageInfo();
 
     expect(info.bindsToQuoteVersion).toBe(true);
-    expect(info.supportedTemplates).toEqual(["template-a"]);
+    expect(info.supportedTemplates).toEqual(["template-a", "template-b"]);
     expect(info.supportedOutputs).toEqual(["html", "pdf"]);
   });
 
@@ -144,6 +149,122 @@ describe("Template A HTML preview", () => {
     for (const label of coreEnglishLabels) {
       expect(pdfText).not.toContain(label);
     }
+  });
+});
+
+describe("Template B compact proposal", () => {
+  it("renders compact item blocks with drawing, description, MU, quantity, and unit cost", () => {
+    const html = buildTemplateBHtml(templateBSnapshot());
+
+    expect(html).toContain('data-template-key="template-b"');
+    expect(html).toContain("Propunere compactă");
+    expect(html).toContain("Poziții ofertă");
+    expect(html).toContain("UM");
+    expect(html).toContain("Cant.");
+    expect(html).toContain("Preț unitar");
+    expect(html).toContain("Fereastră fixă living");
+    expect(html).toContain("buc.");
+    expect(html).toContain("500,00 RON");
+    expect(html).toContain("Total poziție");
+  });
+
+  it("shows final total square meters and total document value", () => {
+    const html = buildTemplateBHtml(
+      templateBSnapshot({
+        items: [
+          itemSnapshot({ id: "window-a", sortOrder: 1, surfaceAreaSquareMeters: 3.36 }),
+          itemSnapshot({
+            id: "window-b",
+            sortOrder: 2,
+            customerDescription: "Fereastră dormitor",
+            surfaceAreaSquareMeters: 1.44,
+            subtotalMinor: 600_00,
+            vatMinor: 114_00,
+            totalMinor: 714_00,
+          }),
+        ],
+        totals: {
+          subtotalMinor: 1_600_00,
+          vatMinor: 304_00,
+          totalMinor: 1_904_00,
+          currency: "RON",
+        },
+      }),
+    );
+
+    expect(html).toContain('data-total-area-square-meters="4.80"');
+    expect(html).toContain("Total m²");
+    expect(html).toContain("4.80 mp");
+    expect(html).toContain("Valoare totală document");
+    expect(html).toContain("1.904,00 RON");
+  });
+
+  it("keeps multi-item layout page-break safe", () => {
+    const manyItems = Array.from({ length: 18 }, (_, index) =>
+      itemSnapshot({
+        id: `item-${index + 1}`,
+        sortOrder: index + 1,
+        customerDescription: `Poziție compactă ${index + 1}`,
+      }),
+    );
+    const html = buildTemplateBHtml(templateBSnapshot({ items: manyItems }));
+
+    expect(html.match(/class="proposal-item"/g)).toHaveLength(18);
+    expect(html).toContain("break-inside: avoid");
+    expect(html).toContain("page-break-inside: avoid");
+  });
+
+  it("hides internal costs and trace-like fields in compact customer output", () => {
+    const html = buildTemplateBHtml(
+      templateBSnapshot({
+        items: [
+          {
+            ...itemSnapshot(),
+            internalMaterialCostMinor: 4_321_99,
+            internalNotes: "Supplier cost must stay hidden",
+            traceSummary: "secret margin trace",
+          } as unknown as TemplateBOfferSnapshot["items"][number],
+        ],
+      }),
+    );
+
+    expect(html).not.toContain("Supplier cost");
+    expect(html).not.toContain("secret margin");
+    expect(html).not.toContain("4.321,99");
+    expect(html).not.toContain("internalMaterialCostMinor");
+  });
+
+  it("renders a deterministic Template B PDF with Romanian labels and multiple pages", () => {
+    const pdf = buildTemplateBPdf(
+      templateBSnapshot({
+        items: Array.from({ length: 12 }, (_, index) =>
+          itemSnapshot({
+            id: `item-${index + 1}`,
+            sortOrder: index + 1,
+            customerDescription: `Poziție PDF compactă ${index + 1}`,
+          }),
+        ),
+      }),
+    );
+    const pdfText = new TextDecoder().decode(pdf);
+
+    expect(pdfText.startsWith("%PDF-1.4")).toBe(true);
+    expect(pdfText).toContain(pdfHexText("Propunere comercială"));
+    expect(pdfText).toContain(pdfHexText("Poziții ofertă"));
+    expect(pdfText).toContain(pdfHexText("Total m²"));
+    expect(pdfText).toContain(pdfHexText("Valoare totală document"));
+    expect(pdfText).toContain("/Count 3");
+    expect(pdfText).not.toContain("Supplier cost");
+    expect(pdfText).not.toContain("materialCostMinor");
+  });
+
+  it("routes shared HTML/PDF builders by tenant-selected template key", () => {
+    const snapshot = templateBSnapshot();
+    const html = buildQuoteHtml(snapshot);
+    const pdfText = new TextDecoder().decode(buildQuotePdf(snapshot));
+
+    expect(html).toContain('data-template-key="template-b"');
+    expect(pdfText).toContain(pdfHexText("Template B compact"));
   });
 });
 
@@ -187,6 +308,16 @@ function templateSnapshot(
       warrantyText: "Garanție conform contractului semnat.",
       validityText: "30 de zile",
     },
+    ...overrides,
+  };
+}
+
+function templateBSnapshot(
+  overrides: Partial<TemplateBOfferSnapshot> = {},
+): TemplateBOfferSnapshot {
+  return {
+    ...templateSnapshot(),
+    templateKey: "template-b",
     ...overrides,
   };
 }

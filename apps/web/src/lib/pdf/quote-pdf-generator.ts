@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { DocumentType, type Document, type QuoteVersion } from "@prisma/client";
-import { buildTemplateAPdf } from "@termopane/pdf";
+import {
+  buildQuotePdf,
+  type QuotePdfOfferSnapshot,
+  type QuotePdfTemplateKey,
+} from "@termopane/pdf";
 import {
   createTenantDataAccess,
   type TenantDataClient,
@@ -9,7 +13,7 @@ import {
 import { prisma } from "../prisma";
 import { writeLocalDocument, type LocalDocumentStorageOptions } from "./local-document-storage";
 import {
-  buildTemplateAOfferSnapshot,
+  buildQuotePdfOfferSnapshot,
   isQuoteVersionLockedForCustomerOutput,
   visibleTotalsSnapshotFromTemplate,
 } from "./template-a-snapshot";
@@ -19,7 +23,8 @@ export type GenerateQuotePdfOptions = LocalDocumentStorageOptions & {
   client?: TenantDataClient;
   now?: () => Date;
   nonce?: () => string;
-  renderPdf?: typeof buildTemplateAPdf;
+  templateKey?: QuotePdfTemplateKey;
+  renderPdf?: (snapshot: QuotePdfOfferSnapshot) => Uint8Array;
 };
 
 export type GenerateQuotePdfResult =
@@ -34,7 +39,6 @@ export type GenerateQuotePdfResult =
       reason: "not_found" | "not_locked" | "write_failed";
     };
 
-const TEMPLATE_KEY = "template-a";
 const PDF_MIME_TYPE = "application/pdf";
 
 export async function generateTenantQuotePdf(
@@ -61,8 +65,9 @@ export async function generateTenantQuotePdf(
   }
 
   const items = await data.listTenantQuoteItems(scope, quoteVersion.id);
-  const snapshot = buildTemplateAOfferSnapshot(quoteState.quote, quoteVersion, items);
-  const renderPdf = options.renderPdf ?? buildTemplateAPdf;
+  const templateKey = options.templateKey ?? "template-a";
+  const snapshot = buildQuotePdfOfferSnapshot(quoteState.quote, quoteVersion, items, templateKey);
+  const renderPdf = options.renderPdf ?? buildQuotePdf;
   const pdfBytes = renderPdf(snapshot);
   const checksum = sha256(pdfBytes);
   const storageKey = documentStorageKey(
@@ -72,7 +77,7 @@ export async function generateTenantQuotePdf(
     options.now?.() ?? new Date(),
     options.nonce?.() ?? randomUUID(),
   );
-  const fileName = documentFileName(quoteState.quote.quoteNumber, quoteVersion);
+  const fileName = documentFileName(quoteState.quote.quoteNumber, quoteVersion, templateKey);
 
   try {
     await writeLocalDocument(storageKey, pdfBytes, options);
@@ -82,7 +87,7 @@ export async function generateTenantQuotePdf(
 
   const document = await data.createTenantQuoteDocument(scope, quoteVersion.id, {
     actorUserId: options.actorUserId ?? null,
-    templateKey: TEMPLATE_KEY,
+    templateKey,
     fileName,
     storageKey,
     mimeType: PDF_MIME_TYPE,
@@ -123,8 +128,14 @@ function documentStorageKey(
   ].join("/");
 }
 
-function documentFileName(quoteNumber: string, quoteVersion: QuoteVersion) {
-  return `${safeFileSegment(quoteNumber)}-v${quoteVersion.versionNumber}.pdf`;
+function documentFileName(
+  quoteNumber: string,
+  quoteVersion: QuoteVersion,
+  templateKey: QuotePdfTemplateKey,
+) {
+  const templateSuffix = templateKey === "template-a" ? "" : `-${templateKey}`;
+
+  return `${safeFileSegment(quoteNumber)}-v${quoteVersion.versionNumber}${templateSuffix}.pdf`;
 }
 
 function sha256(bytes: Uint8Array) {

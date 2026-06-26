@@ -6,6 +6,8 @@ import {
   type QuoteVersion,
 } from "@prisma/client";
 import {
+  type QuotePdfOfferSnapshot,
+  type QuotePdfTemplateKey,
   type TemplateACompanySnapshot,
   type TemplateACustomerSnapshot,
   type TemplateAItemSnapshot,
@@ -23,11 +25,25 @@ export function buildTemplateAOfferSnapshot(
   quoteVersion: QuoteVersion,
   items: QuoteItem[],
 ): TemplateAOfferSnapshot {
+  return buildQuotePdfOfferSnapshot(
+    quote,
+    quoteVersion,
+    items,
+    "template-a",
+  ) as TemplateAOfferSnapshot;
+}
+
+export function buildQuotePdfOfferSnapshot(
+  quote: Quote,
+  quoteVersion: QuoteVersion,
+  items: QuoteItem[],
+  templateKey: QuotePdfTemplateKey = "template-a",
+): QuotePdfOfferSnapshot {
   const currency = quoteVersion.currency || quote.currency || "RON";
   const draftWarning = previewDraftWarning(quoteVersion);
 
   return {
-    templateKey: "template-a",
+    templateKey,
     locale: "ro",
     quote: {
       quoteNumber: quote.quoteNumber,
@@ -67,11 +83,11 @@ export function isQuoteVersionLockedForCustomerOutput(quoteVersion: {
 }
 
 export function visibleTotalsSnapshotFromTemplate(
-  snapshot: TemplateAOfferSnapshot,
+  snapshot: QuotePdfOfferSnapshot,
   quoteVersionId: string,
 ) {
   return {
-    source: "template-a-pdf",
+    source: `${snapshot.templateKey}-pdf`,
     templateKey: snapshot.templateKey,
     quoteNumber: snapshot.quote.quoteNumber,
     quoteVersionId,
@@ -208,6 +224,15 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
       item.customerDescription ??
       stringFrom(configuration?.customerDescription, configuration?.description) ??
       "Poziție fără titlu",
+    unitLabel:
+      unitLabelFromSnapshot(
+        stringFrom(
+          configuration?.unitLabel,
+          configuration?.unit,
+          catalog?.unitLabel,
+          catalog?.unit,
+        ),
+      ) ?? "buc.",
     quantity,
     widthMm,
     heightMm,
@@ -226,6 +251,30 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
 
 function itemTypeLabel(itemType: QuoteItemType) {
   return quoteItemTypeLabel(itemType);
+}
+
+function unitLabelFromSnapshot(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim();
+  const upper = normalized.toUpperCase();
+
+  switch (upper) {
+    case "EACH":
+      return "buc.";
+    case "LINEAR_METER":
+      return "ml";
+    case "SQUARE_METER":
+      return "mp";
+    case "HOUR":
+      return "oră";
+    case "FIXED":
+      return "lot";
+    default:
+      return normalized;
+  }
 }
 
 function surfaceAreaSquareMeters(

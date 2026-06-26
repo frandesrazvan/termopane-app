@@ -1,12 +1,16 @@
 export type PdfPackageInfo = Readonly<{
   packageName: "@termopane/pdf";
-  status: "template-a-html-and-pdf";
+  status: "template-a-b-html-and-pdf";
   bindsToQuoteVersion: true;
-  supportedTemplates: readonly ["template-a"];
+  supportedTemplates: readonly QuotePdfTemplateKey[];
   supportedOutputs: readonly ["html", "pdf"];
 }>;
 
 export type PdfPlaceholder = PdfPackageInfo;
+
+export const quotePdfTemplateKeys = ["template-a", "template-b"] as const;
+
+export type QuotePdfTemplateKey = (typeof quotePdfTemplateKeys)[number];
 
 export type TemplateAMoneyMinor = number | bigint;
 
@@ -55,6 +59,7 @@ export type TemplateAItemSnapshot = Readonly<{
   sortOrder: number;
   itemTypeLabel: string;
   customerDescription: string;
+  unitLabel?: string | null;
   quantity: number;
   widthMm?: number | null;
   heightMm?: number | null;
@@ -90,18 +95,48 @@ export type TemplateAOfferSnapshot = Readonly<{
   warning?: string | null;
 }>;
 
+export type TemplateBOfferSnapshot = Readonly<
+  Omit<TemplateAOfferSnapshot, "templateKey"> & {
+    templateKey: "template-b";
+  }
+>;
+
+export type QuotePdfOfferSnapshot = TemplateAOfferSnapshot | TemplateBOfferSnapshot;
+
 export function getPdfPackageInfo(): PdfPackageInfo {
   return Object.freeze({
     packageName: "@termopane/pdf",
-    status: "template-a-html-and-pdf",
+    status: "template-a-b-html-and-pdf",
     bindsToQuoteVersion: true,
-    supportedTemplates: ["template-a"] as const,
+    supportedTemplates: quotePdfTemplateKeys,
     supportedOutputs: ["html", "pdf"] as const,
   });
 }
 
 export function getPdfPlaceholder(): PdfPackageInfo {
   return getPdfPackageInfo();
+}
+
+export function isQuotePdfTemplateKey(value: string): value is QuotePdfTemplateKey {
+  return (quotePdfTemplateKeys as readonly string[]).includes(value);
+}
+
+export function buildQuoteHtml(
+  snapshot: QuotePdfOfferSnapshot,
+  templateKey: QuotePdfTemplateKey = snapshot.templateKey,
+): string {
+  return templateKey === "template-b"
+    ? buildTemplateBHtml(snapshot)
+    : buildTemplateAHtml(toTemplateASnapshot(snapshot));
+}
+
+export function buildQuotePdf(
+  snapshot: QuotePdfOfferSnapshot,
+  templateKey: QuotePdfTemplateKey = snapshot.templateKey,
+): Uint8Array {
+  return templateKey === "template-b"
+    ? buildTemplateBPdf(snapshot)
+    : buildTemplateAPdf(toTemplateASnapshot(snapshot));
 }
 
 export function buildTemplateAHtml(snapshot: TemplateAOfferSnapshot): string {
@@ -308,8 +343,262 @@ export function buildTemplateAHtml(snapshot: TemplateAOfferSnapshot): string {
 </html>`;
 }
 
+export function buildTemplateBHtml(snapshot: TemplateAOfferSnapshot | TemplateBOfferSnapshot): string {
+  const currency = safeCurrency(snapshot.totals.currency || snapshot.quote.currency);
+  const sortedItems = sortTemplateItems(snapshot.items);
+  const totalArea = totalSurfaceAreaSquareMeters(sortedItems);
+
+  return `<!doctype html>
+<html lang="${escapeHtml(snapshot.locale ?? "ro")}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${escapeHtml(snapshot.quote.quoteNumber)} previzualizare Template B</title>
+    <style>
+      :root {
+        color: #1f2937;
+        background: #f4f4f5;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f4f4f5; color: #1f2937; }
+      .document {
+        max-width: 940px;
+        margin: 0 auto;
+        min-height: 100vh;
+        background: #ffffff;
+        padding: 26px;
+      }
+      .draft-ribbon {
+        margin-bottom: 14px;
+        border: 1px solid #f59e0b;
+        background: #fffbeb;
+        color: #92400e;
+        padding: 9px 11px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      h1, h2, h3, p { margin: 0; }
+      h1 { font-size: 24px; line-height: 1.12; letter-spacing: 0; text-transform: uppercase; }
+      h2 { font-size: 15px; }
+      h3 { font-size: 14px; line-height: 1.25; }
+      .small { font-size: 12px; line-height: 1.45; }
+      .muted { color: #5b6472; }
+      .header {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr);
+        gap: 20px;
+        align-items: start;
+        border-bottom: 2px solid #1f2937;
+        padding-bottom: 14px;
+      }
+      .brand { display: flex; gap: 12px; align-items: flex-start; }
+      .logo {
+        width: 60px;
+        height: 60px;
+        object-fit: contain;
+        border: 1px solid #d4d4d8;
+      }
+      .meta { text-align: right; }
+      .proposal-title { color: #0f766e; font-weight: 800; }
+      .summary-line {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: end;
+        margin-top: 18px;
+        padding: 12px 0;
+        border-bottom: 1px solid #d4d4d8;
+      }
+      .section { margin-top: 18px; }
+      .proposal-item {
+        border: 1px solid #c8ccd2;
+        margin-top: 10px;
+        background: #ffffff;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .item-main {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr) 170px;
+        min-height: 148px;
+      }
+      .item-drawing {
+        display: grid;
+        place-items: center;
+        border-right: 1px solid #d4d4d8;
+        background: #f8fafc;
+        padding: 8px;
+        overflow: hidden;
+      }
+      .item-drawing svg { max-width: 100%; height: auto; display: block; }
+      .item-description {
+        padding: 12px 14px;
+        min-width: 0;
+      }
+      .item-commercial {
+        display: grid;
+        align-content: start;
+        gap: 0;
+        border-left: 1px solid #d4d4d8;
+        background: #fafafa;
+      }
+      .commercial-row {
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr);
+        min-height: 36px;
+        border-bottom: 1px solid #e4e4e7;
+        font-size: 12px;
+      }
+      .commercial-row span,
+      .commercial-row strong {
+        padding: 9px 10px;
+      }
+      .commercial-row span {
+        border-right: 1px solid #e4e4e7;
+        color: #5b6472;
+        font-weight: 700;
+      }
+      .commercial-row strong {
+        text-align: right;
+        overflow-wrap: anywhere;
+      }
+      .item-index {
+        color: #0f766e;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+      .specs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 5px 12px;
+        margin-top: 10px;
+      }
+      .spec-row {
+        display: grid;
+        grid-template-columns: 82px minmax(0, 1fr);
+        gap: 6px;
+        font-size: 11px;
+        line-height: 1.35;
+      }
+      .spec-row span { color: #5b6472; }
+      .spec-row strong { overflow-wrap: anywhere; }
+      .item-total-band {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        background: #0f766e;
+        color: #ffffff;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 800;
+      }
+      .final-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        border: 2px solid #0f766e;
+        margin-top: 18px;
+      }
+      .summary-cell {
+        padding: 14px;
+      }
+      .summary-cell + .summary-cell { border-left: 1px solid #99f6e4; }
+      .summary-cell span {
+        display: block;
+        color: #5b6472;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .summary-cell strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 20px;
+        color: #0f766e;
+      }
+      .footer {
+        margin-top: 22px;
+        border-top: 1px solid #d4d4d8;
+        padding-top: 12px;
+        color: #5b6472;
+      }
+      @media (max-width: 760px) {
+        .document { padding: 18px; }
+        .header, .summary-line, .item-main, .final-summary { grid-template-columns: 1fr; }
+        .meta { text-align: left; }
+        .item-drawing, .item-commercial { border-left: 0; border-right: 0; border-top: 1px solid #d4d4d8; }
+        .item-drawing { border-top: 0; min-height: 160px; }
+        .summary-cell + .summary-cell { border-left: 0; border-top: 1px solid #99f6e4; }
+      }
+      @page { size: A4; margin: 14mm; }
+      @media print {
+        body { background: #ffffff; }
+        .document { padding: 0; max-width: none; }
+        .proposal-item { break-inside: avoid; page-break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="document" data-template-key="template-b">
+      ${snapshot.isDraft ? draftRibbon(snapshot.warning) : ""}
+      <header class="header">
+        ${renderCompanyHeader(snapshot.company)}
+        <div class="meta">
+          <p class="small muted">Propunere comercială · Template B</p>
+          <h1>${escapeHtml(snapshot.quote.quoteNumber)}</h1>
+          <p class="small">Versiunea ${escapeHtml(String(snapshot.quote.versionNumber))} - ${escapeHtml(formatVersionStatus(snapshot.quote.versionStatus))}</p>
+          <p class="small">Data ${escapeHtml(formatDate(snapshot.quote.issueDateIso))}</p>
+        </div>
+      </header>
+
+      <section class="summary-line">
+        <div>
+          <p class="proposal-title">Propunere compactă</p>
+          <h2>${escapeHtml(snapshot.quote.quoteTitle ?? "Ofertă client")}</h2>
+          <p class="small muted">Client: ${escapeHtml(snapshot.customer.displayName)}</p>
+        </div>
+        <div class="small">
+          <strong>${formatMoney(snapshot.totals.totalMinor, currency)}</strong>
+          <p class="muted">${escapeHtml(String(sortedItems.length))} poziții ofertă</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Poziții ofertă</h2>
+        ${sortedItems.length > 0 ? sortedItems.map((item, index) => renderTemplateBItemBlock(item, index, currency)).join("") : emptyItemsBlock()}
+      </section>
+
+      <section
+        class="final-summary"
+        data-total-area-square-meters="${escapeHtml(totalArea === null ? "" : totalArea.toFixed(2))}"
+        data-total-document-minor="${escapeHtml(String(minorToNumber(snapshot.totals.totalMinor)))}"
+      >
+        <div class="summary-cell">
+          <span>Total m²</span>
+          <strong>${escapeHtml(formatAreaSummary(totalArea))}</strong>
+        </div>
+        <div class="summary-cell">
+          <span>Valoare totală document</span>
+          <strong>${formatMoney(snapshot.totals.totalMinor, currency)}</strong>
+        </div>
+      </section>
+
+      ${snapshot.terms?.footerText ? `<footer class="footer small">${escapeHtml(snapshot.terms.footerText)}</footer>` : ""}
+    </main>
+  </body>
+</html>`;
+}
+
 export function buildTemplateAPdf(snapshot: TemplateAOfferSnapshot): Uint8Array {
   const renderer = new TemplateAPdfRenderer(snapshot);
+
+  return renderer.render();
+}
+
+export function buildTemplateBPdf(snapshot: TemplateAOfferSnapshot | TemplateBOfferSnapshot): Uint8Array {
+  const renderer = new TemplateBPdfRenderer(snapshot);
 
   return renderer.render();
 }
@@ -648,6 +937,284 @@ class TemplateAPdfRenderer {
   }
 }
 
+class TemplateBPdfRenderer {
+  private currentPage = new PdfPageCanvas();
+  private readonly pages: PdfPageCanvas[] = [this.currentPage];
+  private cursorTop = PDF_MARGIN;
+  private readonly currency: string;
+  private readonly sortedItems: TemplateAItemSnapshot[];
+
+  constructor(private readonly snapshot: TemplateAOfferSnapshot | TemplateBOfferSnapshot) {
+    this.currency = safeCurrency(snapshot.totals.currency || snapshot.quote.currency);
+    this.sortedItems = sortTemplateItems(snapshot.items);
+  }
+
+  render() {
+    this.renderHeader();
+    this.renderCustomerSummary();
+    this.renderItems();
+    this.renderFinalSummary();
+    this.renderFooters();
+
+    return writePdfDocument(this.pages.map((page) => page.toString()));
+  }
+
+  private renderHeader() {
+    if (this.snapshot.isDraft) {
+      this.currentPage.fillRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, 22, 1, 0.97, 0.86);
+      this.currentPage.text(
+        PDF_MARGIN + 8,
+        this.cursorTop + 14,
+        this.snapshot.warning ?? "PDF de test/ciornă. Blochează versiunea înainte de trimitere.",
+        8.5,
+        "bold",
+      );
+      this.cursorTop += 34;
+    }
+
+    this.currentPage.text(PDF_MARGIN, this.cursorTop, this.snapshot.company.displayName, 17, "bold");
+    this.currentPage.textRight(
+      PDF_MARGIN + PDF_CONTENT_WIDTH,
+      this.cursorTop,
+      "Propunere comercială",
+      15,
+      "bold",
+    );
+    this.cursorTop += 17;
+
+    const companyLines = cleanTextList([
+      this.snapshot.company.legalName,
+      this.snapshot.company.taxIdentifier
+        ? `CUI: ${this.snapshot.company.taxIdentifier}`
+        : null,
+      this.snapshot.company.registrationNumber
+        ? `Reg.: ${this.snapshot.company.registrationNumber}`
+        : null,
+      ...(this.snapshot.company.addressLines ?? []),
+      this.snapshot.company.phone,
+      this.snapshot.company.email,
+      this.snapshot.company.website,
+    ]);
+
+    const metaLines = [
+      `Ofertă ${this.snapshot.quote.quoteNumber}`,
+      `Versiunea ${this.snapshot.quote.versionNumber} - ${formatVersionStatus(this.snapshot.quote.versionStatus)}`,
+      `Data ${formatDate(this.snapshot.quote.issueDateIso)}`,
+      "Template B compact",
+    ];
+    const lines = Math.max(companyLines.length, metaLines.length);
+
+    for (let index = 0; index < lines; index += 1) {
+      const top = this.cursorTop + index * 11;
+      const companyLine = companyLines[index];
+      const metaLine = metaLines[index];
+
+      if (companyLine) {
+        this.currentPage.text(PDF_MARGIN, top, companyLine, 8.3);
+      }
+
+      if (metaLine) {
+        this.currentPage.textRight(PDF_MARGIN + PDF_CONTENT_WIDTH, top, metaLine, 8.3);
+      }
+    }
+
+    this.cursorTop += lines * 11 + 14;
+    this.currentPage.line(PDF_MARGIN, this.cursorTop, PDF_MARGIN + PDF_CONTENT_WIDTH, this.cursorTop);
+    this.cursorTop += 16;
+  }
+
+  private renderCustomerSummary() {
+    const boxHeight = 68;
+
+    this.ensureSpace(boxHeight + 18);
+    this.currentPage.strokeRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, boxHeight);
+    this.currentPage.fillRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, 22, 0.94, 0.98, 0.97);
+    this.currentPage.text(PDF_MARGIN + 10, this.cursorTop + 14, "Client", 10, "bold");
+    this.currentPage.textRight(
+      PDF_MARGIN + PDF_CONTENT_WIDTH - 10,
+      this.cursorTop + 14,
+      `${this.sortedItems.length} poziții ofertă`,
+      9,
+      "bold",
+    );
+
+    const summaryLines = cleanTextList([
+      this.snapshot.customer.displayName,
+      this.snapshot.quote.quoteTitle ?? "Ofertă client",
+      this.snapshot.customer.contactName,
+      this.snapshot.customer.email,
+      this.snapshot.customer.phone,
+    ]);
+    this.currentPage.textBlock(PDF_MARGIN + 10, this.cursorTop + 36, PDF_CONTENT_WIDTH - 20, summaryLines, 8.5);
+    this.cursorTop += boxHeight + 18;
+  }
+
+  private renderItems() {
+    this.currentPage.text(PDF_MARGIN, this.cursorTop, "Poziții ofertă", 12, "bold");
+    this.cursorTop += 16;
+
+    if (this.sortedItems.length === 0) {
+      this.ensureSpace(46);
+      this.currentPage.strokeRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, 34);
+      this.currentPage.text(
+        PDF_MARGIN + 10,
+        this.cursorTop + 20,
+        "Nu există poziții pentru client pe această versiune de ofertă.",
+        8.5,
+      );
+      this.cursorTop += 46;
+      return;
+    }
+
+    this.sortedItems.forEach((item, index) => this.renderItem(item, index));
+  }
+
+  private renderItem(item: TemplateAItemSnapshot, index: number) {
+    const itemHeight = 126;
+    const drawingWidth = 118;
+    const commercialWidth = 126;
+    const gap = 10;
+    const textLeft = PDF_MARGIN + drawingWidth + gap * 2;
+    const commercialLeft = PDF_MARGIN + PDF_CONTENT_WIDTH - commercialWidth - 10;
+    const textWidth = commercialLeft - textLeft - gap;
+    const title = item.customerDescription || item.itemTypeLabel || `Poziția ${index + 1}`;
+
+    this.ensureSpace(itemHeight + 14);
+    this.currentPage.strokeRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, itemHeight);
+    this.currentPage.fillRect(PDF_MARGIN, this.cursorTop + itemHeight - 22, PDF_CONTENT_WIDTH, 22, 0.06, 0.46, 0.43);
+    this.currentPage.text(
+      PDF_MARGIN + 10,
+      this.cursorTop + itemHeight - 8,
+      "Total poziție",
+      8.5,
+      "bold",
+    );
+    this.currentPage.textRight(
+      PDF_MARGIN + PDF_CONTENT_WIDTH - 10,
+      this.cursorTop + itemHeight - 8,
+      formatMoneyOrPending(item.totalMinor, this.currency, item.totalsPending),
+      8.5,
+      "bold",
+    );
+
+    this.renderItemSchematic(item, PDF_MARGIN + 10, this.cursorTop + 18, drawingWidth, 76);
+    this.currentPage.text(textLeft, this.cursorTop + 18, `Poziția ${index + 1} · ${item.itemTypeLabel}`, 7.8, "bold");
+    this.currentPage.textBlock(textLeft, this.cursorTop + 32, textWidth, [title], 9.2);
+
+    const specs = cleanTextList([
+      item.widthMm && item.heightMm
+        ? `Dimensiuni: ${formatDimension(item.widthMm)} x ${formatDimension(item.heightMm)} mm`
+        : "Dimensiuni: Nespecificat",
+      item.surfaceAreaSquareMeters ? `Suprafață: ${item.surfaceAreaSquareMeters.toFixed(2)} mp` : null,
+      item.profileLabel ? `Profil: ${item.profileLabel}` : null,
+      item.glassLabel ? `Sticlă/panou: ${item.glassLabel}` : null,
+      item.hardwareLabel ? `Feronerie: ${item.hardwareLabel}` : null,
+    ]);
+    this.currentPage.textBlock(textLeft, this.cursorTop + 58, textWidth, specs, 7.6);
+
+    this.currentPage.line(commercialLeft, this.cursorTop, commercialLeft, this.cursorTop + itemHeight - 22);
+    this.currentPage.text(commercialLeft + 8, this.cursorTop + 20, "UM", 8, "bold");
+    this.currentPage.textRight(commercialLeft + commercialWidth - 8, this.cursorTop + 20, itemUnitLabel(item), 8, "bold");
+    this.currentPage.line(commercialLeft, this.cursorTop + 30, commercialLeft + commercialWidth, this.cursorTop + 30);
+    this.currentPage.text(commercialLeft + 8, this.cursorTop + 48, "Cant.", 8, "bold");
+    this.currentPage.textRight(commercialLeft + commercialWidth - 8, this.cursorTop + 48, formatQuantity(item.quantity), 8, "bold");
+    this.currentPage.line(commercialLeft, this.cursorTop + 58, commercialLeft + commercialWidth, this.cursorTop + 58);
+    this.currentPage.text(commercialLeft + 8, this.cursorTop + 76, "Preț unitar", 8, "bold");
+    this.currentPage.textRight(
+      commercialLeft + commercialWidth - 8,
+      this.cursorTop + 76,
+      formatMoneyOrPending(itemUnitCostMinor(item), this.currency, item.totalsPending),
+      8,
+      "bold",
+    );
+
+    this.cursorTop += itemHeight + 12;
+  }
+
+  private renderItemSchematic(
+    item: TemplateAItemSnapshot,
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+  ) {
+    this.currentPage.strokeRect(left, top, width, height);
+    this.currentPage.fillRect(left + 5, top + 5, width - 10, height - 10, 0.96, 0.98, 1);
+    this.currentPage.strokeRect(left + 16, top + 13, width - 32, height - 28);
+
+    if (item.widthMm && item.heightMm) {
+      this.currentPage.textCenter(left + width / 2, top + height - 8, `${formatDimension(item.widthMm)} mm`, 7);
+      this.currentPage.textRight(left + width - 5, top + height / 2, `${formatDimension(item.heightMm)} mm`, 7);
+      return;
+    }
+
+    this.currentPage.textCenter(left + width / 2, top + height / 2, "Schemă indisponibilă", 7.5);
+  }
+
+  private renderFinalSummary() {
+    const boxHeight = 58;
+    const totalArea = totalSurfaceAreaSquareMeters(this.sortedItems);
+
+    this.ensureSpace(boxHeight + 28);
+    this.currentPage.strokeRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, boxHeight);
+    this.currentPage.fillRect(PDF_MARGIN, this.cursorTop, PDF_CONTENT_WIDTH, boxHeight, 0.94, 0.99, 0.98);
+    this.currentPage.text(PDF_MARGIN + 12, this.cursorTop + 18, "Total m²", 9, "bold");
+    this.currentPage.text(PDF_MARGIN + 12, this.cursorTop + 40, formatAreaSummary(totalArea), 14, "bold");
+    this.currentPage.textRight(
+      PDF_MARGIN + PDF_CONTENT_WIDTH - 12,
+      this.cursorTop + 18,
+      "Valoare totală document",
+      9,
+      "bold",
+    );
+    this.currentPage.textRight(
+      PDF_MARGIN + PDF_CONTENT_WIDTH - 12,
+      this.cursorTop + 40,
+      formatMoney(this.snapshot.totals.totalMinor, this.currency),
+      14,
+      "bold",
+    );
+    this.cursorTop += boxHeight + 18;
+
+    if (this.snapshot.terms?.footerText) {
+      this.ensureSpace(38);
+      this.currentPage.line(PDF_MARGIN, this.cursorTop, PDF_MARGIN + PDF_CONTENT_WIDTH, this.cursorTop);
+      this.currentPage.textBlock(
+        PDF_MARGIN,
+        this.cursorTop + 12,
+        PDF_CONTENT_WIDTH,
+        [this.snapshot.terms.footerText],
+        7.5,
+      );
+    }
+  }
+
+  private renderFooters() {
+    const pageCount = this.pages.length;
+
+    this.pages.forEach((page, index) => {
+      page.line(PDF_MARGIN, PDF_PAGE_HEIGHT - 34, PDF_MARGIN + PDF_CONTENT_WIDTH, PDF_PAGE_HEIGHT - 34);
+      page.text(PDF_MARGIN, PDF_PAGE_HEIGHT - 20, "Propunere generată din snapshot-ul versiunii ofertei", 7.2);
+      page.textRight(
+        PDF_MARGIN + PDF_CONTENT_WIDTH,
+        PDF_PAGE_HEIGHT - 20,
+        `Pagina ${index + 1} din ${pageCount}`,
+        7.2,
+      );
+    });
+  }
+
+  private ensureSpace(height: number) {
+    if (this.cursorTop + height <= PDF_PAGE_HEIGHT - PDF_MARGIN) {
+      return;
+    }
+
+    this.currentPage = new PdfPageCanvas();
+    this.pages.push(this.currentPage);
+    this.cursorTop = PDF_MARGIN;
+  }
+}
+
 class PdfPageCanvas {
   private readonly operations: string[] = [];
 
@@ -943,6 +1510,55 @@ function renderItemBlock(item: TemplateAItemSnapshot, index: number, fallbackCur
   </article>`;
 }
 
+function renderTemplateBItemBlock(
+  item: TemplateAItemSnapshot,
+  index: number,
+  fallbackCurrency: string,
+) {
+  const title = item.customerDescription || item.itemTypeLabel || `Poziția ${index + 1}`;
+  const drawing = safeDrawingSvg(item.drawingSvg, title);
+  const dimensions = item.widthMm && item.heightMm
+    ? `${formatDimension(item.widthMm)} x ${formatDimension(item.heightMm)} mm`
+    : "Nespecificat";
+  const specs: Array<readonly [string, string]> = [];
+
+  addSpec(specs, "Dimensiuni", dimensions);
+  addSpec(specs, "Suprafață", formatArea(item.surfaceAreaSquareMeters));
+  addSpec(specs, "Profil", item.profileLabel);
+  addSpec(specs, "Sticlă/panou", item.glassLabel);
+  addSpec(specs, "Feronerie", item.hardwareLabel);
+
+  return `<article class="proposal-item">
+    <div class="item-main">
+      <div class="item-drawing">${drawing}</div>
+      <div class="item-description">
+        <p class="item-index">Poziția ${escapeHtml(String(index + 1))} · ${escapeHtml(item.itemTypeLabel)}</p>
+        <h3>${escapeHtml(title)}</h3>
+        <p class="small muted">${escapeHtml(item.customerDescription)}</p>
+        <div class="specs">
+          ${specs.map(([label, value]) => `<div class="spec-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}
+        </div>
+      </div>
+      <div class="item-commercial">
+        ${renderTemplateBCommercialRow("UM", itemUnitLabel(item))}
+        ${renderTemplateBCommercialRow("Cant.", formatQuantity(item.quantity))}
+        ${renderTemplateBCommercialRow(
+          "Preț unitar",
+          formatMoneyOrPending(itemUnitCostMinor(item), fallbackCurrency, item.totalsPending),
+        )}
+      </div>
+    </div>
+    <div class="item-total-band">
+      <span>Total poziție</span>
+      <strong>${formatMoneyOrPending(item.totalMinor, fallbackCurrency, item.totalsPending)}</strong>
+    </div>
+  </article>`;
+}
+
+function renderTemplateBCommercialRow(label: string, value: string) {
+  return `<div class="commercial-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
 function renderTerms(terms?: TemplateATermsSnapshot) {
   if (!terms) {
     return "";
@@ -984,6 +1600,85 @@ function draftRibbon(warning?: string | null) {
 
 function emptyItemsBlock() {
   return `<div class="box small muted">Nu există poziții pentru client pe această versiune de ofertă.</div>`;
+}
+
+function toTemplateASnapshot(snapshot: QuotePdfOfferSnapshot): TemplateAOfferSnapshot {
+  if (snapshot.templateKey === "template-a") {
+    return snapshot;
+  }
+
+  return {
+    ...snapshot,
+    templateKey: "template-a",
+  };
+}
+
+function sortTemplateItems(items: readonly TemplateAItemSnapshot[]) {
+  return [...items].sort((left, right) => {
+    if (left.sortOrder !== right.sortOrder) {
+      return left.sortOrder - right.sortOrder;
+    }
+
+    return left.id.localeCompare(right.id);
+  });
+}
+
+function itemUnitLabel(item: TemplateAItemSnapshot) {
+  const unit = item.unitLabel?.trim();
+
+  return unit && unit.length > 0 ? unit : "buc.";
+}
+
+function itemUnitCostMinor(item: TemplateAItemSnapshot): TemplateAMoneyMinor | null {
+  if (item.unitPriceMinor !== null && item.unitPriceMinor !== undefined) {
+    return item.unitPriceMinor;
+  }
+
+  const quantity = Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : null;
+
+  if (!quantity) {
+    return null;
+  }
+
+  if (item.subtotalMinor !== null && item.subtotalMinor !== undefined) {
+    return Math.round(minorToNumber(item.subtotalMinor) / quantity);
+  }
+
+  if (item.totalMinor !== null && item.totalMinor !== undefined) {
+    return Math.round(minorToNumber(item.totalMinor) / quantity);
+  }
+
+  return null;
+}
+
+function totalSurfaceAreaSquareMeters(items: readonly TemplateAItemSnapshot[]) {
+  let total = 0;
+  let hasArea = false;
+
+  for (const item of items) {
+    if (
+      item.surfaceAreaSquareMeters !== null &&
+      item.surfaceAreaSquareMeters !== undefined &&
+      Number.isFinite(item.surfaceAreaSquareMeters)
+    ) {
+      total += item.surfaceAreaSquareMeters;
+      hasArea = true;
+    }
+  }
+
+  return hasArea ? Math.round(total * 100) / 100 : null;
+}
+
+function formatAreaSummary(value: number | null) {
+  return value === null ? "Nespecificat" : `${value.toFixed(2)} mp`;
+}
+
+function formatQuantity(value: number) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
 function renderRow(label: string, value: string) {

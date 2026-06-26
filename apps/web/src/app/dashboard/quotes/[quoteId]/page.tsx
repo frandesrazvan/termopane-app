@@ -30,7 +30,7 @@ import {
 } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { canViewInternalCosts, requireTenant } from "@/lib/auth";
+import { canGeneratePdf, canViewInternalCosts, requireTenant } from "@/lib/auth";
 import {
   isSelectableCatalogRecord,
   selectActiveCatalogPriceList,
@@ -133,6 +133,7 @@ export default async function QuoteDetailPage({
 
   const canEditItems = currentVersion ? isDraftVersionMutable(currentVersion) : false;
   const canCreateRevision = currentVersion ? isLockedOrSentVersion(currentVersion) : false;
+  const canGenerateDocuments = canGeneratePdf(context.membership);
   const canViewInternalTrace = canViewInternalCosts(context.membership);
   const catalogOptions = canEditItems
     ? await loadFixedWindowCatalogOptions(context, quote.currency)
@@ -303,6 +304,7 @@ export default async function QuoteDetailPage({
           documentError={paramsValue.documentError}
           documentEvent={paramsValue.documentEvent}
           documents={documents}
+          canGenerateDocuments={canGenerateDocuments}
           quoteId={quote.id}
         />
 
@@ -470,19 +472,22 @@ function AddItemForms({
 }
 
 function QuoteDocumentsCard({
+  canGenerateDocuments,
   currentVersion,
   documentError,
   documentEvent,
   documents,
   quoteId,
 }: {
+  canGenerateDocuments: boolean;
   currentVersion: QuoteVersion | null;
   documentError?: string;
   documentEvent?: string;
   documents: Document[];
   quoteId: string;
 }) {
-  const canGeneratePdf = currentVersion ? isLockedOrSentVersion(currentVersion) : false;
+  const canGeneratePdfForVersion =
+    canGenerateDocuments && currentVersion ? isLockedOrSentVersion(currentVersion) : false;
 
   return (
     <section id="documents" className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
@@ -490,11 +495,26 @@ function QuoteDocumentsCard({
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Documente</h2>
           <p className="mt-1 text-sm text-zinc-600">
-            PDF-uri Template A imutabile pentru versiunea {currentVersion?.versionNumber ?? "-"}
+            PDF-uri imutabile Template A/B pentru versiunea {currentVersion?.versionNumber ?? "-"}
           </p>
         </div>
-        {currentVersion && canGeneratePdf ? (
-          <form action={generateQuotePdfAction.bind(null, quoteId, currentVersion.id)}>
+        {currentVersion && canGeneratePdfForVersion ? (
+          <form
+            action={generateQuotePdfAction.bind(null, quoteId, currentVersion.id)}
+            className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
+          >
+            <label className="sr-only" htmlFor="quote-template-key">
+              Șablon PDF
+            </label>
+            <select
+              className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm"
+              defaultValue="template-a"
+              id="quote-template-key"
+              name="templateKey"
+            >
+              <option value="template-a">Template A - ofertă detaliată</option>
+              <option value="template-b">Template B - propunere compactă</option>
+            </select>
             <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 sm:w-auto">
               <FileText aria-hidden="true" size={15} />
               Generează PDF
@@ -502,7 +522,7 @@ function QuoteDocumentsCard({
           </form>
         ) : (
           <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-sm font-medium text-zinc-600">
-            Blochează versiunea întâi
+            {canGenerateDocuments ? "Blochează versiunea întâi" : "Generare PDF nepermisă"}
           </span>
         )}
       </div>
@@ -532,6 +552,9 @@ function QuoteDocumentsCard({
                   <p className="mt-1 text-xs font-medium text-zinc-600">
                     {formatDateTimeRo(document.createdAt)}
                   </p>
+                  <p className="mt-1 text-xs font-medium text-zinc-600">
+                    {documentTemplateLabel(document.templateKey)}
+                  </p>
                   {document.checksum ? (
                     <p className="mt-2 break-all text-xs text-zinc-500">
                       SHA-256 {document.checksum.slice(0, 16)}...
@@ -556,6 +579,18 @@ function QuoteDocumentsCard({
       )}
     </section>
   );
+}
+
+function documentTemplateLabel(templateKey: string | null) {
+  if (templateKey === "template-b") {
+    return "Template B - propunere compactă";
+  }
+
+  if (templateKey === "template-a") {
+    return "Template A - ofertă detaliată";
+  }
+
+  return "Template nespecificat";
 }
 
 function VersionLifecyclePanel({

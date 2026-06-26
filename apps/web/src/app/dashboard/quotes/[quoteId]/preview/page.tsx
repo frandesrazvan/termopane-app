@@ -1,20 +1,27 @@
 import { AlertTriangle, ArrowLeft, FileText } from "lucide-react";
-import { buildTemplateAHtml } from "@termopane/pdf";
+import {
+  buildQuoteHtml,
+  isQuotePdfTemplateKey,
+  type QuotePdfTemplateKey,
+} from "@termopane/pdf";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/auth";
 import { getTenantQuoteWithCurrentVersion, listTenantQuoteItems } from "@/lib/data";
-import { buildTemplateAOfferSnapshot } from "@/lib/pdf/template-a-snapshot";
+import { buildQuotePdfOfferSnapshot } from "@/lib/pdf/template-a-snapshot";
 
 export const dynamic = "force-dynamic";
 
 type QuotePreviewPageProps = {
   params: Promise<{ quoteId: string }>;
+  searchParams: Promise<{ template?: string }>;
 };
 
-export default async function QuotePreviewPage({ params }: QuotePreviewPageProps) {
+export default async function QuotePreviewPage({ params, searchParams }: QuotePreviewPageProps) {
   const context = await requireTenant();
   const { quoteId } = await params;
+  const paramsValue = await searchParams;
+  const templateKey = selectedTemplateKey(paramsValue.template);
   const quoteState = await getTenantQuoteWithCurrentVersion(context, quoteId);
 
   if (!quoteState?.currentVersion) {
@@ -22,12 +29,14 @@ export default async function QuotePreviewPage({ params }: QuotePreviewPageProps
   }
 
   const items = await listTenantQuoteItems(context, quoteState.currentVersion.id);
-  const snapshot = buildTemplateAOfferSnapshot(
+  const snapshot = buildQuotePdfOfferSnapshot(
     quoteState.quote,
     quoteState.currentVersion,
     items,
+    templateKey,
   );
-  const previewHtml = buildTemplateAHtml(snapshot);
+  const previewHtml = buildQuoteHtml(snapshot);
+  const templateLabel = quoteTemplateLabel(templateKey);
 
   return (
     <main className="min-h-screen bg-stone-50 px-4 py-5 sm:px-6 lg:px-8">
@@ -46,13 +55,22 @@ export default async function QuotePreviewPage({ params }: QuotePreviewPageProps
               Previzualizare ofertă
             </h1>
             <p className="mt-1 text-sm text-zinc-600">
-              Previzualizare Template A pentru client: {quoteState.quote.quoteNumber}, versiunea{" "}
+              Previzualizare {templateLabel} pentru client: {quoteState.quote.quoteNumber}, versiunea{" "}
               {quoteState.currentVersion.versionNumber}
             </p>
           </div>
-          <span className="inline-flex w-fit rounded-md bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-sm ring-1 ring-zinc-200">
-            Template A
-          </span>
+          <div className="flex flex-wrap gap-2">
+            <TemplateLink
+              active={templateKey === "template-a"}
+              href={`/dashboard/quotes/${quoteState.quote.id}/preview?template=template-a`}
+              label="Template A"
+            />
+            <TemplateLink
+              active={templateKey === "template-b"}
+              href={`/dashboard/quotes/${quoteState.quote.id}/preview?template=template-b`}
+              label="Template B"
+            />
+          </div>
         </div>
 
         {snapshot.isDraft ? (
@@ -72,5 +90,37 @@ export default async function QuotePreviewPage({ params }: QuotePreviewPageProps
         </section>
       </div>
     </main>
+  );
+}
+
+function selectedTemplateKey(value: string | undefined): QuotePdfTemplateKey {
+  return value && isQuotePdfTemplateKey(value) ? value : "template-a";
+}
+
+function quoteTemplateLabel(templateKey: QuotePdfTemplateKey) {
+  return templateKey === "template-b" ? "Template B compact" : "Template A detaliat";
+}
+
+function TemplateLink({
+  active,
+  href,
+  label,
+}: {
+  active: boolean;
+  href: string;
+  label: string;
+}) {
+  return (
+    <Link
+      aria-current={active ? "page" : undefined}
+      href={href}
+      className={
+        active
+          ? "inline-flex h-10 items-center justify-center rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm"
+          : "inline-flex h-10 items-center justify-center rounded-md bg-white px-3 text-sm font-semibold text-zinc-700 shadow-sm ring-1 ring-zinc-200 hover:bg-stone-100"
+      }
+    >
+      {label}
+    </Link>
   );
 }

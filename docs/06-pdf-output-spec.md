@@ -109,3 +109,16 @@ development storage, creates a new immutable `Document` row for every generation
 totals and checksum metadata, and writes an `AuditLog` entry with `DOCUMENT_GENERATED`. Regeneration
 does not overwrite existing document records or files; production object storage remains a future
 deployment concern.
+
+## COD-021 Template B compact proposal notes
+
+Template B is available as a tenant-selected template key during quote preview and PDF generation.
+The compact customer-facing layout keeps item order stable from the saved `QuoteVersion`, renders a
+left drawing/schematic, center description/spec block, and right commercial block with `UM`,
+quantity, and unit price, then shows a colored item total band.
+
+Template B final summary displays total surface area in square meters when available and the total
+document value from the quote version totals snapshot. Generated Template B PDFs store
+`template-b` on the immutable `Document`, include that key in visible totals metadata and audit
+metadata, and use a distinct filename suffix. Internal material costs, supplier notes, margins, and
+calculation traces remain excluded from Template B HTML/PDF output.
