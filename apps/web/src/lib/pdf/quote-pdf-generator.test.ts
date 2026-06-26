@@ -32,6 +32,7 @@ import {
 } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTenantDataAccess, type TenantDataClient } from "../data";
+import type { DocumentStorageProvider } from "./document-storage";
 import { resolveLocalDocumentPath } from "./local-document-storage";
 import { generateTenantQuotePdf } from "./quote-pdf-generator";
 
@@ -205,6 +206,54 @@ describe("quote PDF generation", () => {
     });
   });
 
+  it("returns a storage write failure without creating Document metadata", async () => {
+    const state = testState();
+    const storage = memoryDocumentStorageProvider({
+      putError: new Error("storage unavailable"),
+    });
+    const result = await generateTenantQuotePdf(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      "version-a",
+      {
+        ...generatorOptions(state.client, "write-failure"),
+        storageProvider: storage.provider,
+      },
+    );
+
+    expect(result).toEqual({ ok: false, reason: "storage_write_failed" });
+    expect(state.documents).toHaveLength(0);
+    expect(state.auditLogs).toHaveLength(0);
+    expect(storage.storedKeys()).toEqual([]);
+  });
+
+  it("cleans up stored PDF bytes when Document metadata creation fails", async () => {
+    const state = testState();
+    const storage = memoryDocumentStorageProvider();
+    state.client.document = {
+      ...state.client.document,
+      async create() {
+        throw new Error("metadata unavailable");
+      },
+    };
+    const result = await generateTenantQuotePdf(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      "version-a",
+      {
+        ...generatorOptions(state.client, "metadata-failure"),
+        storageProvider: storage.provider,
+      },
+    );
+
+    expect(result).toEqual({ ok: false, reason: "document_create_failed" });
+    expect(state.documents).toHaveLength(0);
+    expect(state.auditLogs).toHaveLength(0);
+    expect(storage.storedKeys()).toEqual([]);
+    expect(storage.deletedKeys).toHaveLength(1);
+    expect(storage.deletedKeys[0]).toContain("documents/tenant-a/version-a/");
+  });
+
   it("stores visible totals from the quote version snapshot", async () => {
     const state = testState();
     const result = await generateTenantQuotePdf(
@@ -367,6 +416,45 @@ function generatorOptions(client: TenantDataClient, nonce: string) {
     now: () => new Date("2026-06-25T12:00:00.000Z"),
     renderPdf: () => new TextEncoder().encode("%PDF-1.4\nSynthetic PDF\n"),
     rootDir: storageRoot,
+  };
+}
+
+function memoryDocumentStorageProvider(options: { putError?: Error } = {}) {
+  const stored = new Map<string, Uint8Array>();
+  const deletedKeys: string[] = [];
+  const provider: DocumentStorageProvider = {
+    kind: "local",
+    async put({ storageKey, bytes }) {
+      if (options.putError) {
+        throw options.putError;
+      }
+
+      stored.set(storageKey, bytes);
+
+      return {
+        storageKey,
+        provider: "local",
+      };
+    },
+    async get(storageKey) {
+      const bytes = stored.get(storageKey);
+
+      if (!bytes) {
+        throw new Error("Document missing from memory storage.");
+      }
+
+      return bytes;
+    },
+    async delete(storageKey) {
+      deletedKeys.push(storageKey);
+      stored.delete(storageKey);
+    },
+  };
+
+  return {
+    deletedKeys,
+    provider,
+    storedKeys: () => [...stored.keys()],
   };
 }
 

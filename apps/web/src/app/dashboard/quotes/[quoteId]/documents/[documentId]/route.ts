@@ -2,7 +2,8 @@ import { DocumentType } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/auth";
 import { getTenantQuoteDocument } from "@/lib/data";
-import { readLocalDocument } from "@/lib/pdf/local-document-storage";
+import { isDocumentStorageError } from "@/lib/pdf/document-storage";
+import { createConfiguredDocumentStorageProvider } from "@/lib/pdf/document-storage-provider";
 
 export const dynamic = "force-dynamic";
 
@@ -26,11 +27,15 @@ export async function GET(_request: Request, { params }: DocumentDownloadRouteCo
     notFound();
   }
 
-  let file: Buffer;
+  let file: Uint8Array;
 
   try {
-    file = await readLocalDocument(result.document.storageKey);
-  } catch {
+    file = await createConfiguredDocumentStorageProvider().get(result.document.storageKey);
+  } catch (error) {
+    if (isOperationalStorageError(error)) {
+      return storageUnavailableResponse();
+    }
+
     notFound();
   }
 
@@ -47,4 +52,22 @@ export async function GET(_request: Request, { params }: DocumentDownloadRouteCo
 
 function downloadFileName(value: string | null) {
   return (value || "quote.pdf").replace(/["\r\n]/g, "");
+}
+
+function isOperationalStorageError(error: unknown) {
+  return (
+    isDocumentStorageError(error, "configuration") ||
+    isDocumentStorageError(error, "not_implemented") ||
+    isDocumentStorageError(error, "unavailable")
+  );
+}
+
+function storageUnavailableResponse() {
+  return new Response("Document storage unavailable.", {
+    status: 503,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
