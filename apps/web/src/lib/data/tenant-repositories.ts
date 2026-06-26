@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   Accessory,
   AuditAction,
@@ -202,6 +203,24 @@ export type TenantQuoteVersionCalculationUpdateInput = {
 export type TenantQuoteItemCalculationUpdateInput = {
   calculationSnapshot: Record<string, unknown>;
   totalsSnapshot: Record<string, unknown>;
+};
+
+export type TenantQuoteItemManualOverrideInput = {
+  amountMinor: bigint | number;
+  reason: string;
+  actorUserId?: string | null;
+};
+
+export type TenantQuoteDiscountInput = {
+  amountMinor?: bigint | number | null;
+  basisPoints?: number | null;
+  reason: string;
+  actorUserId?: string | null;
+};
+
+export type TenantCommercialAdjustmentResult<TRecord> = {
+  record: TRecord;
+  auditLog: AuditLog;
 };
 
 export type TenantQuoteCalculationResultWriteInput = {
@@ -1562,6 +1581,179 @@ export function createTenantDataAccess(
       });
     },
 
+    async applyTenantQuoteItemManualOverride(
+      scope: TenantDataScope,
+      quoteItemId: string,
+      data: TenantQuoteItemManualOverrideInput,
+    ): Promise<TenantCommercialAdjustmentResult<QuoteItem> | null> {
+      if (!hasCommercialReason(data.reason) || !isValidMinorAmount(data.amountMinor)) {
+        return null;
+      }
+
+      return runTenantDataTransaction(client, async (transactionClient) => {
+        const transactionAccess = createTenantDataAccess(transactionClient, options);
+        const existingItem = await transactionAccess.getTenantQuoteItem(scope, quoteItemId);
+
+        if (!existingItem) {
+          return null;
+        }
+
+        const quoteVersion = await transactionAccess.getTenantQuoteVersion(
+          scope,
+          existingItem.quoteVersionId,
+        );
+        const quoteState = quoteVersion
+          ? await transactionAccess.getTenantQuoteWithCurrentVersion(scope, quoteVersion.quoteId)
+          : null;
+
+        if (
+          !quoteVersion ||
+          !quoteState ||
+          quoteState.currentVersion?.id !== existingItem.quoteVersionId ||
+          !isDraftVersionMutable(quoteState.currentVersion)
+        ) {
+          return null;
+        }
+
+        const auditId = commercialAuditId();
+        const timestamp = new Date();
+        const beforeSnapshot = quoteItemCommercialAuditSnapshot(existingItem);
+        const configurationSnapshot = {
+          ...jsonRecord(existingItem.configurationSnapshot),
+          manualOverride: {
+            target: "totalWithVat",
+            amountMinor: minorValueAuditString(data.amountMinor),
+            reason: data.reason.trim(),
+            actorId: data.actorUserId ?? null,
+            timestamp: timestamp.toISOString(),
+            auditReferenceId: auditId,
+          },
+        };
+        const updatedItem = await transactionClient.quoteItem.update({
+          where: { id: existingItem.id },
+          data: {
+            configurationSnapshot,
+            calculationSnapshot: null,
+            totalsSnapshot: {
+              ...jsonRecord(existingItem.totalsSnapshot),
+              pendingCalculation: true,
+              source: "manual-commercial-adjustment",
+            },
+          },
+        });
+        const afterSnapshot = quoteItemCommercialAuditSnapshot(updatedItem);
+        const auditLog = await transactionClient.auditLog.create({
+          data: {
+            id: auditId,
+            tenantId: tenantIdFromScope(scope),
+            actorUserId: data.actorUserId ?? null,
+            action: AuditAction.PRICING_OVERRIDE_APPLIED,
+            entityType: "QuoteItem",
+            entityId: updatedItem.id,
+            beforeSnapshot,
+            afterSnapshot,
+            metadata: {
+              adjustmentType: "item-manual-override",
+              field: "configurationSnapshot.manualOverride",
+              quoteId: quoteState.quote.id,
+              quoteVersionId: quoteVersion.id,
+              quoteNumber: quoteState.quote.quoteNumber,
+              amountMinor: minorValueAuditString(data.amountMinor),
+              reason: data.reason.trim(),
+            },
+          },
+        });
+
+        return {
+          record: updatedItem,
+          auditLog,
+        };
+      });
+    },
+
+    async applyTenantQuoteDiscount(
+      scope: TenantDataScope,
+      quoteId: string,
+      data: TenantQuoteDiscountInput,
+    ): Promise<TenantCommercialAdjustmentResult<QuoteVersion> | null> {
+      if (
+        !hasCommercialReason(data.reason) ||
+        !hasValidQuoteDiscountValue(data.amountMinor, data.basisPoints)
+      ) {
+        return null;
+      }
+
+      return runTenantDataTransaction(client, async (transactionClient) => {
+        const transactionAccess = createTenantDataAccess(transactionClient, options);
+        const quoteState = await transactionAccess.getTenantQuoteWithCurrentVersion(scope, quoteId);
+
+        if (!quoteState?.currentVersion || !isDraftVersionMutable(quoteState.currentVersion)) {
+          return null;
+        }
+
+        const auditId = commercialAuditId();
+        const timestamp = new Date();
+        const beforeSnapshot = quoteVersionCommercialAuditSnapshot(quoteState.currentVersion);
+        const priceSnapshot = {
+          ...jsonRecord(quoteState.currentVersion.priceSnapshot),
+          quoteDiscount: {
+            ...(data.amountMinor !== null && data.amountMinor !== undefined
+              ? { amountMinor: minorValueAuditString(data.amountMinor) }
+              : {}),
+            ...(data.basisPoints !== null && data.basisPoints !== undefined
+              ? { basisPoints: data.basisPoints }
+              : {}),
+            reason: data.reason.trim(),
+            actorId: data.actorUserId ?? null,
+            timestamp: timestamp.toISOString(),
+            auditReferenceId: auditId,
+          },
+        };
+        const updatedVersion = await transactionClient.quoteVersion.update({
+          where: { id: quoteState.currentVersion.id },
+          data: {
+            priceSnapshot,
+            totalsSnapshot: {
+              ...jsonRecord(quoteState.currentVersion.totalsSnapshot),
+              pendingCalculation: true,
+              source: "manual-commercial-adjustment",
+            },
+          },
+        });
+        const afterSnapshot = quoteVersionCommercialAuditSnapshot(updatedVersion);
+        const auditLog = await transactionClient.auditLog.create({
+          data: {
+            id: auditId,
+            tenantId: tenantIdFromScope(scope),
+            actorUserId: data.actorUserId ?? null,
+            action: AuditAction.PRICING_OVERRIDE_APPLIED,
+            entityType: "QuoteVersion",
+            entityId: updatedVersion.id,
+            beforeSnapshot,
+            afterSnapshot,
+            metadata: {
+              adjustmentType: "quote-discount",
+              field: "priceSnapshot.quoteDiscount",
+              quoteId: quoteState.quote.id,
+              quoteVersionId: updatedVersion.id,
+              quoteNumber: quoteState.quote.quoteNumber,
+              amountMinor:
+                data.amountMinor === null || data.amountMinor === undefined
+                  ? null
+                  : minorValueAuditString(data.amountMinor),
+              basisPoints: data.basisPoints ?? null,
+              reason: data.reason.trim(),
+            },
+          },
+        });
+
+        return {
+          record: updatedVersion,
+          auditLog,
+        };
+      });
+    },
+
     async updateTenantQuoteVersionCalculation(
       scope: TenantDataScope,
       quoteVersionId: string,
@@ -2070,6 +2262,22 @@ export function deleteTenantQuoteItem(scope: TenantDataScope, quoteItemId: strin
   return tenantDataAccess.deleteTenantQuoteItem(scope, quoteItemId);
 }
 
+export function applyTenantQuoteItemManualOverride(
+  scope: TenantDataScope,
+  quoteItemId: string,
+  data: TenantQuoteItemManualOverrideInput,
+) {
+  return tenantDataAccess.applyTenantQuoteItemManualOverride(scope, quoteItemId, data);
+}
+
+export function applyTenantQuoteDiscount(
+  scope: TenantDataScope,
+  quoteId: string,
+  data: TenantQuoteDiscountInput,
+) {
+  return tenantDataAccess.applyTenantQuoteDiscount(scope, quoteId, data);
+}
+
 export function updateTenantQuoteVersionCalculation(
   scope: TenantDataScope,
   quoteVersionId: string,
@@ -2523,6 +2731,87 @@ function documentAuditSnapshot(document: Document) {
     generatedById: document.generatedById,
     createdAt: document.createdAt?.toISOString() ?? null,
   };
+}
+
+function quoteItemCommercialAuditSnapshot(item: QuoteItem) {
+  const configuration = jsonRecord(item.configurationSnapshot);
+
+  return {
+    id: item.id,
+    tenantId: item.tenantId,
+    quoteVersionId: item.quoteVersionId,
+    type: item.type,
+    quantity: item.quantity,
+    manualOverride: cloneNullableJsonValue(configuration.manualOverride),
+    totalsSnapshot: cloneNullableJsonValue(item.totalsSnapshot),
+  };
+}
+
+function quoteVersionCommercialAuditSnapshot(quoteVersion: QuoteVersion) {
+  const priceSnapshot = jsonRecord(quoteVersion.priceSnapshot);
+
+  return {
+    id: quoteVersion.id,
+    tenantId: quoteVersion.tenantId,
+    quoteId: quoteVersion.quoteId,
+    versionNumber: quoteVersion.versionNumber,
+    status: quoteVersion.status,
+    isLocked: quoteVersion.isLocked,
+    quoteDiscount: cloneNullableJsonValue(priceSnapshot.quoteDiscount),
+    subtotalMinor: minorValueAuditString(quoteVersion.subtotalMinor),
+    vatMinor: minorValueAuditString(quoteVersion.vatMinor),
+    totalMinor: minorValueAuditString(quoteVersion.totalMinor),
+    totalsSnapshot: cloneNullableJsonValue(quoteVersion.totalsSnapshot),
+  };
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function hasCommercialReason(reason: string) {
+  return reason.trim().length > 0 && reason.trim().length <= 500;
+}
+
+function isValidMinorAmount(value: bigint | number | null | undefined) {
+  if (typeof value === "bigint") {
+    return value >= BigInt(0);
+  }
+
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function hasValidQuoteDiscountValue(
+  amountMinor: bigint | number | null | undefined,
+  basisPoints: number | null | undefined,
+) {
+  const hasAmount = amountMinor !== null && amountMinor !== undefined;
+  const hasBasisPoints = basisPoints !== null && basisPoints !== undefined;
+
+  if (hasAmount === hasBasisPoints) {
+    return false;
+  }
+
+  if (hasAmount) {
+    if (typeof amountMinor === "bigint") {
+      return amountMinor > BigInt(0);
+    }
+
+    return typeof amountMinor === "number" && Number.isInteger(amountMinor) && amountMinor > 0;
+  }
+
+  return (
+    typeof basisPoints === "number" &&
+    Number.isInteger(basisPoints) &&
+    basisPoints > 0 &&
+    basisPoints <= 10_000
+  );
+}
+
+function commercialAuditId() {
+  return `commercial_${randomUUID()}`;
 }
 
 function minorValueAuditString(value: bigint | number | null | undefined) {

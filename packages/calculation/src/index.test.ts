@@ -373,6 +373,48 @@ describe("calculateQuote", () => {
     );
   });
 
+  it("keeps item-level manual adjustments when a quote-level discount is applied", () => {
+    const quoteWithoutItemOverride = calculateQuote({
+      quoteId: "quote-discount-only",
+      commercialRules,
+      items: [baseInput],
+      quoteDiscount: {
+        amountMinor: 1_000,
+        reason: "Synthetic quote-level discount",
+      },
+    });
+    const quoteWithItemOverride = calculateQuote({
+      quoteId: "quote-item-override-and-discount",
+      commercialRules,
+      items: [
+        {
+          ...baseInput,
+          manualOverride: {
+            target: "totalWithVat",
+            amountMinor: 20_000,
+            reason: "Synthetic item final total override",
+            auditReferenceId: "audit-item-override",
+          },
+        },
+      ],
+      quoteDiscount: {
+        amountMinor: 1_000,
+        reason: "Synthetic quote-level discount",
+      },
+    });
+
+    expect(quoteWithItemOverride.totals.manualAdjustmentMinor).toBe(
+      20_000 - quoteWithItemOverride.items[0]!.totals.totalBeforeManualOverrideMinor,
+    );
+    expect(quoteWithItemOverride.totals.totalWithVatMinor).toBe(
+      quoteWithoutItemOverride.totals.totalWithVatMinor +
+        quoteWithItemOverride.totals.manualAdjustmentMinor,
+    );
+    expect(quoteWithItemOverride.warnings.map((warning) => warning.code)).toEqual(
+      expect.arrayContaining(["QUOTE_DISCOUNT_APPLIED", "MANUAL_OVERRIDE_APPLIED"]),
+    );
+  });
+
   it("warns when custom manual line prices are missing", () => {
     const quote = calculateQuote({
       quoteId: "quote-missing-custom-price",

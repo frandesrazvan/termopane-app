@@ -30,7 +30,12 @@ import {
 } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { canGeneratePdf, canViewInternalCosts, requireTenant } from "@/lib/auth";
+import {
+  canApplyCommercialOverrides,
+  canGeneratePdf,
+  canViewInternalCosts,
+  requireTenant,
+} from "@/lib/auth";
 import {
   isSelectableCatalogRecord,
   selectActiveCatalogPriceList,
@@ -62,6 +67,8 @@ import {
 import {
   addCustomLineItemAction,
   addFixedWindowItemAction,
+  applyItemManualOverrideAction,
+  applyQuoteDiscountAction,
   createQuoteRevisionAction,
   deleteQuoteItemAction,
   generateQuotePdfAction,
@@ -87,6 +94,8 @@ export default async function QuoteDetailPage({
   searchParams: Promise<{
     calculated?: string;
     calculationError?: string;
+    commercialError?: string;
+    commercialEvent?: string;
     itemError?: string;
     documentError?: string;
     documentEvent?: string;
@@ -135,6 +144,8 @@ export default async function QuoteDetailPage({
   const canCreateRevision = currentVersion ? isLockedOrSentVersion(currentVersion) : false;
   const canGenerateDocuments = canGeneratePdf(context.membership);
   const canViewInternalTrace = canViewInternalCosts(context.membership);
+  const canApplyCommercialAdjustments =
+    canEditItems && canApplyCommercialOverrides(context.membership);
   const catalogOptions = canEditItems
     ? await loadFixedWindowCatalogOptions(context, quote.currency)
     : emptyFixedWindowCatalogFormOptions();
@@ -249,6 +260,18 @@ export default async function QuoteDetailPage({
                 : "Verifică datele poziției și încearcă din nou."}
             </p>
           ) : null}
+          {paramsValue.commercialError ? (
+            <p className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
+              {paramsValue.commercialError === "locked"
+                ? "Ajustarea comercială nu poate fi aplicată pe o versiune blocată sau trimisă."
+                : "Completează valoarea și motivul ajustării comerciale."}
+            </p>
+          ) : null}
+          {paramsValue.commercialEvent === "item-override" ? (
+            <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+              Ajustarea manuală a poziției a fost auditată și recalculată.
+            </p>
+          ) : null}
 
           {canEditItems ? (
             <AddItemForms
@@ -271,6 +294,7 @@ export default async function QuoteDetailPage({
                   quoteId={quote.id}
                   currency={quote.currency}
                   canEdit={canEditItems}
+                  canApplyCommercialAdjustments={canApplyCommercialAdjustments}
                   catalogOptions={catalogOptions}
                 />
               ))}
@@ -291,6 +315,9 @@ export default async function QuoteDetailPage({
         <CalculationReviewCard
           calculationError={paramsValue.calculationError}
           calculationResult={calculationResult}
+          commercialError={paramsValue.commercialError}
+          commercialEvent={paramsValue.commercialEvent}
+          canApplyCommercialAdjustments={canApplyCommercialAdjustments}
           canRecalculate={canEditItems}
           canViewInternalTrace={canViewInternalTrace}
           currency={quote.currency}
@@ -673,6 +700,9 @@ function VersionLifecyclePanel({
 function CalculationReviewCard({
   calculationError,
   calculationResult,
+  commercialError,
+  commercialEvent,
+  canApplyCommercialAdjustments,
   canRecalculate,
   canViewInternalTrace,
   currency,
@@ -682,6 +712,9 @@ function CalculationReviewCard({
 }: {
   calculationError?: string;
   calculationResult: QuoteCalculationResult | null;
+  commercialError?: string;
+  commercialEvent?: string;
+  canApplyCommercialAdjustments: boolean;
   canRecalculate: boolean;
   canViewInternalTrace: boolean;
   currency: string;
@@ -695,6 +728,8 @@ function CalculationReviewCard({
   const traceSummary = asRecord(currentVersion?.traceSummary);
   const traceCount = numberFrom(traceSummary?.traceEntryCount) ?? arrayLength(calculationResult?.trace);
   const traceSteps = traceStepNames(calculationResult);
+  const commercialTotals = commercialTotalsFromVersion(currentVersion);
+  const quoteDiscount = quoteDiscountFromVersion(currentVersion);
 
   return (
     <section id="calculation" className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
@@ -735,11 +770,51 @@ function CalculationReviewCard({
         </p>
       ) : null}
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <Metric label="Subtotal" value={formatMinor(currentVersion?.subtotalMinor, currency)} />
-        <Metric label="TVA" value={formatMinor(currentVersion?.vatMinor, currency)} />
+      {commercialEvent === "quote-discount" ? (
+        <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+          Reducerea la nivel de ofertă a fost auditată și recalculată.
+        </p>
+      ) : null}
+      {commercialError ? (
+        <p className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800">
+          {commercialError === "locked"
+            ? "Ajustările comerciale sunt disponibile doar pe ciorne editabile."
+            : "Completează valoarea și motivul ajustării comerciale."}
+        </p>
+      ) : null}
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric
+          label="Total calculat"
+          value={formatMinor(commercialTotals.calculatedTotalMinor, currency)}
+        />
+        <Metric
+          label="Reducere ofertă"
+          value={formatMinor(commercialTotals.quoteDiscountMinor, currency)}
+        />
+        <Metric
+          label="Ajustări manuale"
+          value={formatSignedMinor(commercialTotals.manualAdjustmentMinor, currency)}
+        />
         <Metric label="Total" value={formatMinor(currentVersion?.totalMinor, currency)} emphasized />
       </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <Metric label="Subtotal" value={formatMinor(currentVersion?.subtotalMinor, currency)} />
+        <Metric label="TVA" value={formatMinor(currentVersion?.vatMinor, currency)} />
+        <Metric
+          label="Total înainte de override"
+          value={formatMinor(commercialTotals.totalBeforeManualOverrideMinor, currency)}
+        />
+      </div>
+
+      <QuoteDiscountControls
+        canApply={canApplyCommercialAdjustments}
+        canEditDraft={canRecalculate}
+        currency={currency}
+        quoteDiscount={quoteDiscount}
+        quoteId={quoteId}
+      />
 
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Metric label="Necesar materiale" value={String(metrics.materialRequirementsCount)} />
@@ -794,6 +869,88 @@ function CalculationReviewCard({
   );
 }
 
+function QuoteDiscountControls({
+  canApply,
+  canEditDraft,
+  currency,
+  quoteDiscount,
+  quoteId,
+}: {
+  canApply: boolean;
+  canEditDraft: boolean;
+  currency: string;
+  quoteDiscount: ReturnType<typeof quoteDiscountFromVersion>;
+  quoteId: string;
+}) {
+  if (!canEditDraft) {
+    return null;
+  }
+
+  if (!canApply) {
+    return (
+      <p className="mt-4 rounded-md bg-stone-100 p-4 text-sm text-zinc-700">
+        Ajustările comerciale sunt disponibile doar pentru roluri autorizate.
+      </p>
+    );
+  }
+
+  const defaultType = quoteDiscount?.basisPoints ? "percent" : "amount";
+  const defaultValue =
+    quoteDiscount?.basisPoints !== undefined
+      ? formatBasisPointsInput(quoteDiscount.basisPoints)
+      : quoteDiscount?.amountMinor !== undefined
+        ? minorInput(quoteDiscount.amountMinor)
+        : "";
+
+  return (
+    <details className="mt-4 rounded-md border border-zinc-200 bg-stone-50 p-4">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
+        <Pencil aria-hidden="true" size={15} />
+        Reducere ofertă
+      </summary>
+      {quoteDiscount ? (
+        <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm text-zinc-700">
+          Reducere curentă:{" "}
+          <span className="font-semibold text-zinc-950">
+            {quoteDiscount.basisPoints !== undefined
+              ? `${formatBasisPointsLabel(quoteDiscount.basisPoints)}`
+              : formatMinor(quoteDiscount.amountMinor, currency)}
+          </span>
+          . Motiv: {quoteDiscount.reason}
+        </p>
+      ) : null}
+      <form action={applyQuoteDiscountAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SelectField
+            defaultValue={defaultType}
+            label="Tip reducere"
+            name="discountType"
+            options={[
+              { label: `Sumă (${currency})`, value: "amount" },
+              { label: "Procent", value: "percent" },
+            ]}
+          />
+          <TextField
+            defaultValue={defaultValue}
+            inputMode="decimal"
+            label="Valoare reducere"
+            name="discountValue"
+            placeholder={defaultType === "percent" ? "10" : "100.00"}
+            required
+          />
+        </div>
+        <TextAreaField
+          defaultValue={quoteDiscount?.reason ?? ""}
+          label="Motiv reducere"
+          name="discountReason"
+          required
+        />
+        <SubmitButton label="Aplică reducerea" />
+      </form>
+    </details>
+  );
+}
+
 function Metric({
   emphasized = false,
   label,
@@ -814,12 +971,14 @@ function Metric({
 }
 
 function QuoteItemCard({
+  canApplyCommercialAdjustments,
   canEdit,
   catalogOptions,
   currency,
   item,
   quoteId,
 }: {
+  canApplyCommercialAdjustments: boolean;
   canEdit: boolean;
   catalogOptions: FixedWindowCatalogFormOptions;
   currency: string;
@@ -828,6 +987,7 @@ function QuoteItemCard({
 }) {
   const manualUnitPriceMinor = manualUnitPriceFromItem(item);
   const itemTotals = totalsFromItem(item);
+  const manualOverride = manualOverrideFromItem(item);
   const catalogSummary = catalogSummaryFromItem(item);
   const catalogNeedsValidation = catalogRequiresBusinessValidation(item);
 
@@ -865,7 +1025,26 @@ function QuoteItemCard({
             <span className="rounded-md bg-stone-100 px-2 py-1">
               {itemTotals ? `Total ${formatMinor(itemTotals.totalMinor, currency)}` : "Total în așteptare"}
             </span>
+            {itemTotals ? (
+              <span className="rounded-md bg-white px-2 py-1 ring-1 ring-zinc-200">
+                Calculat {formatMinor(itemTotals.calculatedTotalMinor, currency)}
+              </span>
+            ) : null}
+            {itemTotals?.hasManualOverride ? (
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-800">
+                Ajustat {formatMinor(itemTotals.totalMinor, currency)}
+              </span>
+            ) : null}
           </div>
+
+          {manualOverride ? (
+            <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              <p className="font-semibold">
+                Override manual: {formatMinor(manualOverride.amountMinor, currency)}
+              </p>
+              <p className="mt-1 break-words">Motiv: {manualOverride.reason}</p>
+            </div>
+          ) : null}
 
           {catalogNeedsValidation ? (
             <span className="mt-3 inline-flex w-fit rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
@@ -907,6 +1086,21 @@ function QuoteItemCard({
                   quoteId={quoteId}
                 />
               </details>
+              {canApplyCommercialAdjustments ? (
+                <details className="rounded-md bg-stone-50 p-3">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-900">
+                    <Pencil aria-hidden="true" size={15} />
+                    Ajustare preț poziție
+                  </summary>
+                  <ItemManualOverrideForm
+                    currency={currency}
+                    item={item}
+                    itemTotals={itemTotals}
+                    manualOverride={manualOverride}
+                    quoteId={quoteId}
+                  />
+                </details>
+              ) : null}
               <form action={deleteQuoteItemAction.bind(null, quoteId, item.id)}>
                 <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-rose-200 bg-white px-3 text-sm font-semibold text-rose-800 shadow-sm hover:bg-rose-50 sm:w-auto">
                   <Trash2 aria-hidden="true" size={15} />
@@ -918,6 +1112,57 @@ function QuoteItemCard({
         </div>
       </div>
     </article>
+  );
+}
+
+function ItemManualOverrideForm({
+  currency,
+  item,
+  itemTotals,
+  manualOverride,
+  quoteId,
+}: {
+  currency: string;
+  item: QuoteItem;
+  itemTotals: ReturnType<typeof totalsFromItem>;
+  manualOverride: ReturnType<typeof manualOverrideFromItem>;
+  quoteId: string;
+}) {
+  const defaultTotalMinor =
+    manualOverride?.amountMinor ??
+    itemTotals?.totalMinor ??
+    itemTotals?.calculatedTotalMinor ??
+    0;
+
+  return (
+    <form
+      action={applyItemManualOverrideAction.bind(null, quoteId, item.id)}
+      className="mt-4 grid gap-3"
+    >
+      <p className="rounded-md bg-white px-3 py-2 text-sm text-zinc-700">
+        Total calculat curent:{" "}
+        <span className="font-semibold text-zinc-950">
+          {itemTotals
+            ? formatMinor(itemTotals.calculatedTotalMinor, currency)
+            : commonLabel("totalPending")}
+        </span>
+      </p>
+      <TextField
+        defaultValue={defaultTotalMinor ? minorInput(defaultTotalMinor) : ""}
+        inputMode="decimal"
+        label={`Total final manual (${currency})`}
+        name="overrideTotal"
+        placeholder="0.00"
+        required
+      />
+      <TextAreaField
+        defaultValue={manualOverride?.reason ?? ""}
+        label="Motiv override"
+        name="overrideReason"
+        required
+      />
+      <SubmitButton label="Aplică override" />
+    </form>
   );
 }
 
@@ -1042,14 +1287,45 @@ function TextField({
   );
 }
 
-function TextAreaField({
+function SelectField({
   defaultValue,
   label,
   name,
+  options,
 }: {
   defaultValue?: string;
   label: string;
   name: string;
+  options: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-zinc-800">{label}</span>
+      <select
+        name={name}
+        defaultValue={defaultValue}
+        className="mt-2 h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function TextAreaField({
+  defaultValue,
+  label,
+  name,
+  required = false,
+}: {
+  defaultValue?: string;
+  label: string;
+  name: string;
+  required?: boolean;
 }) {
   return (
     <label className="block">
@@ -1057,6 +1333,7 @@ function TextAreaField({
       <textarea
         name={name}
         defaultValue={defaultValue}
+        required={required}
         rows={3}
         className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950 outline-none focus:border-zinc-900"
       />
@@ -1301,13 +1578,76 @@ function traceStepNames(calculationResult: QuoteCalculationResult | null) {
 function totalsFromItem(item: QuoteItem) {
   const totals = asRecord(item.totalsSnapshot);
   const totalMinor = numberFrom(totals?.totalMinor);
+  const manualAdjustmentMinor = numberFrom(totals?.manualAdjustmentMinor) ?? 0;
+  const totalBeforeManualOverrideMinor =
+    numberFrom(totals?.totalBeforeManualOverrideMinor) ?? totalMinor;
 
   if (!totals || totals.pendingCalculation === true || totalMinor === undefined) {
     return null;
   }
 
   return {
+    calculatedTotalMinor:
+      totalBeforeManualOverrideMinor ?? totalMinor - manualAdjustmentMinor,
+    hasManualOverride: manualAdjustmentMinor !== 0,
+    manualAdjustmentMinor,
     totalMinor,
+    totalBeforeManualOverrideMinor,
+  };
+}
+
+function manualOverrideFromItem(item: QuoteItem) {
+  const configuration = asRecord(item.configurationSnapshot);
+  const manualOverride = asRecord(configuration?.manualOverride);
+  const amountMinor = numberFrom(manualOverride?.amountMinor);
+  const reason = stringFrom(manualOverride?.reason);
+
+  if (!manualOverride || amountMinor === undefined || !reason) {
+    return null;
+  }
+
+  return {
+    amountMinor,
+    reason,
+  };
+}
+
+function quoteDiscountFromVersion(quoteVersion: QuoteVersion | null) {
+  const priceSnapshot = asRecord(quoteVersion?.priceSnapshot);
+  const quoteDiscount = asRecord(priceSnapshot?.quoteDiscount);
+  const amountMinor = numberFrom(quoteDiscount?.amountMinor);
+  const basisPoints = numberFrom(quoteDiscount?.basisPoints);
+  const reason = stringFrom(quoteDiscount?.reason);
+
+  if (!quoteDiscount || !reason) {
+    return null;
+  }
+
+  if (amountMinor === undefined && basisPoints === undefined) {
+    return null;
+  }
+
+  return {
+    amountMinor,
+    basisPoints,
+    reason,
+  };
+}
+
+function commercialTotalsFromVersion(quoteVersion: QuoteVersion | null) {
+  const totals = asRecord(quoteVersion?.totalsSnapshot);
+  const totalMinor = numberFrom(quoteVersion?.totalMinor) ?? numberFrom(totals?.totalMinor);
+  const manualAdjustmentMinor = numberFrom(totals?.manualAdjustmentMinor) ?? 0;
+  const quoteDiscountMinor = numberFrom(totals?.quoteDiscountMinor) ?? 0;
+  const totalBeforeManualOverrideMinor =
+    numberFrom(totals?.totalBeforeManualOverrideMinor) ?? totalMinor;
+
+  return {
+    calculatedTotalMinor:
+      totalMinor === undefined ? undefined : totalMinor - manualAdjustmentMinor,
+    manualAdjustmentMinor,
+    quoteDiscountMinor,
+    totalBeforeManualOverrideMinor,
   };
 }
 
@@ -1340,6 +1680,12 @@ function numberFrom(value: unknown) {
     return Number(value);
   }
 
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
   return undefined;
 }
 
@@ -1351,10 +1697,30 @@ function minorInput(value: number) {
   return (value / 100).toFixed(2);
 }
 
+function formatBasisPointsInput(value: number) {
+  return (value / 100).toFixed(2).replace(/\.00$/, "");
+}
+
+function formatBasisPointsLabel(value: number) {
+  return `${new Intl.NumberFormat("ro-RO", {
+    maximumFractionDigits: 2,
+  }).format(value / 100)}%`;
+}
+
 function formatMeasurement(value: number) {
   return new Intl.NumberFormat("ro-RO", {
     maximumFractionDigits: 3,
   }).format(value);
+}
+
+function formatSignedMinor(value: number | null | undefined, currency = "RON") {
+  if (value === null || value === undefined || value === 0) {
+    return formatMoneyMinorRo(0, currency);
+  }
+
+  const formatted = formatMoneyMinorRo(Math.abs(value), currency);
+
+  return `${value > 0 ? "+" : "-"}${formatted}`;
 }
 
 function formatMinor(value: bigint | number | null | undefined, currency = "RON") {

@@ -134,6 +134,7 @@ async function main() {
       role: TenantRole.OWNER,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: true,
+      canApplyCommercialOverrides: true,
       joinedAt: new Date("2026-01-01T00:00:00.000Z"),
     },
     create: {
@@ -143,6 +144,7 @@ async function main() {
       role: TenantRole.OWNER,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: true,
+      canApplyCommercialOverrides: true,
       joinedAt: new Date("2026-01-01T00:00:00.000Z"),
     },
   });
@@ -158,6 +160,7 @@ async function main() {
       role: TenantRole.OWNER,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: true,
+      canApplyCommercialOverrides: true,
       joinedAt: new Date("2026-01-02T00:00:00.000Z"),
     },
     create: {
@@ -167,6 +170,7 @@ async function main() {
       role: TenantRole.OWNER,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: true,
+      canApplyCommercialOverrides: true,
       joinedAt: new Date("2026-01-02T00:00:00.000Z"),
     },
   });
@@ -182,6 +186,7 @@ async function main() {
       role: TenantRole.ADMIN,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: true,
+      canApplyCommercialOverrides: true,
       joinedAt: new Date("2026-01-03T00:00:00.000Z"),
     },
     create: {
@@ -191,6 +196,7 @@ async function main() {
       role: TenantRole.ADMIN,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: true,
+      canApplyCommercialOverrides: true,
       joinedAt: new Date("2026-01-03T00:00:00.000Z"),
     },
   });
@@ -206,6 +212,7 @@ async function main() {
       role: TenantRole.ESTIMATOR,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: false,
+      canApplyCommercialOverrides: true,
       joinedAt: new Date("2026-01-04T00:00:00.000Z"),
     },
     create: {
@@ -215,6 +222,7 @@ async function main() {
       role: TenantRole.ESTIMATOR,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: false,
+      canApplyCommercialOverrides: true,
       joinedAt: new Date("2026-01-04T00:00:00.000Z"),
     },
   });
@@ -230,6 +238,7 @@ async function main() {
       role: TenantRole.DEALER,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: false,
+      canApplyCommercialOverrides: false,
       joinedAt: new Date("2026-01-05T00:00:00.000Z"),
     },
     create: {
@@ -239,6 +248,7 @@ async function main() {
       role: TenantRole.DEALER,
       status: TenantMemberStatus.ACTIVE,
       canViewInternalCosts: false,
+      canApplyCommercialOverrides: false,
       joinedAt: new Date("2026-01-05T00:00:00.000Z"),
     },
   });
