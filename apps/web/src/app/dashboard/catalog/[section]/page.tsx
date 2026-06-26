@@ -16,6 +16,7 @@ import {
   listTenantTaxRates,
 } from "@/lib/data";
 import { CatalogEntityPage } from "../_components/catalog-entity-page";
+import { CatalogCsvTools } from "../_components/catalog-csv-tools";
 import type { CatalogLookupData, CatalogRecord } from "../_components/catalog-form";
 import { getCatalogConfigBySlug, type CatalogEntityConfig } from "../catalog-config";
 
@@ -54,6 +55,12 @@ export default async function CatalogSectionPage({
     <CatalogEntityPage
       canManage={canManageCatalog(context.membership)}
       config={config}
+      csvToolsSlot={
+        <CatalogCsvTools
+          defaultEntity={config.entity}
+          entities={csvEntitiesForConfig(config)}
+        />
+      }
       error={query.error}
       event={query.event}
       lookups={lookups}
@@ -66,6 +73,17 @@ export default async function CatalogSectionPage({
       tenantName={context.tenant.name}
     />
   );
+}
+
+function csvEntitiesForConfig(config: CatalogEntityConfig) {
+  if (config.entity === "priceListItems") {
+    return [
+      { key: "priceLists" as const, label: "Liste de preturi" },
+      { key: "priceListItems" as const, label: "Pozitii de pret" },
+    ];
+  }
+
+  return [{ key: config.entity, label: config.title }];
 }
 
 function listRecords(

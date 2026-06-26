@@ -246,8 +246,22 @@ pricing rules are listed for context, while price-list item create/update/archiv
 The first catalog admin UI lives under `/dashboard/catalog` with Romanian labels. OWNER and ADMIN
 memberships can create, edit, and archive catalog records; ESTIMATOR and DEALER memberships are
 read-only. Unvalidated configuration or rule JSON is shown with the `necesită validare business`
-badge. Catalog admin remains separate from supplier integrations, CSV import/export, and production
-formula execution.
+badge. Catalog admin remains separate from supplier integrations and production formula execution.
+
+## COD-030 catalog CSV import/export notes
+
+Catalog CSV import/export covers supplier, profile-system, profile-item, glass-package,
+hardware-kit, color-finish, accessory, service-item, tax-rate, price-list, and price-list-item
+records. CSV files omit `tenantId`; import/export scope is always resolved from the authenticated
+tenant context, and OWNER/ADMIN authorization is enforced server-side because price-list item exports
+can include internal cost columns.
+
+CSV import validates the whole file as a dry-run before publishing. Rows with missing required
+fields, invalid enum/date/JSON values, unknown record ids, or parent references outside the active
+tenant produce row-level errors. If any row is invalid, no rows are published. Valid publish imports
+create rows without an `id` and update only existing rows whose `id` belongs to the active tenant.
+Price-list changes still affect new quote snapshots only; locked quote versions continue to use
+their stored catalog and price snapshots.
 
 ## COD-019 catalog snapshot selection notes
 

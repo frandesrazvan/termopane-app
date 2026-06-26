@@ -22,6 +22,10 @@ production formulas.
   edit, and archive catalog records; ESTIMATOR and DEALER memberships have read-only catalog access.
 - Catalog archive actions use `deletedAt` soft delete and mark records inactive. Unvalidated
   configuration/rule JSON is surfaced with the Romanian `necesită validare business` badge.
+- Catalog sections now support tenant-scoped CSV export and dry-run import for suppliers, profile
+  systems/items, glass packages, hardware kits, colors, accessories, services, tax rates, price
+  lists, and price-list items. Import shows row-level validation errors and publishes only after all
+  rows pass OWNER/ADMIN validation.
 - Fixed-window quote items now select tenant catalog systems, frame profiles, glass packages,
   colors, and optional hardware placeholders. The selected catalog names, IDs, units, active
   price-list references, and sale-price snapshots are frozen on `QuoteItem.catalogSnapshot`.

@@ -10,6 +10,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireTenant } from "@/lib/auth";
 import {
+  importTenantCatalogCsv,
+  initialCatalogCsvImportResult,
+  isCatalogCsvEntityKey,
+  type CatalogCsvImportResult,
+} from "@/lib/catalog/catalog-csv";
+import {
   archiveTenantAccessory,
   archiveTenantColorFinish,
   archiveTenantGlassPackage,
@@ -338,6 +344,78 @@ export async function archiveCatalogRecordAction(entity: CatalogEntityKey, recor
   redirect(`${route}?event=archived`);
 }
 
+export async function importCatalogCsvAction(
+  _previousState: CatalogCsvImportResult = initialCatalogCsvImportResult,
+  formData: FormData,
+): Promise<CatalogCsvImportResult> {
+  void _previousState;
+
+  const context = await requireTenant();
+  const entity = formText(formData, "csvEntity");
+  const mode = formText(formData, "intent") === "publish" ? "publish" : "dry-run";
+
+  if (!canMutateCatalog(context.membership)) {
+    return {
+      ...initialCatalogCsvImportResult,
+      entity: null,
+      mode,
+      status: "invalid",
+      message: "Doar rolurile OWNER si ADMIN pot importa CSV in catalog.",
+      errors: [
+        {
+          rowNumber: 0,
+          field: "rol",
+          message: "Rolul curent nu poate modifica date de catalog.",
+        },
+      ],
+    };
+  }
+
+  if (!isCatalogCsvEntityKey(entity)) {
+    return {
+      ...initialCatalogCsvImportResult,
+      entity: null,
+      mode,
+      status: "invalid",
+      message: "Alege o sectiune valida de catalog pentru import.",
+      errors: [
+        {
+          rowNumber: 0,
+          field: "csvEntity",
+          message: "Sectiunea CSV nu este valida.",
+        },
+      ],
+    };
+  }
+
+  const csvText = await csvTextFromFormData(formData);
+
+  if (!csvText.trim()) {
+    return {
+      ...initialCatalogCsvImportResult,
+      entity,
+      mode,
+      status: "empty",
+      message: "Incarca un fisier CSV inainte de validare.",
+      errors: [
+        {
+          rowNumber: 0,
+          field: "csvFile",
+          message: "Fisierul CSV lipseste.",
+        },
+      ],
+    };
+  }
+
+  return importTenantCatalogCsv({
+    actorUserId: context.user.id,
+    csvText,
+    entity,
+    mode,
+    scope: context,
+  });
+}
+
 function parseEntity(value: string): CatalogEntityKey {
   if (catalogEntityKeys.includes(value as CatalogEntityKey)) {
     return value as CatalogEntityKey;
@@ -521,5 +599,22 @@ function formText(formData: FormData, field: string) {
   const value = formData.get(field);
 
   return typeof value === "string" ? value : "";
+}
+
+async function csvTextFromFormData(formData: FormData) {
+  const file = formData.get("csvFile");
+
+  if (
+    file &&
+    typeof file === "object" &&
+    "size" in file &&
+    Number(file.size) > 0 &&
+    "text" in file &&
+    typeof file.text === "function"
+  ) {
+    return String(await file.text());
+  }
+
+  return formText(formData, "csvText");
 }
 

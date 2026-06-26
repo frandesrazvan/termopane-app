@@ -8,6 +8,7 @@ import { CatalogForm, selectOptions, type CatalogLookupData, type CatalogRecord 
 type CatalogEntityPageProps = {
   canManage: boolean;
   config: CatalogEntityConfig;
+  csvToolsSlot?: ReactNode;
   error?: string;
   event?: string;
   lookups: CatalogLookupData;
@@ -19,6 +20,7 @@ type CatalogEntityPageProps = {
 export function CatalogEntityPage({
   canManage,
   config,
+  csvToolsSlot,
   error,
   event,
   lookups,
@@ -72,6 +74,8 @@ export function CatalogEntityPage({
         </section>
 
         {summarySlot}
+
+        {canManage ? csvToolsSlot : null}
 
         {canManage ? (
           <details className="mt-5 rounded-md border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">

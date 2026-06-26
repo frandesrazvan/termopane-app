@@ -73,3 +73,10 @@ only by OWNER memberships because changing the next number affects tenant-wide c
 ESTIMATOR and DEALER memberships may view settings screens where exposed, but server actions reject
 company and numbering mutations for those roles. User preferences are scoped to the active tenant and
 current user.
+
+## COD-030 catalog CSV permissions
+
+Catalog CSV import and export are restricted to OWNER and ADMIN memberships. This applies to exports
+as well as imports because price-list item CSV files can include internal cost columns. ESTIMATOR and
+DEALER users can continue to read permitted catalog screens but cannot download or publish catalog
+CSV files.
