@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Termopane App">
+  <rect width="512" height="512" rx="96" fill="#fafaf9"/>
+  <rect x="72" y="88" width="368" height="336" rx="34" fill="#0f172a"/>
+  <rect x="112" y="128" width="288" height="256" rx="18" fill="#ecfeff"/>
+  <path d="M256 128v256M112 256h288" stroke="#0f172a" stroke-width="24" stroke-linecap="round"/>
+  <path d="M142 158h84M286 158h84M142 354h84M286 354h84" stroke="#14b8a6" stroke-width="18" stroke-linecap="round"/>
+</svg>

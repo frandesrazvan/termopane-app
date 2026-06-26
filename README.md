@@ -33,6 +33,9 @@ production formulas.
 - Saved-offer workflow filters now persist per user with `SavedFilter`, with Romanian quick filters
   for draft/sent/accepted/rejected offers, expiring offers, generated PDFs, missing calculations,
   and warnings.
+- PWA metadata, install manifest, static app icons, conservative service-worker registration, mobile
+  dashboard navigation, Romanian loading/error states, and sticky quote total/actions are present for
+  mobile sales workflows.
 
 ## Stack
 

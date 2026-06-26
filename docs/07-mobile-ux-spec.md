@@ -96,6 +96,26 @@ Offer cards show the quote status, current quote-version status, generated-PDF s
 calculation state, and warning count in Romanian badges so mobile users can triage work without
 opening every offer.
 
+## COD-023 PWA and mobile hardening notes
+
+The web app exposes installable PWA metadata through the Next manifest route, app icons, Romanian
+application description, standalone display mode, and a service worker. The service worker caches
+only static application assets such as icons, the manifest, and hashed framework files; tenant pages,
+quote data, customer data, and generated documents remain network-first and are not cached for
+offline reuse.
+
+Authenticated dashboard routes share persistent navigation: a desktop sidebar and a bottom mobile
+navigation bar for `Panou`, `Clienți`, `Oferte`, and `Catalog`. Dead mobile links are not shown until
+their destination routes exist.
+
+The quote detail screen keeps `Total curent`, the version number, preview, and the next useful quote
+action sticky above the mobile navigation. This keeps recalculation, PDF generation, or revision
+creation reachable while reviewing positions and warnings on a phone.
+
+Mobile audit widths for this hardening pass are `360px`, `390px`, and `430px`. The audited target is
+that Romanian labels, totals, status badges, sticky actions, and bottom navigation remain readable
+without hover-only controls at those widths.
+
 ## Accessibility and responsiveness
 
 - Tap targets should be large enough for mobile use.
