@@ -13,6 +13,9 @@ production formulas.
   present.
 - PDF generation, local document storage, immutable `Document` records, selected template keys, and
   audit logging are present for generated quote documents.
+- Document storage now goes through a provider interface. The local provider remains the default
+  for dev/test, and an S3-compatible provider stub validates deployment config until a real adapter
+  is implemented.
 - Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
   glass packages, hardware kits, colors, accessories, services, tax rates, price lists, price-list
   items, and pricing rules.
@@ -46,7 +49,8 @@ production formulas.
 - Next.js app with TypeScript and Tailwind
 - Prisma configured for PostgreSQL
 - Pure packages for calculation, drawing, and PDF rendering
-- Local development document storage under ignored `.local-storage`
+- Document storage provider abstraction with local development storage under ignored
+  `.local-storage`
 - GitHub Actions CI for install, Prisma generate, lint, typecheck, test, and build
 
 ## Local Setup
@@ -123,14 +127,57 @@ Use only synthetic data in fixtures, screenshots, and docs.
 
 ## Documents And Storage
 
-Generated PDFs are written to ignored local storage. By default this is `.local-storage` at the repo
-root. Override it with:
+Generated PDFs are stored through the provider selected by `DOCUMENT_STORAGE_PROVIDER`.
+
+The default provider is `local`, which writes to ignored local storage. By default this is
+`.local-storage` at the repo root. Override it with:
 
 ```powershell
+$env:DOCUMENT_STORAGE_PROVIDER="local"
 $env:DOCUMENT_STORAGE_ROOT="E:\path\to\storage"
 ```
 
-Production object storage is not implemented yet.
+The `s3` provider is a deployment stub. It validates S3-compatible environment values and then
+returns a controlled "not implemented" storage error for reads and writes until an SDK-backed adapter
+is added:
+
+```powershell
+$env:DOCUMENT_STORAGE_PROVIDER="s3"
+$env:DOCUMENT_STORAGE_S3_ENDPOINT="https://s3-compatible.example"
+$env:DOCUMENT_STORAGE_S3_REGION="eu-central-1"
+$env:DOCUMENT_STORAGE_S3_BUCKET="termopane-documents"
+$env:DOCUMENT_STORAGE_S3_ACCESS_KEY_ID="replace-in-secret-store"
+$env:DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY="replace-in-secret-store"
+$env:DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE="true"
+```
+
+PDF generation writes storage bytes before creating the immutable `Document` row. If metadata
+creation fails after storage succeeds, the app attempts to delete the newly written object so failed
+generations do not leave orphaned files.
+
+## Deployment Readiness
+
+Before deploying, configure these server-side environment values in the target platform secret store:
+
+- `DATABASE_URL`
+- `AUTH_SECRET`
+- `AUTH_COOKIE_NAME`
+- `AUTH_SESSION_DAYS`
+- `AUTH_DEV_LOGIN_ENABLED="false"`
+- `DOCUMENT_STORAGE_PROVIDER`
+- Local-only: `DOCUMENT_STORAGE_ROOT`
+- S3-compatible stub: `DOCUMENT_STORAGE_S3_ENDPOINT`, `DOCUMENT_STORAGE_S3_REGION`,
+  `DOCUMENT_STORAGE_S3_BUCKET`, `DOCUMENT_STORAGE_S3_ACCESS_KEY_ID`,
+  `DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY`, and `DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE`
+
+Use a Node.js or Docker deployment target for the Next.js app; static export is not suitable because
+auth, tenant-scoped database access, PDF generation, and document downloads require server runtime
+behavior. Run `pnpm prisma generate`, `pnpm build`, and a migration command appropriate for the
+target database before starting `pnpm --filter web start`.
+
+Do not enable development login in production, do not store S3 credentials in source control, and do
+not use the `s3` provider for live PDF delivery until the SDK-backed adapter replaces the current
+stub.
 
 ## Validation
 
@@ -162,7 +209,7 @@ pnpm verify
 
 ## Not Done Yet
 
-- Production object storage.
+- SDK-backed S3-compatible object storage.
 - Email sending or customer delivery workflow.
 - Door, accessory, service, and advanced pricing-rule selection inside the quote builder.
 - Real production formulas or supplier-specific pricing rules.

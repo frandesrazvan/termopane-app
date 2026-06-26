@@ -11,7 +11,9 @@ import {
   type TenantDataScope,
 } from "../data";
 import { prisma } from "../prisma";
-import { writeLocalDocument, type LocalDocumentStorageOptions } from "./local-document-storage";
+import type { DocumentStorageProvider } from "./document-storage";
+import { createConfiguredDocumentStorageProvider } from "./document-storage-provider";
+import type { LocalDocumentStorageOptions } from "./local-document-storage";
 import {
   buildQuotePdfOfferSnapshot,
   isQuoteVersionLockedForCustomerOutput,
@@ -23,6 +25,7 @@ export type GenerateQuotePdfOptions = LocalDocumentStorageOptions & {
   client?: TenantDataClient;
   now?: () => Date;
   nonce?: () => string;
+  storageProvider?: DocumentStorageProvider;
   templateKey?: QuotePdfTemplateKey;
   renderPdf?: (snapshot: QuotePdfOfferSnapshot) => Uint8Array;
 };
@@ -36,7 +39,11 @@ export type GenerateQuotePdfResult =
     }
   | {
       ok: false;
-      reason: "not_found" | "not_locked" | "write_failed";
+      reason:
+        | "document_create_failed"
+        | "not_found"
+        | "not_locked"
+        | "storage_write_failed";
     };
 
 const PDF_MIME_TYPE = "application/pdf";
@@ -78,28 +85,50 @@ export async function generateTenantQuotePdf(
     options.nonce?.() ?? randomUUID(),
   );
   const fileName = documentFileName(quoteState.quote.quoteNumber, quoteVersion, templateKey);
+  let storageProvider: DocumentStorageProvider;
 
   try {
-    await writeLocalDocument(storageKey, pdfBytes, options);
+    storageProvider = options.storageProvider ?? createConfiguredDocumentStorageProvider(options);
+    await storageProvider.put({
+      storageKey,
+      bytes: pdfBytes,
+      contentType: PDF_MIME_TYPE,
+      checksum,
+      metadata: {
+        quoteVersionId: quoteVersion.id,
+        templateKey,
+        tenantId: tenantIdFromScope(scope),
+      },
+    });
   } catch {
-    return { ok: false, reason: "write_failed" };
+    return { ok: false, reason: "storage_write_failed" };
   }
 
-  const document = await data.createTenantQuoteDocument(scope, quoteVersion.id, {
-    actorUserId: options.actorUserId ?? null,
-    templateKey,
-    fileName,
-    storageKey,
-    mimeType: PDF_MIME_TYPE,
-    checksum,
-    visibleTotalsSnapshot: {
-      ...visibleTotalsSnapshotFromTemplate(snapshot, quoteVersion.id),
-      documentType: DocumentType.QUOTE_PDF,
-      itemCount: items.length,
-    },
-  });
+  let document: Document | null;
+
+  try {
+    document = await data.createTenantQuoteDocument(scope, quoteVersion.id, {
+      actorUserId: options.actorUserId ?? null,
+      templateKey,
+      fileName,
+      storageKey,
+      mimeType: PDF_MIME_TYPE,
+      checksum,
+      visibleTotalsSnapshot: {
+        ...visibleTotalsSnapshotFromTemplate(snapshot, quoteVersion.id),
+        documentType: DocumentType.QUOTE_PDF,
+        itemCount: items.length,
+      },
+    });
+  } catch {
+    await cleanupStoredDocument(storageProvider, storageKey);
+
+    return { ok: false, reason: "document_create_failed" };
+  }
 
   if (!document) {
+    await cleanupStoredDocument(storageProvider, storageKey);
+
     return { ok: false, reason: "not_found" };
   }
 
@@ -109,6 +138,17 @@ export async function generateTenantQuotePdf(
     checksum,
     storageKey,
   };
+}
+
+async function cleanupStoredDocument(
+  storageProvider: DocumentStorageProvider,
+  storageKey: string,
+) {
+  try {
+    await storageProvider.delete(storageKey);
+  } catch {
+    // Preserve the original generation failure. The missing Document row remains the source of truth.
+  }
 }
 
 function documentStorageKey(

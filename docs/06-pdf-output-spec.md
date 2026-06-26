@@ -133,3 +133,16 @@ The committed examples are synthetic redacted JSON fixtures, not PDF files. Real
 PDFs and source price lists must remain outside Git. Future validated cases should store only the
 redacted snapshot facts needed to reproduce the quote totals and selected `template-a` or
 `template-b` output.
+
+## COD-025 storage/deployment readiness notes
+
+Generated quote PDFs now go through a document storage provider interface. The local provider keeps
+the current development/test behavior under ignored local storage. The S3-compatible provider is a
+deployment configuration stub: it validates endpoint, region, bucket, and credential env values, then
+returns a controlled not-implemented storage error until an SDK-backed adapter is added.
+
+Generation distinguishes storage-write failures from `Document` metadata creation failures. If bytes
+are stored but the immutable `Document` row or audit metadata cannot be created, the app attempts to
+delete the just-written object so failed generations do not leave orphaned PDF files. Customer-facing
+PDF contents, tenant-scoped document access, quote-version binding, and hidden internal costs are
+unchanged.
