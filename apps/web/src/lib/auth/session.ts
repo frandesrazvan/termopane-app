@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { readAuthSecret } from "../env/runtime";
 
 export type SessionPayload = {
   userId: string;
@@ -21,13 +22,7 @@ function sessionDurationMs() {
 }
 
 function authSecret() {
-  const secret = process.env.AUTH_SECRET;
-
-  if (!secret) {
-    throw new Error("AUTH_SECRET must be configured before using authentication.");
-  }
-
-  return secret;
+  return readAuthSecret();
 }
 
 function encodeBase64Url(value: string) {

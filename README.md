@@ -19,6 +19,9 @@ production formulas.
   explicitly added.
 - Document storage now goes through a provider interface. The local provider remains the default
   for dev/test, and an SDK-backed S3-compatible provider is available for deployable object storage.
+- Production deployment hardening now includes runtime env validation, production dev-login blocking,
+  `/api/health`, PII-redacting server logging helpers, a storage smoke test command, and a Render
+  pilot deployment checklist.
 - Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
   glass packages, hardware kits, colors, accessories, services, tax rates, price lists, price-list
   items, and pricing rules.
@@ -140,7 +143,8 @@ production formulas.
    ```
 
 The web app runs at `http://localhost:3000` by default. Development login requires
-`AUTH_DEV_LOGIN_ENABLED="true"`.
+`AUTH_DEV_LOGIN_ENABLED="true"` in your local `.env`; `.env.example` keeps it disabled by default so
+it is not accidentally copied into production.
 
 ## Seed Users
 
@@ -186,30 +190,54 @@ No real bucket integration tests run in CI. Validate bucket credentials, endpoin
 path-style settings, lifecycle/retention policy, and object access controls in the target
 environment before using `DOCUMENT_STORAGE_PROVIDER="s3"` for live PDF delivery.
 
+Run the storage smoke test after setting target storage env values:
+
+```powershell
+pnpm storage:smoke
+```
+
 ## Deployment Readiness
 
-Before deploying, configure these server-side environment values in the target platform secret store:
+See `docs/12-production-deployment-hardening.md` for the full pilot checklist, backup/restore notes,
+and Render deployment path. Before deploying, configure these server-side environment values in the
+target platform secret store:
 
 - `DATABASE_URL`
-- `AUTH_SECRET`
+- `AUTH_SECRET` with at least 32 random characters
 - `AUTH_COOKIE_NAME`
 - `AUTH_SESSION_DAYS`
 - `AUTH_DEV_LOGIN_ENABLED="false"`
-- `DOCUMENT_STORAGE_PROVIDER`
-- Local-only: `DOCUMENT_STORAGE_ROOT`
+- `DOCUMENT_STORAGE_PROVIDER="s3"` for pilot deployments
 - S3-compatible: `DOCUMENT_STORAGE_S3_ENDPOINT`, `DOCUMENT_STORAGE_S3_REGION`,
   `DOCUMENT_STORAGE_S3_BUCKET`, `DOCUMENT_STORAGE_S3_ACCESS_KEY_ID`,
   `DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY`, and `DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE`
 
 Use a Node.js or Docker deployment target for the Next.js app; static export is not suitable because
 auth, tenant-scoped database access, PDF generation, and document downloads require server runtime
-behavior. Run `pnpm prisma generate` and `pnpm build` during deployment. Because committed Prisma
-migrations are not present yet, define the target database schema rollout explicitly before a real
-environment deploy; once migrations are committed, use the normal deployment migration command for
-the target database before starting `pnpm --filter web start`.
+behavior. The pilot host documented for this repo is Render with managed PostgreSQL plus
+S3-compatible document storage.
+
+Recommended deployment commands:
+
+```bash
+pnpm prisma generate
+pnpm build
+pnpm db:migrate:deploy
+pnpm --filter web start
+```
+
+Because committed Prisma migrations are not present yet, define and review the first migration before
+a real environment deploy. Do not use undocumented `db push` behavior for pilot deployment.
+
+Configure the host health check path as:
+
+```text
+/api/health
+```
 
 Do not enable development login in production, do not store S3 credentials in source control, and do
-not expose bucket credentials to browser-side code.
+not expose bucket credentials to browser-side code. CI runs `pnpm env:check-defaults` to ensure
+unsafe production defaults are not enabled in `.env.example`.
 
 ## Validation
 
@@ -218,6 +246,7 @@ Run the same checks as CI:
 ```powershell
 pnpm install --frozen-lockfile
 pnpm prisma generate
+pnpm env:check-defaults
 pnpm lint
 pnpm typecheck
 pnpm test
@@ -237,11 +266,12 @@ pnpm verify
 - `packages/drawing`: deterministic SVG schematic renderer.
 - `packages/pdf`: Template A and Template B HTML/PDF rendering package.
 - `prisma`: schema, migrations, and synthetic seed entrypoint.
+- `scripts`: operational checks such as env-default and storage smoke tests.
 - `docs`: product, data, calculation, PDF, UX, and tasking docs.
 
 ## Not Done Yet
 
-- Real bucket integration tests and deployment-specific storage smoke tests.
+- Real bucket integration tests.
 - Real email-provider integration for customer delivery.
 - Advanced pricing-rule selection inside the quote builder.
 - Production-ready door formulas for panels, locks, thresholds, reinforcement, and fabrication.
