@@ -72,6 +72,17 @@ automatic distance lookup, route planning, installation scheduling, or labor for
   draft/new revision.
 - Duplicating or revising a sent quote must create a new version.
 
+## COD-032 business validation dashboard notes
+
+OWNER/ADMIN dashboard users see `Validare business necesară` when tenant-scoped catalog, pricing, or
+calculation settings contain `requires business validation` / `validare business` markers. The
+callout shows only categories and record counts; it must not expose customer PII, internal material
+costs, supplier costs, or quote trace details.
+
+The callout points admins back to catalog/settings so they can resolve profile systems, glass
+deductions, profile linear-meter rules, hardware rules, accessories/services, VAT/discount/markup,
+PDF template choice, and sample-output requirements before historical quote validation.
+
 ## Catalog and admin UX
 
 - Catalog admin can be denser than quote creation but must still work on mobile.

@@ -59,6 +59,17 @@ Fixed-window quote item forms use these Romanian labels:
 
 The quote item catalog validation badge remains `necesită validare business`.
 
+## COD-032 Business Validation Labels
+
+The dashboard owner/admin callout uses Romanian labels:
+
+- `Validare business necesară`
+- `Catalog`
+- `Setări`
+
+The callout remains an internal admin signal and must not expose customer-facing data, internal
+material costs, supplier costs, or trace details.
+
 ## COD-020 Commercial Adjustment Labels
 
 Manual commercial controls in the quote workflow use Romanian labels:

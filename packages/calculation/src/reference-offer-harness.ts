@@ -13,6 +13,7 @@ export const requiredReviewInputKeys = [
   "accessoryServicePrices",
   "commercialRules",
   "preferredPdfTemplate",
+  "sampleOutputRequirements",
 ] as const;
 
 export type RequiredReviewInputKey = (typeof requiredReviewInputKeys)[number];
@@ -116,6 +117,27 @@ export type ReferenceOfferRecreationResult = Readonly<{
 export type ReferenceOfferPackRecreationResult = Readonly<{
   passed: boolean;
   cases: readonly ReferenceOfferRecreationResult[];
+}>;
+
+export type ReferenceOfferComparisonCaseSummary = Readonly<{
+  caseId: string;
+  passed: boolean;
+  mismatchCount: number;
+  totalWithVatMinor: number;
+  warningCodes: readonly CalculationWarningCode[];
+}>;
+
+export type ReferenceOfferComparisonReport = Readonly<{
+  packId: string;
+  packType: ReferenceOfferPackType;
+  caseCount: number;
+  validationErrorCount: number;
+  validationWarningCount: number;
+  passedCaseCount: number;
+  failedCaseCount: number;
+  historicalCaseWindowSatisfied: boolean;
+  readyForReviewSession: boolean;
+  cases: readonly ReferenceOfferComparisonCaseSummary[];
 }>;
 
 const privateArtifactPattern = /\.(pdf|png|jpe?g|xlsx?|docx?)\b/i;
@@ -285,6 +307,46 @@ export function recreateReferenceOfferPack(
   return Object.freeze({
     passed: cases.every((result) => result.passed),
     cases: Object.freeze(cases),
+  });
+}
+
+export function createReferenceOfferComparisonReport(
+  pack: ReferenceOfferFixturePack,
+): ReferenceOfferComparisonReport {
+  const validation = validateReferenceOfferPack(pack);
+  const recreation = recreateReferenceOfferPack(pack);
+  const passedCaseCount = recreation.cases.filter((result) => result.passed).length;
+  const failedCaseCount = recreation.cases.length - passedCaseCount;
+  const historicalCaseWindowSatisfied =
+    pack.packType !== "validated-historical-recreation" ||
+    isValidatedHistoricalPackSize(pack.cases.length);
+
+  return Object.freeze({
+    packId: pack.packId,
+    packType: pack.packType,
+    caseCount: pack.cases.length,
+    validationErrorCount: validation.errors.length,
+    validationWarningCount: validation.warnings.length,
+    passedCaseCount,
+    failedCaseCount,
+    historicalCaseWindowSatisfied,
+    readyForReviewSession:
+      validation.errors.length === 0 &&
+      failedCaseCount === 0 &&
+      historicalCaseWindowSatisfied,
+    cases: Object.freeze(
+      recreation.cases.map((result) =>
+        Object.freeze({
+          caseId: result.caseId,
+          passed: result.passed,
+          mismatchCount: result.mismatches.length,
+          totalWithVatMinor: result.result.totals.totalWithVatMinor,
+          warningCodes: uniqueSortedWarningCodes(
+            result.result.warnings.map((warning) => warning.code),
+          ),
+        }),
+      ),
+    ),
   });
 }
 

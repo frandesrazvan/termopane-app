@@ -144,6 +144,17 @@ Validated historical packs should contain between 10 and 20 cases. Unknown or un
 rules must stay marked as pending business-owner input or `requires business validation`; they must
 not be filled with invented production formulas.
 
+## COD-032 business-owner validation notes
+
+The owner-review checklist lives in `docs/11-business-owner-review-pack.md`. It adds
+`sampleOutputRequirements` to the required reference-offer input categories so the business owner can
+confirm not only formulas and prices, but also the expected visible PDF/sample-output shape.
+
+`createReferenceOfferComparisonReport` summarizes validation errors, warning counts, pass/fail
+status, and whether a historical pack satisfies the 10-20 case window. A pack can be used in review
+only when the JSON is redacted, contains no private artifacts, and all recreated totals/warnings match
+the expected values.
+
 ## COD-028 door MVP calculation notes
 
 Door quote items are supported as rough MVP calculation inputs with `type: "door"`. The calculator

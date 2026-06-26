@@ -39,6 +39,11 @@
       "key": "preferredPdfTemplate",
       "label": "Preferred PDF template",
       "status": "pending-business-owner"
+    },
+    {
+      "key": "sampleOutputRequirements",
+      "label": "Sample output requirements",
+      "status": "pending-business-owner"
     }
   ],
   "cases": [
@@ -66,7 +71,8 @@
         "hardwareRules": "not-applicable",
         "accessoryServicePrices": "synthetic",
         "commercialRules": "synthetic",
-        "preferredPdfTemplate": "synthetic"
+        "preferredPdfTemplate": "synthetic",
+        "sampleOutputRequirements": "synthetic"
       },
       "calculationInput": {
         "quoteId": "synthetic-offer-001",
@@ -163,7 +169,8 @@
         "hardwareRules": "synthetic",
         "accessoryServicePrices": "not-applicable",
         "commercialRules": "synthetic",
-        "preferredPdfTemplate": "synthetic"
+        "preferredPdfTemplate": "synthetic",
+        "sampleOutputRequirements": "synthetic"
       },
       "calculationInput": {
         "quoteId": "synthetic-offer-002",

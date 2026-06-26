@@ -30,6 +30,9 @@ production formulas.
   systems/items, glass packages, hardware kits, colors, accessories, services, tax rates, price
   lists, and price-list items. Import shows row-level validation errors and publishes only after all
   rows pass OWNER/ADMIN validation.
+- Business-owner validation prep is documented in `docs/11-business-owner-review-pack.md` and
+  `fixtures/reference-offers`. OWNER/ADMIN dashboard users see `Validare business necesară` when
+  tenant catalog, pricing, or calculation settings still require business confirmation.
 - Fixed-window quote items now select tenant catalog systems, frame profiles, glass packages,
   colors, and optional hardware placeholders. The selected catalog names, IDs, units, active
   price-list references, and sale-price snapshots are frozen on `QuoteItem.catalogSnapshot`.
@@ -61,8 +64,8 @@ production formulas.
   dashboard navigation, Romanian loading/error states, and sticky quote total/actions are present for
   mobile sales workflows.
 - Pilot reference-offer fixtures are prepared under `fixtures/reference-offers` with synthetic
-  redacted examples, a business-owner collection checklist, and a pure calculation harness for
-  recreating 10-20 validated historical quotes later.
+  redacted examples, a Romanian business-owner collection checklist, sample-output requirements, and
+  a pure calculation comparison harness for recreating 10-20 validated historical quotes later.
 
 ## Stack
 

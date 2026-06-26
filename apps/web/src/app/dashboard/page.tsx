@@ -1,4 +1,12 @@
-import { Archive, FilePlus2, FileText, Settings, ShieldCheck, UsersRound } from "lucide-react";
+import {
+  AlertTriangle,
+  Archive,
+  FilePlus2,
+  FileText,
+  Settings,
+  ShieldCheck,
+  UsersRound,
+} from "lucide-react";
 import Link from "next/link";
 import {
   canGeneratePdf,
@@ -8,20 +16,43 @@ import {
   listTenantMemberships,
   requireTenant,
 } from "@/lib/auth";
-import { getTenantUserPreference } from "@/lib/data";
+import {
+  getTenantCompanySettings,
+  getTenantUserPreference,
+  listTenantAccessories,
+  listTenantColorFinishes,
+  listTenantGlassPackages,
+  listTenantHardwareKits,
+  listTenantPriceListItems,
+  listTenantPriceLists,
+  listTenantPricingRules,
+  listTenantProfileItems,
+  listTenantProfileSystems,
+  listTenantServiceItems,
+  listTenantTaxRates,
+} from "@/lib/data";
 import { tenantMemberStatusLabel } from "@/lib/i18n";
+import {
+  summarizeBusinessValidationRecords,
+  type BusinessValidationRecordInput,
+  type BusinessValidationSummary,
+} from "@/lib/validation/business-validation";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const context = await requireTenant();
-  const [memberships, userPreference] = await Promise.all([
+  const canManageCatalogRecords = canManageCatalog(context.membership);
+  const [memberships, userPreference, businessValidationSummary] = await Promise.all([
     listTenantMemberships(context.user.id),
     getTenantUserPreference(context, context.user.id),
+    canManageCatalogRecords
+      ? loadBusinessValidationSummary(context)
+      : Promise.resolve(emptyBusinessValidationSummary),
   ]);
   const permissions = [
     { label: "Costuri interne", allowed: canViewInternalCosts(context.membership) },
-    { label: "Administrare catalog", allowed: canManageCatalog(context.membership) },
+    { label: "Administrare catalog", allowed: canManageCatalogRecords },
     { label: "Administrare utilizatori", allowed: canManageUsers(context.membership) },
     { label: "Generare PDF", allowed: canGeneratePdf(context.membership) },
   ];
@@ -64,6 +95,8 @@ export default async function DashboardPage() {
             </div>
           ))}
         </div>
+
+        <BusinessValidationCallout summary={businessValidationSummary} />
 
         <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-base font-semibold text-zinc-950">Scurtături</h2>
@@ -118,3 +151,189 @@ function dashboardShortcuts(value: unknown) {
 
   return filtered.length > 0 ? filtered : shortcuts.slice(0, 2);
 }
+
+function BusinessValidationCallout({ summary }: { summary: BusinessValidationSummary }) {
+  if (!summary.hasPending) {
+    return null;
+  }
+
+  return (
+    <section className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-amber-900">
+            <AlertTriangle aria-hidden="true" size={18} />
+            <h2 className="text-base font-semibold">Validare business necesară</h2>
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-950">
+            {summary.total} înregistrări din catalog/calcul așteaptă confirmarea ownerilor
+            înainte de folosire ca formulă de producție.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-md bg-amber-900 px-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-800"
+            href="/dashboard/catalog"
+          >
+            Catalog
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-md border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-900 shadow-sm hover:bg-amber-100"
+            href="/dashboard/settings"
+          >
+            Setări
+          </Link>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {summary.areas.map((area) => (
+          <div key={area.area} className="rounded-md bg-white/80 px-3 py-2">
+            <p className="text-xs font-medium text-amber-800">{area.label}</p>
+            <p className="mt-1 text-lg font-semibold text-amber-950">{area.count}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-2 lg:grid-cols-3">
+        {summary.items.slice(0, 3).map((item) => (
+          <div
+            key={`${item.area}-${item.recordId ?? item.label}`}
+            className="rounded-md bg-white/80 px-3 py-2"
+          >
+            <p className="truncate text-sm font-semibold text-amber-950">{item.label}</p>
+            <p className="mt-1 text-xs font-medium text-amber-800">{item.areaLabel}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+async function loadBusinessValidationSummary(
+  context: Awaited<ReturnType<typeof requireTenant>>,
+) {
+  const [
+    companySettings,
+    profileSystems,
+    profileItems,
+    glassPackages,
+    hardwareKits,
+    colorFinishes,
+    accessories,
+    serviceItems,
+    taxRates,
+    priceLists,
+    priceListItems,
+    pricingRules,
+  ] = await Promise.all([
+    getTenantCompanySettings(context),
+    listTenantProfileSystems(context),
+    listTenantProfileItems(context),
+    listTenantGlassPackages(context),
+    listTenantHardwareKits(context),
+    listTenantColorFinishes(context),
+    listTenantAccessories(context),
+    listTenantServiceItems(context),
+    listTenantTaxRates(context),
+    listTenantPriceLists(context),
+    listTenantPriceListItems(context),
+    listTenantPricingRules(context),
+  ]);
+  const records: BusinessValidationRecordInput[] = [];
+
+  if (companySettings) {
+    records.push({
+      area: "companySettings",
+      label: companySettings.displayName,
+      recordId: companySettings.id,
+      values: [
+        companySettings.commercialDefaults,
+        companySettings.calculationDefaults,
+        companySettings.warrantyText,
+        companySettings.deliveryText,
+        companySettings.advancePaymentText,
+        companySettings.pdfFooterText,
+      ],
+    });
+  }
+
+  records.push(
+    ...profileSystems.map((record) => ({
+      area: "profileSystems" as const,
+      label: record.name,
+      recordId: record.id,
+      values: [record.configuration],
+    })),
+    ...profileItems.map((record) => ({
+      area: "profileItems" as const,
+      label: record.name,
+      recordId: record.id,
+      values: [record.deductionRule, record.wasteRule, record.configuration],
+    })),
+    ...glassPackages.map((record) => ({
+      area: "glassPackages" as const,
+      label: record.name,
+      recordId: record.id,
+      values: [record.deductionRule, record.configuration],
+    })),
+    ...hardwareKits.map((record) => ({
+      area: "hardwareKits" as const,
+      label: record.name,
+      recordId: record.id,
+      values: [record.quantityRule, record.configuration],
+    })),
+    ...colorFinishes.map((record) => ({
+      area: "colorFinishes" as const,
+      label: record.name,
+      recordId: record.id,
+      values: [record.configuration],
+    })),
+    ...accessories.map((record) => ({
+      area: "accessories" as const,
+      label: record.name,
+      recordId: record.id,
+      values: [record.quantityRule, record.configuration],
+    })),
+    ...serviceItems.map((record) => ({
+      area: "serviceItems" as const,
+      label: record.name,
+      recordId: record.id,
+      values: [record.configuration],
+    })),
+    ...taxRates.map((record) => ({
+      area: "taxRates" as const,
+      label: record.name,
+      recordId: record.id,
+      values: [record.configuration],
+    })),
+    ...priceLists.map((record) => ({
+      area: "priceLists" as const,
+      label: `${record.name} / ${record.version}`,
+      recordId: record.id,
+      values: [record.notes],
+    })),
+    ...priceListItems.map((record) => ({
+      area: "priceListItems" as const,
+      label: record.sku ?? record.description ?? record.catalogItemId,
+      recordId: record.id,
+      values: [record.metadata],
+    })),
+    ...pricingRules.map((record) => ({
+      area: "pricingRules" as const,
+      label: record.name,
+      recordId: record.id,
+      requiresBusinessValidation: record.requiresBusinessValidation,
+      values: [record.configuration],
+    })),
+  );
+
+  return summarizeBusinessValidationRecords(records);
+}
+
+const emptyBusinessValidationSummary: BusinessValidationSummary = {
+  total: 0,
+  hasPending: false,
+  areas: [],
+  items: [],
+};

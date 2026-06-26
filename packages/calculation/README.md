@@ -34,3 +34,18 @@ appear only as explicit snapshot requirements passed into the input. The package
 those quantities.
 
 Unknown production rules must remain configurable or be marked as requiring business validation.
+
+## Reference Offer Harness
+
+`src/reference-offer-harness.ts` validates the redacted reference-offer fixture pack used for
+business-owner review. The committed pack is synthetic only; future validated historical packs must
+contain 10-20 redacted cases and must not include private PDFs, real customer identifiers, addresses,
+emails, phone numbers, or supplier-confidential files.
+
+The harness checks required owner inputs, redaction guardrails, expected totals, expected warning
+codes, and exposes `createReferenceOfferComparisonReport` for a compact pass/fail summary before a
+review session.
+
+```powershell
+pnpm --filter @termopane/calculation test -- reference-offer-harness
+```
