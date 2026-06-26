@@ -8,6 +8,7 @@ export type TenantMembershipRecord = {
   role: TenantRole;
   status: TenantMemberStatus;
   canViewInternalCosts: boolean;
+  canApplyCommercialOverrides: boolean;
   tenant: {
     id: string;
     name: string;

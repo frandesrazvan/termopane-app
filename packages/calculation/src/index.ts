@@ -323,9 +323,11 @@ export function calculateQuote(input: QuoteCalculationInput): QuoteCalculationRe
   const vatMinor = hasQuoteDiscount
     ? applyBasisPoints(subtotalAfterDiscountMinor, quoteRules.vatBasisPoints)
     : baseTotals.vatMinor;
-  const totalBeforeQuoteOverrideMinor = hasQuoteDiscount
+  const calculatedTotalAfterQuoteDiscountMinor = hasQuoteDiscount
     ? subtotalAfterDiscountMinor + vatMinor
-    : baseTotals.totalWithVatMinor;
+    : baseTotals.totalBeforeManualOverrideMinor;
+  const totalBeforeQuoteOverrideMinor =
+    calculatedTotalAfterQuoteDiscountMinor + baseTotals.manualAdjustmentMinor;
 
   const overrideResult = applyManualOverride(
     totalBeforeQuoteOverrideMinor,

@@ -1,4 +1,6 @@
 export {
+  applyTenantQuoteDiscount,
+  applyTenantQuoteItemManualOverride,
   archiveTenantAccessory,
   archiveTenantColorFinish,
   archiveTenantGlassPackage,
@@ -99,6 +101,8 @@ export type {
   TenantDataScope,
   TenantGlassPackageWriteInput,
   TenantHardwareKitWriteInput,
+  TenantCommercialAdjustmentResult,
+  TenantQuoteDiscountInput,
   TenantPriceListItemWriteInput,
   TenantProfileItemWriteInput,
   TenantProfileSystemWriteInput,
@@ -109,6 +113,7 @@ export type {
   TenantQuoteDraftInput,
   TenantQuoteDraftResult,
   TenantQuoteItemCalculationUpdateInput,
+  TenantQuoteItemManualOverrideInput,
   TenantQuoteItemUpdateInput,
   TenantQuoteItemWriteInput,
   TenantQuoteLifecycleResult,

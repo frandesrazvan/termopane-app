@@ -78,6 +78,14 @@ UX requirements:
 - After generation, provide preview/download/share actions according to platform capability.
 - Make it clear whether the generated PDF is for a draft, sent version, or revised version.
 
+## COD-020 commercial adjustment UX notes
+
+The quote detail workflow exposes Romanian commercial controls only on mutable drafts. Authorized
+users can enter an item-level manual final total or a quote-level discount, and every form requires a
+reason before submission. The review panel separates `Total calculat`, `Reducere ofertă`,
+`Ajustări manuale`, `Total înainte de override`, and final `Total` so mobile users can see what the
+calculator produced versus what was commercially adjusted before locking a version.
+
 ## Accessibility and responsiveness
 
 - Tap targets should be large enough for mobile use.

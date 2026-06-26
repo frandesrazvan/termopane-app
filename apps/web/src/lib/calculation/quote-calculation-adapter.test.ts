@@ -228,6 +228,70 @@ describe("quote calculation adapter", () => {
     });
   });
 
+  it("stores manual override and quote discount totals for commercial review", async () => {
+    const state = testState({
+      items: [
+        fixedWindowItem({
+          configurationSnapshot: {
+            kind: "fixed-window",
+            quantity: 1,
+            widthMm: 1_200,
+            heightMm: 1_400,
+            manualOverride: {
+              target: "totalWithVat",
+              amountMinor: 20_000,
+              reason: "Synthetic item final total",
+              actorId: "user-a",
+              auditReferenceId: "audit-item-override",
+            },
+          },
+        }),
+      ],
+      versionOverrides: {
+        priceSnapshot: {
+          commercialRules: {
+            markupBasisPoints: 0,
+            discountBasisPoints: 0,
+            vatBasisPoints: 1_900,
+          },
+          quoteDiscount: {
+            amountMinor: 1_000,
+            reason: "Synthetic quote discount",
+            actorId: "user-a",
+          },
+        },
+      },
+    });
+    const result = await recalculateTenantCurrentQuoteVersion(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      { client: state.client },
+    );
+
+    expectCalculationOk(result);
+    expect(result.quoteVersion).toMatchObject({
+      subtotalMinor: 19_200,
+      vatMinor: 3_648,
+      totalMinor: 18_810,
+    });
+    expect(state.quoteItems[0]?.totalsSnapshot).toMatchObject({
+      totalMinor: 20_000,
+      totalBeforeManualOverrideMinor: 24_038,
+      manualAdjustmentMinor: -4_038,
+    });
+    expect(result.quoteVersion.totalsSnapshot).toMatchObject({
+      quoteDiscountMinor: 1_000,
+      manualAdjustmentMinor: -4_038,
+      totalBeforeManualOverrideMinor: 18_810,
+    });
+    expect(result.quoteVersion.warningsSnapshot).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "QUOTE_DISCOUNT_APPLIED" }),
+        expect.objectContaining({ code: "MANUAL_OVERRIDE_APPLIED" }),
+      ]),
+    );
+  });
+
   it("uses selected catalog price and rule snapshots for fixed-window items", async () => {
     const state = testState({
       items: [

@@ -6,6 +6,7 @@ const activeMembership = {
   role: TenantRole.ADMIN,
   status: TenantMemberStatus.ACTIVE,
   canViewInternalCosts: false,
+  canApplyCommercialOverrides: false,
 };
 
 describe("catalog mutation permissions", () => {

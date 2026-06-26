@@ -3,7 +3,7 @@
 import { ProfileItemType, QuoteItemType, QuoteVersionStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireTenant } from "@/lib/auth";
+import { canApplyCommercialOverrides, requireTenant } from "@/lib/auth";
 import { recalculateTenantCurrentQuoteVersion } from "@/lib/calculation/quote-calculation-adapter";
 import {
   buildFixedWindowCatalogSnapshot,
@@ -11,6 +11,8 @@ import {
   selectActiveCatalogPriceList,
 } from "@/lib/catalog/quote-item-catalog-snapshot";
 import {
+  applyTenantQuoteDiscount,
+  applyTenantQuoteItemManualOverride,
   createTenantQuoteRevision,
   createTenantQuoteItem,
   deleteTenantQuoteItem,
@@ -74,6 +76,82 @@ const customLineSchema = z.object({
     .refine((value) => /^\d+(\.\d{1,2})?$/.test(value))
     .transform((value) => moneyToMinor(value)),
 });
+
+const commercialReasonSchema = z.string().trim().min(1).max(500);
+const moneyInputSchema = z
+  .string()
+  .trim()
+  .refine((value) => /^\d+(\.\d{1,2})?$/.test(value))
+  .transform((value) => moneyToMinor(value));
+
+const itemManualOverrideSchema = z.object({
+  amountMinor: moneyInputSchema,
+  reason: commercialReasonSchema,
+});
+
+const quoteDiscountSchema = z
+  .object({
+    discountType: z.enum(["amount", "percent"]),
+    value: z.string().trim(),
+    reason: commercialReasonSchema,
+  })
+  .transform((data, ctx) => {
+    if (data.discountType === "amount") {
+      if (!/^\d+(\.\d{1,2})?$/.test(data.value)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Invalid money amount.",
+          path: ["value"],
+        });
+
+        return z.NEVER;
+      }
+
+      const amountMinor = moneyToMinor(data.value);
+
+      if (amountMinor <= 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Discount amount must be positive.",
+          path: ["value"],
+        });
+
+        return z.NEVER;
+      }
+
+      return {
+        amountMinor,
+        reason: data.reason,
+      };
+    }
+
+    if (!/^\d+(\.\d{1,2})?$/.test(data.value)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Invalid percentage.",
+        path: ["value"],
+      });
+
+      return z.NEVER;
+    }
+
+    const basisPoints = percentageToBasisPoints(data.value);
+
+    if (basisPoints <= 0 || basisPoints > 10_000) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Discount percentage must be between 0 and 100.",
+        path: ["value"],
+      });
+
+      return z.NEVER;
+    }
+
+    return {
+      basisPoints,
+      reason: data.reason,
+    };
+  });
 
 type TenantActionContext = Awaited<ReturnType<typeof requireTenant>>;
 
@@ -220,6 +298,70 @@ export async function recalculateCurrentQuoteVersionAction(
   }
 
   redirectToCalculation(quoteId);
+}
+
+export async function applyItemManualOverrideAction(
+  quoteId: string,
+  quoteItemId: string,
+  formData: FormData,
+) {
+  const context = await requireTenant();
+
+  if (!canApplyCommercialOverrides(context.membership)) {
+    redirect("/forbidden");
+  }
+
+  const parsed = itemManualOverrideSchema.safeParse({
+    amountMinor: formText(formData, "overrideTotal"),
+    reason: formText(formData, "overrideReason"),
+  });
+
+  if (!parsed.success) {
+    redirectWithCommercialError(quoteId, "validation", "items");
+  }
+
+  const result = await applyTenantQuoteItemManualOverride(context, quoteItemId, {
+    amountMinor: parsed.data.amountMinor,
+    reason: parsed.data.reason,
+    actorUserId: context.user.id,
+  });
+
+  if (!result) {
+    redirectWithCommercialError(quoteId, "locked", "items");
+  }
+
+  await recalculateAfterCommercialAdjustment(context, quoteId);
+  redirectWithCommercialEvent(quoteId, "item-override", "items");
+}
+
+export async function applyQuoteDiscountAction(quoteId: string, formData: FormData) {
+  const context = await requireTenant();
+
+  if (!canApplyCommercialOverrides(context.membership)) {
+    redirect("/forbidden");
+  }
+
+  const parsed = quoteDiscountSchema.safeParse({
+    discountType: formText(formData, "discountType"),
+    value: formText(formData, "discountValue"),
+    reason: formText(formData, "discountReason"),
+  });
+
+  if (!parsed.success) {
+    redirectWithCommercialError(quoteId, "validation", "calculation");
+  }
+
+  const result = await applyTenantQuoteDiscount(context, quoteId, {
+    ...parsed.data,
+    actorUserId: context.user.id,
+  });
+
+  if (!result) {
+    redirectWithCommercialError(quoteId, "locked", "calculation");
+  }
+
+  await recalculateAfterCommercialAdjustment(context, quoteId);
+  redirectWithCommercialEvent(quoteId, "quote-discount", "calculation");
 }
 
 export async function lockCurrentQuoteVersionAction(
@@ -535,6 +677,25 @@ function moneyToMinor(value: string) {
   return major * 100 + minor;
 }
 
+function percentageToBasisPoints(value: string) {
+  return Math.round(Number(value) * 100);
+}
+
+async function recalculateAfterCommercialAdjustment(
+  context: TenantActionContext,
+  quoteId: string,
+) {
+  const result = await recalculateTenantCurrentQuoteVersion(context, quoteId);
+
+  if (!result.ok) {
+    if (result.reason === "locked") {
+      redirectWithCommercialError(quoteId, "locked", "calculation");
+    }
+
+    redirect("/forbidden");
+  }
+}
+
 function quotePath(quoteId: string) {
   return `/dashboard/quotes/${quoteId}`;
 }
@@ -553,6 +714,22 @@ function redirectWithItemError(quoteId: string, error: "locked" | "validation"):
 
 function redirectWithCalculationError(quoteId: string, error: "locked"): never {
   redirect(`${quotePath(quoteId)}?calculationError=${error}#calculation`);
+}
+
+function redirectWithCommercialEvent(
+  quoteId: string,
+  event: "item-override" | "quote-discount",
+  anchor: "items" | "calculation",
+): never {
+  redirect(`${quotePath(quoteId)}?calculated=1&commercialEvent=${event}#${anchor}`);
+}
+
+function redirectWithCommercialError(
+  quoteId: string,
+  error: "locked" | "validation",
+  anchor: "items" | "calculation",
+): never {
+  redirect(`${quotePath(quoteId)}?commercialError=${error}#${anchor}`);
 }
 
 function redirectWithVersionEvent(quoteId: string, event: "locked" | "revision"): never {
