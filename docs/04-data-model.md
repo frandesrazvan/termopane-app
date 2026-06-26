@@ -236,6 +236,19 @@ PDFs. Document metadata stores the template key, file name, local development st
 checksum, visible totals snapshot, generating user, and creation timestamp. Local files live under
 ignored development storage by default; production object storage remains a deployment follow-up.
 
+## COD-031 offer sending notes
+
+Customer delivery starts only after the current quote version is locked and a tenant-owned quote PDF
+`Document` exists for that same version. Sending changes the current `QuoteVersion` from `LOCKED` to
+`SENT`, sets `sentAt`, marks the parent `Quote` as `SENT`, and writes a tenant-scoped `QUOTE_SENT`
+audit entry. The audit metadata records the selected document id and optional intended recipient
+fields as an email stub; no real email is sent by the MVP workflow.
+
+Sent quote versions remain immutable. Item edits, manual price adjustments, discounts, and
+calculation updates continue to be rejected after send, and the revision flow remains the only way to
+change customer-facing content. The generated PDF `Document` stays bound to its original
+`quoteVersionId`; later revisions create new draft versions instead of rebinding old documents.
+
 ## COD-018 catalog admin UI foundation notes
 
 Tenant-scoped repository helpers now cover the catalog models added in COD-008. Reads and mutations

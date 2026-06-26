@@ -220,6 +220,19 @@ Catalog CSV import/export UI uses Romanian labels including:
 CSV column names remain machine-readable field keys such as `profileSystemId`, `priceListId`, and
 `saleMinor`; do not translate them because exported files are intended for stable re-import.
 
+## COD-031 Offer Sending Labels
+
+Offer sending and confirmation UI uses Romanian labels including:
+
+- `Trimite către client`;
+- `Email destinatar (opțional)`;
+- `Nume destinatar (opțional)`;
+- `Ofertă trimisă`;
+- `Trimisă la`;
+- `Descarcă PDF`;
+- `Creează revizie din ofertă`;
+- `Stub email`.
+
 ## Testing Expectations
 
 When a task changes user-facing offer output, update package/app tests so Romanian labels remain

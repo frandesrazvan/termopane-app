@@ -43,7 +43,9 @@ export type ExplicitTenantScope = {
   tenantId: string;
 };
 
-export type TenantDataScope = ExplicitTenantScope | Pick<TenantContext, "tenant">;
+export type TenantDataScope =
+  | ExplicitTenantScope
+  | Pick<TenantContext, "tenant">;
 
 type FindFirstArgs = {
   where: Record<string, unknown>;
@@ -51,7 +53,9 @@ type FindFirstArgs = {
 
 type FindManyArgs = {
   where: Record<string, unknown>;
-  orderBy?: Record<string, "asc" | "desc"> | Array<Record<string, "asc" | "desc">>;
+  orderBy?:
+    | Record<string, "asc" | "desc">
+    | Array<Record<string, "asc" | "desc">>;
 };
 
 type CreateArgs = {
@@ -81,9 +85,10 @@ type TenantWritableModelDelegate<TRecord> = TenantModelDelegate<TRecord> & {
   update(args: UpdateArgs): Promise<TRecord>;
 };
 
-type TenantDeletableModelDelegate<TRecord> = TenantWritableModelDelegate<TRecord> & {
-  delete(args: DeleteArgs): Promise<TRecord>;
-};
+type TenantDeletableModelDelegate<TRecord> =
+  TenantWritableModelDelegate<TRecord> & {
+    delete(args: DeleteArgs): Promise<TRecord>;
+  };
 
 export type TenantDataClient = {
   accessory: TenantWritableModelDelegate<Accessory>;
@@ -432,7 +437,14 @@ export type ListTenantPricingRulesOptions = {
 
 export type TenantQuoteLockInput = {
   actorUserId?: string | null;
-  status?: QuoteVersionStatus;
+};
+
+export type TenantQuoteSendInput = {
+  actorUserId?: string | null;
+  documentId: string;
+  intendedRecipientEmail?: string | null;
+  intendedRecipientName?: string | null;
+  emailProviderConfigured?: boolean;
 };
 
 export type TenantQuoteRevisionInput = {
@@ -449,6 +461,10 @@ export type TenantQuoteRevisionResult = TenantQuoteLifecycleResult & {
   items: QuoteItem[];
 };
 
+export type TenantQuoteSendResult = TenantQuoteLifecycleResult & {
+  document: Document;
+};
+
 export type TenantQuoteDocumentWriteInput = {
   actorUserId?: string | null;
   templateKey: string;
@@ -460,7 +476,9 @@ export type TenantQuoteDocumentWriteInput = {
 };
 
 export class QuoteNumberCollisionError extends Error {
-  constructor(message = "Could not create a unique quote number for this tenant.") {
+  constructor(
+    message = "Could not create a unique quote number for this tenant.",
+  ) {
     super(message);
     this.name = "QuoteNumberCollisionError";
     Object.setPrototypeOf(this, QuoteNumberCollisionError.prototype);
@@ -481,7 +499,10 @@ export function tenantIdFromScope(scope: TenantDataScope) {
   return tenantId;
 }
 
-function tenantWhere(scope: TenantDataScope, where: Record<string, unknown> = {}) {
+function tenantWhere(
+  scope: TenantDataScope,
+  where: Record<string, unknown> = {},
+) {
   return {
     ...where,
     tenantId: tenantIdFromScope(scope),
@@ -515,12 +536,14 @@ function quoteFilterWhere(options: ListTenantQuotesOptions = {}) {
 
 function customerSearchWhere(search: string) {
   return {
-    OR: ["displayName", "companyName", "contactName", "email", "phone"].map((field) => ({
-      [field]: {
-        contains: search,
-        mode: "insensitive",
-      },
-    })),
+    OR: ["displayName", "companyName", "contactName", "email", "phone"].map(
+      (field) => ({
+        [field]: {
+          contains: search,
+          mode: "insensitive",
+        },
+      }),
+    ),
   };
 }
 
@@ -544,7 +567,10 @@ export function createTenantDataAccess(
       });
     },
 
-    createTenantSupplier(scope: TenantDataScope, data: TenantSupplierWriteInput) {
+    createTenantSupplier(
+      scope: TenantDataScope,
+      data: TenantSupplierWriteInput,
+    ) {
       return client.supplier.create({
         data: {
           ...data,
@@ -560,7 +586,10 @@ export function createTenantDataAccess(
       supplierId: string,
       data: TenantSupplierWriteInput,
     ) {
-      const existingSupplier = await access.getTenantSupplier(scope, supplierId);
+      const existingSupplier = await access.getTenantSupplier(
+        scope,
+        supplierId,
+      );
 
       if (!existingSupplier) {
         return null;
@@ -573,7 +602,10 @@ export function createTenantDataAccess(
     },
 
     async archiveTenantSupplier(scope: TenantDataScope, supplierId: string) {
-      const existingSupplier = await access.getTenantSupplier(scope, supplierId);
+      const existingSupplier = await access.getTenantSupplier(
+        scope,
+        supplierId,
+      );
 
       if (!existingSupplier) {
         return null;
@@ -623,9 +655,15 @@ export function createTenantDataAccess(
       profileSystemId: string,
       data: TenantProfileSystemWriteInput,
     ) {
-      const existingProfileSystem = await access.getTenantProfileSystem(scope, profileSystemId);
+      const existingProfileSystem = await access.getTenantProfileSystem(
+        scope,
+        profileSystemId,
+      );
 
-      if (!existingProfileSystem || !(await supplierBelongsToTenant(scope, data.supplierId))) {
+      if (
+        !existingProfileSystem ||
+        !(await supplierBelongsToTenant(scope, data.supplierId))
+      ) {
         return null;
       }
 
@@ -639,8 +677,14 @@ export function createTenantDataAccess(
       });
     },
 
-    async archiveTenantProfileSystem(scope: TenantDataScope, profileSystemId: string) {
-      const existingProfileSystem = await access.getTenantProfileSystem(scope, profileSystemId);
+    async archiveTenantProfileSystem(
+      scope: TenantDataScope,
+      profileSystemId: string,
+    ) {
+      const existingProfileSystem = await access.getTenantProfileSystem(
+        scope,
+        profileSystemId,
+      );
 
       if (!existingProfileSystem) {
         return null;
@@ -665,7 +709,10 @@ export function createTenantDataAccess(
       });
     },
 
-    async createTenantProfileItem(scope: TenantDataScope, data: TenantProfileItemWriteInput) {
+    async createTenantProfileItem(
+      scope: TenantDataScope,
+      data: TenantProfileItemWriteInput,
+    ) {
       if (
         !(await profileSystemBelongsToTenant(scope, data.profileSystemId)) ||
         !(await supplierBelongsToTenant(scope, data.supplierId))
@@ -692,7 +739,10 @@ export function createTenantDataAccess(
       profileItemId: string,
       data: TenantProfileItemWriteInput,
     ) {
-      const existingProfileItem = await access.getTenantProfileItem(scope, profileItemId);
+      const existingProfileItem = await access.getTenantProfileItem(
+        scope,
+        profileItemId,
+      );
 
       if (
         !existingProfileItem ||
@@ -714,8 +764,14 @@ export function createTenantDataAccess(
       });
     },
 
-    async archiveTenantProfileItem(scope: TenantDataScope, profileItemId: string) {
-      const existingProfileItem = await access.getTenantProfileItem(scope, profileItemId);
+    async archiveTenantProfileItem(
+      scope: TenantDataScope,
+      profileItemId: string,
+    ) {
+      const existingProfileItem = await access.getTenantProfileItem(
+        scope,
+        profileItemId,
+      );
 
       if (!existingProfileItem) {
         return null;
@@ -740,7 +796,10 @@ export function createTenantDataAccess(
       });
     },
 
-    async createTenantGlassPackage(scope: TenantDataScope, data: TenantGlassPackageWriteInput) {
+    async createTenantGlassPackage(
+      scope: TenantDataScope,
+      data: TenantGlassPackageWriteInput,
+    ) {
       if (!(await supplierBelongsToTenant(scope, data.supplierId))) {
         return null;
       }
@@ -763,9 +822,15 @@ export function createTenantDataAccess(
       glassPackageId: string,
       data: TenantGlassPackageWriteInput,
     ) {
-      const existingGlassPackage = await access.getTenantGlassPackage(scope, glassPackageId);
+      const existingGlassPackage = await access.getTenantGlassPackage(
+        scope,
+        glassPackageId,
+      );
 
-      if (!existingGlassPackage || !(await supplierBelongsToTenant(scope, data.supplierId))) {
+      if (
+        !existingGlassPackage ||
+        !(await supplierBelongsToTenant(scope, data.supplierId))
+      ) {
         return null;
       }
 
@@ -780,8 +845,14 @@ export function createTenantDataAccess(
       });
     },
 
-    async archiveTenantGlassPackage(scope: TenantDataScope, glassPackageId: string) {
-      const existingGlassPackage = await access.getTenantGlassPackage(scope, glassPackageId);
+    async archiveTenantGlassPackage(
+      scope: TenantDataScope,
+      glassPackageId: string,
+    ) {
+      const existingGlassPackage = await access.getTenantGlassPackage(
+        scope,
+        glassPackageId,
+      );
 
       if (!existingGlassPackage) {
         return null;
@@ -806,7 +877,10 @@ export function createTenantDataAccess(
       });
     },
 
-    async createTenantHardwareKit(scope: TenantDataScope, data: TenantHardwareKitWriteInput) {
+    async createTenantHardwareKit(
+      scope: TenantDataScope,
+      data: TenantHardwareKitWriteInput,
+    ) {
       if (!(await supplierBelongsToTenant(scope, data.supplierId))) {
         return null;
       }
@@ -829,9 +903,15 @@ export function createTenantDataAccess(
       hardwareKitId: string,
       data: TenantHardwareKitWriteInput,
     ) {
-      const existingHardwareKit = await access.getTenantHardwareKit(scope, hardwareKitId);
+      const existingHardwareKit = await access.getTenantHardwareKit(
+        scope,
+        hardwareKitId,
+      );
 
-      if (!existingHardwareKit || !(await supplierBelongsToTenant(scope, data.supplierId))) {
+      if (
+        !existingHardwareKit ||
+        !(await supplierBelongsToTenant(scope, data.supplierId))
+      ) {
         return null;
       }
 
@@ -846,8 +926,14 @@ export function createTenantDataAccess(
       });
     },
 
-    async archiveTenantHardwareKit(scope: TenantDataScope, hardwareKitId: string) {
-      const existingHardwareKit = await access.getTenantHardwareKit(scope, hardwareKitId);
+    async archiveTenantHardwareKit(
+      scope: TenantDataScope,
+      hardwareKitId: string,
+    ) {
+      const existingHardwareKit = await access.getTenantHardwareKit(
+        scope,
+        hardwareKitId,
+      );
 
       if (!existingHardwareKit) {
         return null;
@@ -872,7 +958,10 @@ export function createTenantDataAccess(
       });
     },
 
-    async createTenantColorFinish(scope: TenantDataScope, data: TenantColorFinishWriteInput) {
+    async createTenantColorFinish(
+      scope: TenantDataScope,
+      data: TenantColorFinishWriteInput,
+    ) {
       if (
         !(await profileSystemBelongsToTenant(scope, data.profileSystemId)) ||
         !(await supplierBelongsToTenant(scope, data.supplierId))
@@ -898,7 +987,10 @@ export function createTenantDataAccess(
       colorFinishId: string,
       data: TenantColorFinishWriteInput,
     ) {
-      const existingColorFinish = await access.getTenantColorFinish(scope, colorFinishId);
+      const existingColorFinish = await access.getTenantColorFinish(
+        scope,
+        colorFinishId,
+      );
 
       if (
         !existingColorFinish ||
@@ -919,8 +1011,14 @@ export function createTenantDataAccess(
       });
     },
 
-    async archiveTenantColorFinish(scope: TenantDataScope, colorFinishId: string) {
-      const existingColorFinish = await access.getTenantColorFinish(scope, colorFinishId);
+    async archiveTenantColorFinish(
+      scope: TenantDataScope,
+      colorFinishId: string,
+    ) {
+      const existingColorFinish = await access.getTenantColorFinish(
+        scope,
+        colorFinishId,
+      );
 
       if (!existingColorFinish) {
         return null;
@@ -945,7 +1043,10 @@ export function createTenantDataAccess(
       });
     },
 
-    async createTenantAccessory(scope: TenantDataScope, data: TenantAccessoryWriteInput) {
+    async createTenantAccessory(
+      scope: TenantDataScope,
+      data: TenantAccessoryWriteInput,
+    ) {
       if (!(await supplierBelongsToTenant(scope, data.supplierId))) {
         return null;
       }
@@ -968,9 +1069,15 @@ export function createTenantDataAccess(
       accessoryId: string,
       data: TenantAccessoryWriteInput,
     ) {
-      const existingAccessory = await access.getTenantAccessory(scope, accessoryId);
+      const existingAccessory = await access.getTenantAccessory(
+        scope,
+        accessoryId,
+      );
 
-      if (!existingAccessory || !(await supplierBelongsToTenant(scope, data.supplierId))) {
+      if (
+        !existingAccessory ||
+        !(await supplierBelongsToTenant(scope, data.supplierId))
+      ) {
         return null;
       }
 
@@ -986,7 +1093,10 @@ export function createTenantDataAccess(
     },
 
     async archiveTenantAccessory(scope: TenantDataScope, accessoryId: string) {
-      const existingAccessory = await access.getTenantAccessory(scope, accessoryId);
+      const existingAccessory = await access.getTenantAccessory(
+        scope,
+        accessoryId,
+      );
 
       if (!existingAccessory) {
         return null;
@@ -1011,7 +1121,10 @@ export function createTenantDataAccess(
       });
     },
 
-    createTenantServiceItem(scope: TenantDataScope, data: TenantServiceItemWriteInput) {
+    createTenantServiceItem(
+      scope: TenantDataScope,
+      data: TenantServiceItemWriteInput,
+    ) {
       return client.serviceItem.create({
         data: {
           ...data,
@@ -1028,7 +1141,10 @@ export function createTenantDataAccess(
       serviceItemId: string,
       data: TenantServiceItemWriteInput,
     ) {
-      const existingServiceItem = await access.getTenantServiceItem(scope, serviceItemId);
+      const existingServiceItem = await access.getTenantServiceItem(
+        scope,
+        serviceItemId,
+      );
 
       if (!existingServiceItem) {
         return null;
@@ -1043,8 +1159,14 @@ export function createTenantDataAccess(
       });
     },
 
-    async archiveTenantServiceItem(scope: TenantDataScope, serviceItemId: string) {
-      const existingServiceItem = await access.getTenantServiceItem(scope, serviceItemId);
+    async archiveTenantServiceItem(
+      scope: TenantDataScope,
+      serviceItemId: string,
+    ) {
+      const existingServiceItem = await access.getTenantServiceItem(
+        scope,
+        serviceItemId,
+      );
 
       if (!existingServiceItem) {
         return null;
@@ -1059,7 +1181,11 @@ export function createTenantDataAccess(
     listTenantTaxRates(scope: TenantDataScope) {
       return client.taxRate.findMany({
         where: tenantWhere(scope),
-        orderBy: [{ isDefault: "desc" }, { name: "asc" }, { createdAt: "desc" }],
+        orderBy: [
+          { isDefault: "desc" },
+          { name: "asc" },
+          { createdAt: "desc" },
+        ],
       });
     },
 
@@ -1128,7 +1254,10 @@ export function createTenantDataAccess(
       });
     },
 
-    createTenantPriceList(scope: TenantDataScope, data: TenantPriceListWriteInput) {
+    createTenantPriceList(
+      scope: TenantDataScope,
+      data: TenantPriceListWriteInput,
+    ) {
       return client.priceList.create({
         data: {
           name: data.name,
@@ -1151,7 +1280,10 @@ export function createTenantDataAccess(
       priceListId: string,
       data: TenantPriceListWriteInput,
     ) {
-      const existingPriceList = await access.getTenantPriceList(scope, priceListId);
+      const existingPriceList = await access.getTenantPriceList(
+        scope,
+        priceListId,
+      );
 
       if (!existingPriceList) {
         return null;
@@ -1162,7 +1294,9 @@ export function createTenantDataAccess(
         data: compactRecord({
           name: data.name,
           version: data.version,
-          currency: normalizedCurrency(data.currency ?? existingPriceList.currency),
+          currency: normalizedCurrency(
+            data.currency ?? existingPriceList.currency,
+          ),
           status: data.status ?? existingPriceList.status,
           effectiveFrom: data.effectiveFrom ?? null,
           effectiveTo: data.effectiveTo ?? null,
@@ -1173,7 +1307,10 @@ export function createTenantDataAccess(
     },
 
     async archiveTenantPriceList(scope: TenantDataScope, priceListId: string) {
-      const existingPriceList = await access.getTenantPriceList(scope, priceListId);
+      const existingPriceList = await access.getTenantPriceList(
+        scope,
+        priceListId,
+      );
 
       if (!existingPriceList) {
         return null;
@@ -1192,7 +1329,9 @@ export function createTenantDataAccess(
       return client.priceListItem.findMany({
         where: tenantWhere(
           scope,
-          options.priceListId ? { priceListId: options.priceListId } : undefined,
+          options.priceListId
+            ? { priceListId: options.priceListId }
+            : undefined,
         ),
         orderBy: [{ itemType: "asc" }, { createdAt: "desc" }],
       });
@@ -1210,7 +1349,11 @@ export function createTenantDataAccess(
     ) {
       if (
         !(await priceListBelongsToTenant(scope, data.priceListId)) ||
-        !(await catalogItemBelongsToTenant(scope, data.itemType, data.catalogItemId))
+        !(await catalogItemBelongsToTenant(
+          scope,
+          data.itemType,
+          data.catalogItemId,
+        ))
       ) {
         return null;
       }
@@ -1232,12 +1375,19 @@ export function createTenantDataAccess(
       priceListItemId: string,
       data: TenantPriceListItemWriteInput,
     ) {
-      const existingPriceListItem = await access.getTenantPriceListItem(scope, priceListItemId);
+      const existingPriceListItem = await access.getTenantPriceListItem(
+        scope,
+        priceListItemId,
+      );
 
       if (
         !existingPriceListItem ||
         !(await priceListBelongsToTenant(scope, data.priceListId)) ||
-        !(await catalogItemBelongsToTenant(scope, data.itemType, data.catalogItemId))
+        !(await catalogItemBelongsToTenant(
+          scope,
+          data.itemType,
+          data.catalogItemId,
+        ))
       ) {
         return null;
       }
@@ -1252,8 +1402,14 @@ export function createTenantDataAccess(
       });
     },
 
-    async archiveTenantPriceListItem(scope: TenantDataScope, priceListItemId: string) {
-      const existingPriceListItem = await access.getTenantPriceListItem(scope, priceListItemId);
+    async archiveTenantPriceListItem(
+      scope: TenantDataScope,
+      priceListItemId: string,
+    ) {
+      const existingPriceListItem = await access.getTenantPriceListItem(
+        scope,
+        priceListItemId,
+      );
 
       if (!existingPriceListItem) {
         return null;
@@ -1272,7 +1428,9 @@ export function createTenantDataAccess(
       return client.pricingRule.findMany({
         where: tenantWhere(
           scope,
-          options.priceListId ? { priceListId: options.priceListId } : undefined,
+          options.priceListId
+            ? { priceListId: options.priceListId }
+            : undefined,
         ),
         orderBy: [{ priority: "asc" }, { name: "asc" }],
       });
@@ -1284,16 +1442,25 @@ export function createTenantDataAccess(
       });
     },
 
-    listTenantCustomers(scope: TenantDataScope, options: ListTenantCustomersOptions = {}) {
+    listTenantCustomers(
+      scope: TenantDataScope,
+      options: ListTenantCustomersOptions = {},
+    ) {
       const search = options.search?.trim();
 
       return client.customer.findMany({
-        where: tenantWhere(scope, search ? customerSearchWhere(search) : undefined),
+        where: tenantWhere(
+          scope,
+          search ? customerSearchWhere(search) : undefined,
+        ),
         orderBy: [{ displayName: "asc" }, { createdAt: "desc" }],
       });
     },
 
-    createTenantCustomer(scope: TenantDataScope, data: TenantCustomerWriteInput) {
+    createTenantCustomer(
+      scope: TenantDataScope,
+      data: TenantCustomerWriteInput,
+    ) {
       return client.customer.create({
         data: {
           ...data,
@@ -1307,7 +1474,10 @@ export function createTenantDataAccess(
       customerId: string,
       data: TenantCustomerWriteInput,
     ) {
-      const existingCustomer = await access.getTenantCustomer(scope, customerId);
+      const existingCustomer = await access.getTenantCustomer(
+        scope,
+        customerId,
+      );
 
       if (!existingCustomer) {
         return null;
@@ -1325,14 +1495,23 @@ export function createTenantDataAccess(
       });
     },
 
-    listTenantProjects(scope: TenantDataScope, options: ListTenantProjectsOptions = {}) {
+    listTenantProjects(
+      scope: TenantDataScope,
+      options: ListTenantProjectsOptions = {},
+    ) {
       return client.project.findMany({
-        where: tenantWhere(scope, options.customerId ? { customerId: options.customerId } : undefined),
+        where: tenantWhere(
+          scope,
+          options.customerId ? { customerId: options.customerId } : undefined,
+        ),
         orderBy: [{ createdAt: "desc" }],
       });
     },
 
-    async createTenantProject(scope: TenantDataScope, data: TenantProjectWriteInput) {
+    async createTenantProject(
+      scope: TenantDataScope,
+      data: TenantProjectWriteInput,
+    ) {
       const customer = await access.getTenantCustomer(scope, data.customerId);
 
       if (!customer) {
@@ -1406,7 +1585,10 @@ export function createTenantDataAccess(
         ? await access.getTenantQuoteVersion(scope, quote.currentVersionId)
         : null;
 
-      if (quote.currentVersionId && (!currentVersion || currentVersion.quoteId !== quote.id)) {
+      if (
+        quote.currentVersionId &&
+        (!currentVersion || currentVersion.quoteId !== quote.id)
+      ) {
         return null;
       }
 
@@ -1416,7 +1598,10 @@ export function createTenantDataAccess(
       };
     },
 
-    listTenantQuotes(scope: TenantDataScope, options: ListTenantQuotesOptions = {}) {
+    listTenantQuotes(
+      scope: TenantDataScope,
+      options: ListTenantQuotesOptions = {},
+    ) {
       return client.quote.findMany({
         where: tenantWhere(scope, quoteFilterWhere(options)),
         orderBy: [{ createdAt: "desc" }],
@@ -1441,9 +1626,15 @@ export function createTenantDataAccess(
       data: TenantCompanySettingsWriteInput,
     ): Promise<TenantAuditedSettingsResult<CompanySettings> | null> {
       return runTenantDataTransaction(client, async (transactionClient) => {
-        const transactionAccess = createTenantDataAccess(transactionClient, options);
+        const transactionAccess = createTenantDataAccess(
+          transactionClient,
+          options,
+        );
         const existing = settingsId
-          ? await transactionAccess.getTenantCompanySettingsById(scope, settingsId)
+          ? await transactionAccess.getTenantCompanySettingsById(
+              scope,
+              settingsId,
+            )
           : await transactionAccess.getTenantCompanySettings(scope);
 
         if (settingsId && !existing) {
@@ -1470,7 +1661,9 @@ export function createTenantDataAccess(
             action: AuditAction.SETTINGS_UPDATED,
             entityType: "CompanySettings",
             entityId: record.id,
-            beforeSnapshot: existing ? companySettingsAuditSnapshot(existing) : null,
+            beforeSnapshot: existing
+              ? companySettingsAuditSnapshot(existing)
+              : null,
             afterSnapshot: companySettingsAuditSnapshot(record),
             metadata: {
               settingsType: "company",
@@ -1489,7 +1682,10 @@ export function createTenantDataAccess(
       });
     },
 
-    getTenantQuoteNumberSettingsById(scope: TenantDataScope, settingsId: string) {
+    getTenantQuoteNumberSettingsById(
+      scope: TenantDataScope,
+      settingsId: string,
+    ) {
       return client.quoteNumberSettings.findFirst({
         where: tenantWhere(scope, { id: settingsId }),
       });
@@ -1501,9 +1697,15 @@ export function createTenantDataAccess(
       data: TenantQuoteNumberSettingsWriteInput,
     ): Promise<TenantAuditedSettingsResult<QuoteNumberSettings> | null> {
       return runTenantDataTransaction(client, async (transactionClient) => {
-        const transactionAccess = createTenantDataAccess(transactionClient, options);
+        const transactionAccess = createTenantDataAccess(
+          transactionClient,
+          options,
+        );
         const existing = settingsId
-          ? await transactionAccess.getTenantQuoteNumberSettingsById(scope, settingsId)
+          ? await transactionAccess.getTenantQuoteNumberSettingsById(
+              scope,
+              settingsId,
+            )
           : await transactionAccess.getTenantQuoteNumberSettings(scope);
 
         if (settingsId && !existing) {
@@ -1530,7 +1732,9 @@ export function createTenantDataAccess(
             action: AuditAction.QUOTE_NUMBERING_UPDATED,
             entityType: "QuoteNumberSettings",
             entityId: record.id,
-            beforeSnapshot: existing ? quoteNumberSettingsAuditSnapshot(existing) : null,
+            beforeSnapshot: existing
+              ? quoteNumberSettingsAuditSnapshot(existing)
+              : null,
             afterSnapshot: quoteNumberSettingsAuditSnapshot(record),
             metadata: {
               settingsType: "quote-numbering",
@@ -1647,91 +1851,109 @@ export function createTenantDataAccess(
       }
 
       const requestedQuoteNumber = data.quoteNumber?.trim() || null;
-      const attemptCount = requestedQuoteNumber ? 1 : GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS;
+      const attemptCount = requestedQuoteNumber
+        ? 1
+        : GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS;
 
       for (let attempt = 0; attempt < attemptCount; attempt += 1) {
         try {
-          return await runTenantDataTransaction(client, async (transactionClient) => {
-            const quoteNumberSettings = requestedQuoteNumber
-              ? null
-              : await getOrCreateTenantQuoteNumberSettings(transactionClient, scope);
-            const generatedSequenceNumber = quoteNumberSettings
-              ? quoteNumberSettings.nextNumber + attempt
-              : null;
-            const quoteNumber =
-              requestedQuoteNumber ??
-              previewTenantQuoteNumber({
-                datePattern: quoteNumberSettings?.datePattern ?? QuoteNumberDatePattern.YEAR,
-                nextNumber: generatedSequenceNumber ?? 1,
-                prefix: quoteNumberSettings?.prefix ?? defaultQuoteNumberPrefix,
-              }, now());
-            const companySettings = await transactionClient.companySettings.findFirst({
-              where: tenantWhere(scope),
-            });
-            const currency = data.currency ?? companySettings?.defaultCurrency ?? "RON";
-            const quote = await transactionClient.quote.create({
-              data: {
-                tenantId,
-                customerId: customer.id,
-                projectId: data.projectId ?? null,
-                quoteNumber,
-                status: QuoteStatus.DRAFT,
-                title: data.title ?? null,
-                currency,
-                createdById: data.createdById ?? null,
-                assignedToId: data.assignedToId ?? null,
-                tags: ["draft"],
-              },
-            });
-            const currentVersion = await transactionClient.quoteVersion.create({
-              data: {
-                tenantId,
-                quoteId: quote.id,
-                versionNumber: 1,
-                status: QuoteVersionStatus.DRAFT,
-                isLocked: false,
-                currency,
-                customerSnapshot: customerSnapshot(customer),
-                companySettingsSnapshot: companySettingsSnapshot(companySettings),
-                itemSnapshot: {
-                  items: [],
-                },
-                totalsSnapshot: {
-                  subtotalMinor: 0,
-                  vatMinor: 0,
-                  totalMinor: 0,
-                },
-                warningsSnapshot: [],
-                traceSummary: {
-                  source: "quote-shell",
-                },
-                subtotalMinor: 0,
-                vatMinor: 0,
-                totalMinor: 0,
-                createdById: data.createdById ?? null,
-              },
-            });
-            const updatedQuote = await transactionClient.quote.update({
-              where: { id: quote.id },
-              data: {
-                currentVersionId: currentVersion.id,
-              },
-            });
-
-            if (quoteNumberSettings && generatedSequenceNumber) {
-              await transactionClient.quoteNumberSettings.update({
-                where: { id: quoteNumberSettings.id },
+          return await runTenantDataTransaction(
+            client,
+            async (transactionClient) => {
+              const quoteNumberSettings = requestedQuoteNumber
+                ? null
+                : await getOrCreateTenantQuoteNumberSettings(
+                    transactionClient,
+                    scope,
+                  );
+              const generatedSequenceNumber = quoteNumberSettings
+                ? quoteNumberSettings.nextNumber + attempt
+                : null;
+              const quoteNumber =
+                requestedQuoteNumber ??
+                previewTenantQuoteNumber(
+                  {
+                    datePattern:
+                      quoteNumberSettings?.datePattern ??
+                      QuoteNumberDatePattern.YEAR,
+                    nextNumber: generatedSequenceNumber ?? 1,
+                    prefix:
+                      quoteNumberSettings?.prefix ?? defaultQuoteNumberPrefix,
+                  },
+                  now(),
+                );
+              const companySettings =
+                await transactionClient.companySettings.findFirst({
+                  where: tenantWhere(scope),
+                });
+              const currency =
+                data.currency ?? companySettings?.defaultCurrency ?? "RON";
+              const quote = await transactionClient.quote.create({
                 data: {
-                  nextNumber: generatedSequenceNumber + 1,
+                  tenantId,
+                  customerId: customer.id,
+                  projectId: data.projectId ?? null,
+                  quoteNumber,
+                  status: QuoteStatus.DRAFT,
+                  title: data.title ?? null,
+                  currency,
+                  createdById: data.createdById ?? null,
+                  assignedToId: data.assignedToId ?? null,
+                  tags: ["draft"],
                 },
               });
-            }
+              const currentVersion =
+                await transactionClient.quoteVersion.create({
+                  data: {
+                    tenantId,
+                    quoteId: quote.id,
+                    versionNumber: 1,
+                    status: QuoteVersionStatus.DRAFT,
+                    isLocked: false,
+                    currency,
+                    customerSnapshot: customerSnapshot(customer),
+                    companySettingsSnapshot:
+                      companySettingsSnapshot(companySettings),
+                    itemSnapshot: {
+                      items: [],
+                    },
+                    totalsSnapshot: {
+                      subtotalMinor: 0,
+                      vatMinor: 0,
+                      totalMinor: 0,
+                    },
+                    warningsSnapshot: [],
+                    traceSummary: {
+                      source: "quote-shell",
+                    },
+                    subtotalMinor: 0,
+                    vatMinor: 0,
+                    totalMinor: 0,
+                    createdById: data.createdById ?? null,
+                  },
+                });
+              const updatedQuote = await transactionClient.quote.update({
+                where: { id: quote.id },
+                data: {
+                  currentVersionId: currentVersion.id,
+                },
+              });
 
-            return {
-              quote: updatedQuote,
-              currentVersion,
-            };
-          });
+              if (quoteNumberSettings && generatedSequenceNumber) {
+                await transactionClient.quoteNumberSettings.update({
+                  where: { id: quoteNumberSettings.id },
+                  data: {
+                    nextNumber: generatedSequenceNumber + 1,
+                  },
+                });
+              }
+
+              return {
+                quote: updatedQuote,
+                currentVersion,
+              };
+            },
+          );
         } catch (error) {
           if (!isQuoteNumberUniqueCollision(error)) {
             throw error;
@@ -1770,7 +1992,10 @@ export function createTenantDataAccess(
     },
 
     async listTenantQuoteItems(scope: TenantDataScope, quoteVersionId: string) {
-      const quoteVersion = await access.getTenantQuoteVersion(scope, quoteVersionId);
+      const quoteVersion = await access.getTenantQuoteVersion(
+        scope,
+        quoteVersionId,
+      );
 
       if (!quoteVersion) {
         return [];
@@ -1788,8 +2013,14 @@ export function createTenantDataAccess(
       });
     },
 
-    async getTenantQuoteCalculationResult(scope: TenantDataScope, quoteVersionId: string) {
-      const quoteVersion = await access.getTenantQuoteVersion(scope, quoteVersionId);
+    async getTenantQuoteCalculationResult(
+      scope: TenantDataScope,
+      quoteVersionId: string,
+    ) {
+      const quoteVersion = await access.getTenantQuoteVersion(
+        scope,
+        quoteVersionId,
+      );
 
       if (!quoteVersion) {
         return null;
@@ -1817,7 +2048,10 @@ export function createTenantDataAccess(
         return null;
       }
 
-      const quoteVersion = await access.getTenantQuoteVersion(scope, document.quoteVersionId);
+      const quoteVersion = await access.getTenantQuoteVersion(
+        scope,
+        document.quoteVersionId,
+      );
 
       if (!quoteVersion || quoteVersion.quoteId !== quoteId) {
         return null;
@@ -1836,8 +2070,14 @@ export function createTenantDataAccess(
       };
     },
 
-    async listTenantQuoteDocuments(scope: TenantDataScope, quoteVersionId: string) {
-      const quoteVersion = await access.getTenantQuoteVersion(scope, quoteVersionId);
+    async listTenantQuoteDocuments(
+      scope: TenantDataScope,
+      quoteVersionId: string,
+    ) {
+      const quoteVersion = await access.getTenantQuoteVersion(
+        scope,
+        quoteVersionId,
+      );
 
       if (!quoteVersion) {
         return [];
@@ -1857,16 +2097,28 @@ export function createTenantDataAccess(
       quoteId: string,
       data: TenantQuoteItemWriteInput,
     ) {
-      const quoteState = await access.getTenantQuoteWithCurrentVersion(scope, quoteId);
+      const quoteState = await access.getTenantQuoteWithCurrentVersion(
+        scope,
+        quoteId,
+      );
 
-      if (!quoteState?.currentVersion || !isDraftVersionMutable(quoteState.currentVersion)) {
+      if (
+        !quoteState?.currentVersion ||
+        !isDraftVersionMutable(quoteState.currentVersion)
+      ) {
         return null;
       }
 
       const tenantId = tenantIdFromScope(scope);
-      const existingItems = await access.listTenantQuoteItems(scope, quoteState.currentVersion.id);
+      const existingItems = await access.listTenantQuoteItems(
+        scope,
+        quoteState.currentVersion.id,
+      );
       const nextSortOrder =
-        existingItems.reduce((highest, item) => Math.max(highest, item.sortOrder), -1) + 1;
+        existingItems.reduce(
+          (highest, item) => Math.max(highest, item.sortOrder),
+          -1,
+        ) + 1;
 
       return client.quoteItem.create({
         data: {
@@ -1898,7 +2150,10 @@ export function createTenantDataAccess(
         return null;
       }
 
-      const quoteState = await getMutableCurrentQuoteStateForItem(scope, existingItem);
+      const quoteState = await getMutableCurrentQuoteStateForItem(
+        scope,
+        existingItem,
+      );
 
       if (!quoteState) {
         return null;
@@ -1929,7 +2184,10 @@ export function createTenantDataAccess(
         return null;
       }
 
-      const quoteState = await getMutableCurrentQuoteStateForItem(scope, existingItem);
+      const quoteState = await getMutableCurrentQuoteStateForItem(
+        scope,
+        existingItem,
+      );
 
       if (!quoteState) {
         return null;
@@ -1945,13 +2203,22 @@ export function createTenantDataAccess(
       quoteItemId: string,
       data: TenantQuoteItemManualOverrideInput,
     ): Promise<TenantCommercialAdjustmentResult<QuoteItem> | null> {
-      if (!hasCommercialReason(data.reason) || !isValidMinorAmount(data.amountMinor)) {
+      if (
+        !hasCommercialReason(data.reason) ||
+        !isValidMinorAmount(data.amountMinor)
+      ) {
         return null;
       }
 
       return runTenantDataTransaction(client, async (transactionClient) => {
-        const transactionAccess = createTenantDataAccess(transactionClient, options);
-        const existingItem = await transactionAccess.getTenantQuoteItem(scope, quoteItemId);
+        const transactionAccess = createTenantDataAccess(
+          transactionClient,
+          options,
+        );
+        const existingItem = await transactionAccess.getTenantQuoteItem(
+          scope,
+          quoteItemId,
+        );
 
         if (!existingItem) {
           return null;
@@ -1962,7 +2229,10 @@ export function createTenantDataAccess(
           existingItem.quoteVersionId,
         );
         const quoteState = quoteVersion
-          ? await transactionAccess.getTenantQuoteWithCurrentVersion(scope, quoteVersion.quoteId)
+          ? await transactionAccess.getTenantQuoteWithCurrentVersion(
+              scope,
+              quoteVersion.quoteId,
+            )
           : null;
 
         if (
@@ -2043,16 +2313,28 @@ export function createTenantDataAccess(
       }
 
       return runTenantDataTransaction(client, async (transactionClient) => {
-        const transactionAccess = createTenantDataAccess(transactionClient, options);
-        const quoteState = await transactionAccess.getTenantQuoteWithCurrentVersion(scope, quoteId);
+        const transactionAccess = createTenantDataAccess(
+          transactionClient,
+          options,
+        );
+        const quoteState =
+          await transactionAccess.getTenantQuoteWithCurrentVersion(
+            scope,
+            quoteId,
+          );
 
-        if (!quoteState?.currentVersion || !isDraftVersionMutable(quoteState.currentVersion)) {
+        if (
+          !quoteState?.currentVersion ||
+          !isDraftVersionMutable(quoteState.currentVersion)
+        ) {
           return null;
         }
 
         const auditId = commercialAuditId();
         const timestamp = new Date();
-        const beforeSnapshot = quoteVersionCommercialAuditSnapshot(quoteState.currentVersion);
+        const beforeSnapshot = quoteVersionCommercialAuditSnapshot(
+          quoteState.currentVersion,
+        );
         const priceSnapshot = {
           ...jsonRecord(quoteState.currentVersion.priceSnapshot),
           quoteDiscount: {
@@ -2079,7 +2361,8 @@ export function createTenantDataAccess(
             },
           },
         });
-        const afterSnapshot = quoteVersionCommercialAuditSnapshot(updatedVersion);
+        const afterSnapshot =
+          quoteVersionCommercialAuditSnapshot(updatedVersion);
         const auditLog = await transactionClient.auditLog.create({
           data: {
             id: auditId,
@@ -2118,7 +2401,10 @@ export function createTenantDataAccess(
       quoteVersionId: string,
       data: TenantQuoteVersionCalculationUpdateInput,
     ) {
-      const quoteState = await getMutableCurrentQuoteStateForVersion(scope, quoteVersionId);
+      const quoteState = await getMutableCurrentQuoteStateForVersion(
+        scope,
+        quoteVersionId,
+      );
 
       if (!quoteState) {
         return null;
@@ -2149,7 +2435,10 @@ export function createTenantDataAccess(
         return null;
       }
 
-      const quoteState = await getMutableCurrentQuoteStateForItem(scope, existingItem);
+      const quoteState = await getMutableCurrentQuoteStateForItem(
+        scope,
+        existingItem,
+      );
 
       if (!quoteState) {
         return null;
@@ -2166,13 +2455,19 @@ export function createTenantDataAccess(
       quoteVersionId: string,
       data: TenantQuoteCalculationResultWriteInput,
     ) {
-      const quoteState = await getMutableCurrentQuoteStateForVersion(scope, quoteVersionId);
+      const quoteState = await getMutableCurrentQuoteStateForVersion(
+        scope,
+        quoteVersionId,
+      );
 
       if (!quoteState) {
         return null;
       }
 
-      const existingResult = await access.getTenantQuoteCalculationResult(scope, quoteVersionId);
+      const existingResult = await access.getTenantQuoteCalculationResult(
+        scope,
+        quoteVersionId,
+      );
       const resultData = {
         calculatorVersion: data.calculatorVersion ?? null,
         inputHash: data.inputHash ?? null,
@@ -2204,8 +2499,14 @@ export function createTenantDataAccess(
       data: TenantQuoteDocumentWriteInput,
     ) {
       return runTenantDataTransaction(client, async (transactionClient) => {
-        const transactionAccess = createTenantDataAccess(transactionClient, options);
-        const quoteVersion = await transactionAccess.getTenantQuoteVersion(scope, quoteVersionId);
+        const transactionAccess = createTenantDataAccess(
+          transactionClient,
+          options,
+        );
+        const quoteVersion = await transactionAccess.getTenantQuoteVersion(
+          scope,
+          quoteVersionId,
+        );
 
         if (!quoteVersion) {
           return null;
@@ -2255,48 +2556,46 @@ export function createTenantDataAccess(
       data: TenantQuoteLockInput = {},
     ): Promise<TenantQuoteLifecycleResult | null> {
       return runTenantDataTransaction(client, async (transactionClient) => {
-        const transactionAccess = createTenantDataAccess(transactionClient, options);
-        const quoteState = await transactionAccess.getTenantQuoteWithCurrentVersion(scope, quoteId);
+        const transactionAccess = createTenantDataAccess(
+          transactionClient,
+          options,
+        );
+        const quoteState =
+          await transactionAccess.getTenantQuoteWithCurrentVersion(
+            scope,
+            quoteId,
+          );
 
-        if (!quoteState?.currentVersion || !isDraftVersionMutable(quoteState.currentVersion)) {
+        if (
+          !quoteState?.currentVersion ||
+          !isDraftVersionMutable(quoteState.currentVersion)
+        ) {
           return null;
         }
 
-        const lockedAt = new Date();
-        const targetStatus =
-          data.status === QuoteVersionStatus.SENT
-            ? QuoteVersionStatus.SENT
-            : QuoteVersionStatus.LOCKED;
+        const lockedAt = now();
+        const targetStatus = QuoteVersionStatus.LOCKED;
         const updatedVersion = await transactionClient.quoteVersion.update({
           where: { id: quoteState.currentVersion.id },
           data: {
             status: targetStatus,
             isLocked: true,
             lockedAt,
-            sentAt: targetStatus === QuoteVersionStatus.SENT ? lockedAt : quoteState.currentVersion.sentAt,
+            sentAt: quoteState.currentVersion.sentAt,
           },
         });
-        const updatedQuote =
-          targetStatus === QuoteVersionStatus.SENT
-            ? await transactionClient.quote.update({
-                where: { id: quoteState.quote.id },
-                data: {
-                  status: QuoteStatus.SENT,
-                },
-              })
-            : quoteState.quote;
+        const updatedQuote = quoteState.quote;
 
         await transactionClient.auditLog.create({
           data: {
             tenantId: tenantIdFromScope(scope),
             actorUserId: data.actorUserId ?? null,
-            action:
-              targetStatus === QuoteVersionStatus.SENT
-                ? AuditAction.QUOTE_SENT
-                : AuditAction.QUOTE_VERSION_LOCKED,
+            action: AuditAction.QUOTE_VERSION_LOCKED,
             entityType: "QuoteVersion",
             entityId: updatedVersion.id,
-            beforeSnapshot: quoteVersionAuditSnapshot(quoteState.currentVersion),
+            beforeSnapshot: quoteVersionAuditSnapshot(
+              quoteState.currentVersion,
+            ),
             afterSnapshot: quoteVersionAuditSnapshot(updatedVersion),
             metadata: {
               quoteId: quoteState.quote.id,
@@ -2313,29 +2612,140 @@ export function createTenantDataAccess(
       });
     },
 
+    async sendTenantQuote(
+      scope: TenantDataScope,
+      quoteId: string,
+      data: TenantQuoteSendInput,
+    ): Promise<TenantQuoteSendResult | null> {
+      return runTenantDataTransaction(client, async (transactionClient) => {
+        const transactionAccess = createTenantDataAccess(
+          transactionClient,
+          options,
+        );
+        const quoteState =
+          await transactionAccess.getTenantQuoteWithCurrentVersion(
+            scope,
+            quoteId,
+          );
+        const currentVersion = quoteState?.currentVersion;
+
+        if (
+          !quoteState ||
+          !currentVersion ||
+          !isLockedVersionReadyForSend(currentVersion)
+        ) {
+          return null;
+        }
+
+        const documentState = await transactionAccess.getTenantQuoteDocument(
+          scope,
+          quoteId,
+          data.documentId,
+        );
+
+        if (
+          !documentState ||
+          documentState.document.type !== DocumentType.QUOTE_PDF ||
+          documentState.quoteVersion.id !== currentVersion.id
+        ) {
+          return null;
+        }
+
+        const sentAt = now();
+        const updatedVersion = await transactionClient.quoteVersion.update({
+          where: { id: currentVersion.id },
+          data: {
+            status: QuoteVersionStatus.SENT,
+            isLocked: true,
+            lockedAt: currentVersion.lockedAt ?? sentAt,
+            sentAt,
+          },
+        });
+        const updatedQuote = await transactionClient.quote.update({
+          where: { id: quoteState.quote.id },
+          data: {
+            status: QuoteStatus.SENT,
+          },
+        });
+
+        await transactionClient.auditLog.create({
+          data: {
+            tenantId: tenantIdFromScope(scope),
+            actorUserId: data.actorUserId ?? null,
+            action: AuditAction.QUOTE_SENT,
+            entityType: "QuoteVersion",
+            entityId: updatedVersion.id,
+            beforeSnapshot: quoteVersionAuditSnapshot(currentVersion),
+            afterSnapshot: quoteVersionAuditSnapshot(updatedVersion),
+            metadata: compactRecord({
+              quoteId: quoteState.quote.id,
+              quoteNumber: quoteState.quote.quoteNumber,
+              quoteVersionId: updatedVersion.id,
+              versionNumber: updatedVersion.versionNumber,
+              targetStatus: QuoteVersionStatus.SENT,
+              documentId: documentState.document.id,
+              documentFileName: documentState.document.fileName,
+              documentChecksum: documentState.document.checksum,
+              intendedRecipientEmail: data.intendedRecipientEmail ?? null,
+              intendedRecipientName: data.intendedRecipientName ?? null,
+              deliveryChannel: data.intendedRecipientEmail
+                ? "email_stub"
+                : "manual_download",
+              emailProviderConfigured: data.emailProviderConfigured ?? false,
+              providerStatus: "stub_recorded",
+              sentAt: sentAt.toISOString(),
+            }),
+          },
+        });
+
+        return {
+          quote: updatedQuote,
+          currentVersion: updatedVersion,
+          document: documentState.document,
+        };
+      });
+    },
+
     async createTenantQuoteRevision(
       scope: TenantDataScope,
       quoteId: string,
       data: TenantQuoteRevisionInput = {},
     ): Promise<TenantQuoteRevisionResult | null> {
       return runTenantDataTransaction(client, async (transactionClient) => {
-        const transactionAccess = createTenantDataAccess(transactionClient, options);
-        const quoteState = await transactionAccess.getTenantQuoteWithCurrentVersion(scope, quoteId);
+        const transactionAccess = createTenantDataAccess(
+          transactionClient,
+          options,
+        );
+        const quoteState =
+          await transactionAccess.getTenantQuoteWithCurrentVersion(
+            scope,
+            quoteId,
+          );
 
         if (!quoteState) {
           return null;
         }
 
-        const versions = await transactionAccess.listTenantQuoteVersions(scope, quoteState.quote.id);
-        const sourceVersion = quoteState.currentVersion ?? latestQuoteVersion(versions);
+        const versions = await transactionAccess.listTenantQuoteVersions(
+          scope,
+          quoteState.quote.id,
+        );
+        const sourceVersion =
+          quoteState.currentVersion ?? latestQuoteVersion(versions);
 
         if (!sourceVersion || isDraftVersionMutable(sourceVersion)) {
           return null;
         }
 
-        const sourceItems = await transactionAccess.listTenantQuoteItems(scope, sourceVersion.id);
+        const sourceItems = await transactionAccess.listTenantQuoteItems(
+          scope,
+          sourceVersion.id,
+        );
         const nextVersionNumber =
-          versions.reduce((highest, version) => Math.max(highest, version.versionNumber), 0) + 1;
+          versions.reduce(
+            (highest, version) => Math.max(highest, version.versionNumber),
+            0,
+          ) + 1;
         const newVersion = await transactionClient.quoteVersion.create({
           data: {
             tenantId: tenantIdFromScope(scope),
@@ -2345,11 +2755,17 @@ export function createTenantDataAccess(
             isLocked: false,
             currency: sourceVersion.currency,
             customerSnapshot: cloneJsonValue(sourceVersion.customerSnapshot),
-            companySettingsSnapshot: cloneJsonValue(sourceVersion.companySettingsSnapshot),
+            companySettingsSnapshot: cloneJsonValue(
+              sourceVersion.companySettingsSnapshot,
+            ),
             priceSnapshot: cloneNullableJsonValue(sourceVersion.priceSnapshot),
             itemSnapshot: cloneNullableJsonValue(sourceVersion.itemSnapshot),
-            totalsSnapshot: cloneNullableJsonValue(sourceVersion.totalsSnapshot),
-            warningsSnapshot: cloneNullableJsonValue(sourceVersion.warningsSnapshot),
+            totalsSnapshot: cloneNullableJsonValue(
+              sourceVersion.totalsSnapshot,
+            ),
+            warningsSnapshot: cloneNullableJsonValue(
+              sourceVersion.warningsSnapshot,
+            ),
             traceSummary: cloneNullableJsonValue(sourceVersion.traceSummary),
             subtotalMinor: sourceVersion.subtotalMinor,
             vatMinor: sourceVersion.vatMinor,
@@ -2375,7 +2791,9 @@ export function createTenantDataAccess(
               internalNotes: item.internalNotes,
               configurationSnapshot: cloneJsonValue(item.configurationSnapshot),
               catalogSnapshot: cloneNullableJsonValue(item.catalogSnapshot),
-              calculationSnapshot: cloneNullableJsonValue(item.calculationSnapshot),
+              calculationSnapshot: cloneNullableJsonValue(
+                item.calculationSnapshot,
+              ),
               totalsSnapshot: cloneNullableJsonValue(item.totalsSnapshot),
             },
           });
@@ -2422,18 +2840,29 @@ export function createTenantDataAccess(
     },
   };
 
-  async function supplierBelongsToTenant(scope: TenantDataScope, supplierId?: string | null) {
-    return !supplierId || Boolean(await access.getTenantSupplier(scope, supplierId));
+  async function supplierBelongsToTenant(
+    scope: TenantDataScope,
+    supplierId?: string | null,
+  ) {
+    return (
+      !supplierId || Boolean(await access.getTenantSupplier(scope, supplierId))
+    );
   }
 
   async function profileSystemBelongsToTenant(
     scope: TenantDataScope,
     profileSystemId?: string | null,
   ) {
-    return !profileSystemId || Boolean(await access.getTenantProfileSystem(scope, profileSystemId));
+    return (
+      !profileSystemId ||
+      Boolean(await access.getTenantProfileSystem(scope, profileSystemId))
+    );
   }
 
-  async function priceListBelongsToTenant(scope: TenantDataScope, priceListId: string) {
+  async function priceListBelongsToTenant(
+    scope: TenantDataScope,
+    priceListId: string,
+  ) {
     return Boolean(await access.getTenantPriceList(scope, priceListId));
   }
 
@@ -2450,7 +2879,9 @@ export function createTenantDataAccess(
       case PriceListItemType.PROFILE_ITEM:
         return Boolean(await access.getTenantProfileItem(scope, catalogItemId));
       case PriceListItemType.GLASS_PACKAGE:
-        return Boolean(await access.getTenantGlassPackage(scope, catalogItemId));
+        return Boolean(
+          await access.getTenantGlassPackage(scope, catalogItemId),
+        );
       case PriceListItemType.HARDWARE_KIT:
         return Boolean(await access.getTenantHardwareKit(scope, catalogItemId));
       case PriceListItemType.COLOR_FINISH:
@@ -2472,13 +2903,19 @@ export function createTenantDataAccess(
     scope: TenantDataScope,
     quoteVersionId: string,
   ) {
-    const quoteVersion = await access.getTenantQuoteVersion(scope, quoteVersionId);
+    const quoteVersion = await access.getTenantQuoteVersion(
+      scope,
+      quoteVersionId,
+    );
 
     if (!quoteVersion) {
       return null;
     }
 
-    const quoteState = await access.getTenantQuoteWithCurrentVersion(scope, quoteVersion.quoteId);
+    const quoteState = await access.getTenantQuoteWithCurrentVersion(
+      scope,
+      quoteVersion.quoteId,
+    );
 
     if (
       !quoteState?.currentVersion ||
@@ -2514,7 +2951,10 @@ export function listTenantCustomers(
   return tenantDataAccess.listTenantCustomers(scope, options);
 }
 
-export function createTenantCustomer(scope: TenantDataScope, data: TenantCustomerWriteInput) {
+export function createTenantCustomer(
+  scope: TenantDataScope,
+  data: TenantCustomerWriteInput,
+) {
   return tenantDataAccess.createTenantCustomer(scope, data);
 }
 
@@ -2530,11 +2970,17 @@ export function getTenantProject(scope: TenantDataScope, projectId: string) {
   return tenantDataAccess.getTenantProject(scope, projectId);
 }
 
-export function listTenantProjects(scope: TenantDataScope, options?: ListTenantProjectsOptions) {
+export function listTenantProjects(
+  scope: TenantDataScope,
+  options?: ListTenantProjectsOptions,
+) {
   return tenantDataAccess.listTenantProjects(scope, options);
 }
 
-export function createTenantProject(scope: TenantDataScope, data: TenantProjectWriteInput) {
+export function createTenantProject(
+  scope: TenantDataScope,
+  data: TenantProjectWriteInput,
+) {
   return tenantDataAccess.createTenantProject(scope, data);
 }
 
@@ -2550,11 +2996,17 @@ export function getTenantQuote(scope: TenantDataScope, quoteId: string) {
   return tenantDataAccess.getTenantQuote(scope, quoteId);
 }
 
-export function getTenantQuoteWithCurrentVersion(scope: TenantDataScope, quoteId: string) {
+export function getTenantQuoteWithCurrentVersion(
+  scope: TenantDataScope,
+  quoteId: string,
+) {
   return tenantDataAccess.getTenantQuoteWithCurrentVersion(scope, quoteId);
 }
 
-export function listTenantQuotes(scope: TenantDataScope, options?: ListTenantQuotesOptions) {
+export function listTenantQuotes(
+  scope: TenantDataScope,
+  options?: ListTenantQuotesOptions,
+) {
   return tenantDataAccess.listTenantQuotes(scope, options);
 }
 
@@ -2565,7 +3017,10 @@ export function listTenantSavedFilters(
   return tenantDataAccess.listTenantSavedFilters(scope, options);
 }
 
-export function getTenantSavedFilter(scope: TenantDataScope, savedFilterId: string) {
+export function getTenantSavedFilter(
+  scope: TenantDataScope,
+  savedFilterId: string,
+) {
   return tenantDataAccess.getTenantSavedFilter(scope, savedFilterId);
 }
 
@@ -2580,7 +3035,10 @@ export function getTenantCompanySettings(scope: TenantDataScope) {
   return tenantDataAccess.getTenantCompanySettings(scope);
 }
 
-export function getTenantCompanySettingsById(scope: TenantDataScope, settingsId: string) {
+export function getTenantCompanySettingsById(
+  scope: TenantDataScope,
+  settingsId: string,
+) {
   return tenantDataAccess.getTenantCompanySettingsById(scope, settingsId);
 }
 
@@ -2596,7 +3054,10 @@ export function getTenantQuoteNumberSettings(scope: TenantDataScope) {
   return tenantDataAccess.getTenantQuoteNumberSettings(scope);
 }
 
-export function getTenantQuoteNumberSettingsById(scope: TenantDataScope, settingsId: string) {
+export function getTenantQuoteNumberSettingsById(
+  scope: TenantDataScope,
+  settingsId: string,
+) {
   return tenantDataAccess.getTenantQuoteNumberSettingsById(scope, settingsId);
 }
 
@@ -2605,10 +3066,17 @@ export function updateTenantQuoteNumberSettings(
   settingsId: string | null,
   data: TenantQuoteNumberSettingsWriteInput,
 ) {
-  return tenantDataAccess.updateTenantQuoteNumberSettings(scope, settingsId, data);
+  return tenantDataAccess.updateTenantQuoteNumberSettings(
+    scope,
+    settingsId,
+    data,
+  );
 }
 
-export function getTenantUserPreference(scope: TenantDataScope, userId: string) {
+export function getTenantUserPreference(
+  scope: TenantDataScope,
+  userId: string,
+) {
   return tenantDataAccess.getTenantUserPreference(scope, userId);
 }
 
@@ -2619,23 +3087,38 @@ export function upsertTenantUserPreference(
   return tenantDataAccess.upsertTenantUserPreference(scope, data);
 }
 
-export function createTenantQuoteDraft(scope: TenantDataScope, data: TenantQuoteDraftInput) {
+export function createTenantQuoteDraft(
+  scope: TenantDataScope,
+  data: TenantQuoteDraftInput,
+) {
   return tenantDataAccess.createTenantQuoteDraft(scope, data);
 }
 
-export function getTenantQuoteVersion(scope: TenantDataScope, quoteVersionId: string) {
+export function getTenantQuoteVersion(
+  scope: TenantDataScope,
+  quoteVersionId: string,
+) {
   return tenantDataAccess.getTenantQuoteVersion(scope, quoteVersionId);
 }
 
-export function listTenantQuoteVersions(scope: TenantDataScope, quoteId: string) {
+export function listTenantQuoteVersions(
+  scope: TenantDataScope,
+  quoteId: string,
+) {
   return tenantDataAccess.listTenantQuoteVersions(scope, quoteId);
 }
 
-export function listTenantQuoteItems(scope: TenantDataScope, quoteVersionId: string) {
+export function listTenantQuoteItems(
+  scope: TenantDataScope,
+  quoteVersionId: string,
+) {
   return tenantDataAccess.listTenantQuoteItems(scope, quoteVersionId);
 }
 
-export function getTenantQuoteItem(scope: TenantDataScope, quoteItemId: string) {
+export function getTenantQuoteItem(
+  scope: TenantDataScope,
+  quoteItemId: string,
+) {
   return tenantDataAccess.getTenantQuoteItem(scope, quoteItemId);
 }
 
@@ -2643,7 +3126,10 @@ export function getTenantQuoteCalculationResult(
   scope: TenantDataScope,
   quoteVersionId: string,
 ) {
-  return tenantDataAccess.getTenantQuoteCalculationResult(scope, quoteVersionId);
+  return tenantDataAccess.getTenantQuoteCalculationResult(
+    scope,
+    quoteVersionId,
+  );
 }
 
 export function getTenantDocument(scope: TenantDataScope, documentId: string) {
@@ -2658,7 +3144,10 @@ export function getTenantQuoteDocument(
   return tenantDataAccess.getTenantQuoteDocument(scope, quoteId, documentId);
 }
 
-export function listTenantQuoteDocuments(scope: TenantDataScope, quoteVersionId: string) {
+export function listTenantQuoteDocuments(
+  scope: TenantDataScope,
+  quoteVersionId: string,
+) {
   return tenantDataAccess.listTenantQuoteDocuments(scope, quoteVersionId);
 }
 
@@ -2678,7 +3167,10 @@ export function updateTenantQuoteItem(
   return tenantDataAccess.updateTenantQuoteItem(scope, quoteItemId, data);
 }
 
-export function deleteTenantQuoteItem(scope: TenantDataScope, quoteItemId: string) {
+export function deleteTenantQuoteItem(
+  scope: TenantDataScope,
+  quoteItemId: string,
+) {
   return tenantDataAccess.deleteTenantQuoteItem(scope, quoteItemId);
 }
 
@@ -2687,7 +3179,11 @@ export function applyTenantQuoteItemManualOverride(
   quoteItemId: string,
   data: TenantQuoteItemManualOverrideInput,
 ) {
-  return tenantDataAccess.applyTenantQuoteItemManualOverride(scope, quoteItemId, data);
+  return tenantDataAccess.applyTenantQuoteItemManualOverride(
+    scope,
+    quoteItemId,
+    data,
+  );
 }
 
 export function applyTenantQuoteDiscount(
@@ -2703,7 +3199,11 @@ export function updateTenantQuoteVersionCalculation(
   quoteVersionId: string,
   data: TenantQuoteVersionCalculationUpdateInput,
 ) {
-  return tenantDataAccess.updateTenantQuoteVersionCalculation(scope, quoteVersionId, data);
+  return tenantDataAccess.updateTenantQuoteVersionCalculation(
+    scope,
+    quoteVersionId,
+    data,
+  );
 }
 
 export function updateTenantQuoteItemCalculation(
@@ -2711,7 +3211,11 @@ export function updateTenantQuoteItemCalculation(
   quoteItemId: string,
   data: TenantQuoteItemCalculationUpdateInput,
 ) {
-  return tenantDataAccess.updateTenantQuoteItemCalculation(scope, quoteItemId, data);
+  return tenantDataAccess.updateTenantQuoteItemCalculation(
+    scope,
+    quoteItemId,
+    data,
+  );
 }
 
 export function upsertTenantQuoteCalculationResult(
@@ -2719,7 +3223,11 @@ export function upsertTenantQuoteCalculationResult(
   quoteVersionId: string,
   data: TenantQuoteCalculationResultWriteInput,
 ) {
-  return tenantDataAccess.upsertTenantQuoteCalculationResult(scope, quoteVersionId, data);
+  return tenantDataAccess.upsertTenantQuoteCalculationResult(
+    scope,
+    quoteVersionId,
+    data,
+  );
 }
 
 export function createTenantQuoteDocument(
@@ -2727,7 +3235,11 @@ export function createTenantQuoteDocument(
   quoteVersionId: string,
   data: TenantQuoteDocumentWriteInput,
 ) {
-  return tenantDataAccess.createTenantQuoteDocument(scope, quoteVersionId, data);
+  return tenantDataAccess.createTenantQuoteDocument(
+    scope,
+    quoteVersionId,
+    data,
+  );
 }
 
 export function lockTenantQuoteVersion(
@@ -2736,6 +3248,14 @@ export function lockTenantQuoteVersion(
   data?: TenantQuoteLockInput,
 ) {
   return tenantDataAccess.lockTenantQuoteVersion(scope, quoteId, data);
+}
+
+export function sendTenantQuote(
+  scope: TenantDataScope,
+  quoteId: string,
+  data: TenantQuoteSendInput,
+) {
+  return tenantDataAccess.sendTenantQuote(scope, quoteId, data);
 }
 
 export function createTenantQuoteRevision(
@@ -2754,7 +3274,10 @@ export function getTenantSupplier(scope: TenantDataScope, supplierId: string) {
   return tenantDataAccess.getTenantSupplier(scope, supplierId);
 }
 
-export function createTenantSupplier(scope: TenantDataScope, data: TenantSupplierWriteInput) {
+export function createTenantSupplier(
+  scope: TenantDataScope,
+  data: TenantSupplierWriteInput,
+) {
   return tenantDataAccess.createTenantSupplier(scope, data);
 }
 
@@ -2766,7 +3289,10 @@ export function updateTenantSupplier(
   return tenantDataAccess.updateTenantSupplier(scope, supplierId, data);
 }
 
-export function archiveTenantSupplier(scope: TenantDataScope, supplierId: string) {
+export function archiveTenantSupplier(
+  scope: TenantDataScope,
+  supplierId: string,
+) {
   return tenantDataAccess.archiveTenantSupplier(scope, supplierId);
 }
 
@@ -2774,7 +3300,10 @@ export function listTenantProfileSystems(scope: TenantDataScope) {
   return tenantDataAccess.listTenantProfileSystems(scope);
 }
 
-export function getTenantProfileSystem(scope: TenantDataScope, profileSystemId: string) {
+export function getTenantProfileSystem(
+  scope: TenantDataScope,
+  profileSystemId: string,
+) {
   return tenantDataAccess.getTenantProfileSystem(scope, profileSystemId);
 }
 
@@ -2790,7 +3319,11 @@ export function updateTenantProfileSystem(
   profileSystemId: string,
   data: TenantProfileSystemWriteInput,
 ) {
-  return tenantDataAccess.updateTenantProfileSystem(scope, profileSystemId, data);
+  return tenantDataAccess.updateTenantProfileSystem(
+    scope,
+    profileSystemId,
+    data,
+  );
 }
 
 export function archiveTenantProfileSystem(
@@ -2804,7 +3337,10 @@ export function listTenantProfileItems(scope: TenantDataScope) {
   return tenantDataAccess.listTenantProfileItems(scope);
 }
 
-export function getTenantProfileItem(scope: TenantDataScope, profileItemId: string) {
+export function getTenantProfileItem(
+  scope: TenantDataScope,
+  profileItemId: string,
+) {
   return tenantDataAccess.getTenantProfileItem(scope, profileItemId);
 }
 
@@ -2823,7 +3359,10 @@ export function updateTenantProfileItem(
   return tenantDataAccess.updateTenantProfileItem(scope, profileItemId, data);
 }
 
-export function archiveTenantProfileItem(scope: TenantDataScope, profileItemId: string) {
+export function archiveTenantProfileItem(
+  scope: TenantDataScope,
+  profileItemId: string,
+) {
   return tenantDataAccess.archiveTenantProfileItem(scope, profileItemId);
 }
 
@@ -2831,7 +3370,10 @@ export function listTenantGlassPackages(scope: TenantDataScope) {
   return tenantDataAccess.listTenantGlassPackages(scope);
 }
 
-export function getTenantGlassPackage(scope: TenantDataScope, glassPackageId: string) {
+export function getTenantGlassPackage(
+  scope: TenantDataScope,
+  glassPackageId: string,
+) {
   return tenantDataAccess.getTenantGlassPackage(scope, glassPackageId);
 }
 
@@ -2850,7 +3392,10 @@ export function updateTenantGlassPackage(
   return tenantDataAccess.updateTenantGlassPackage(scope, glassPackageId, data);
 }
 
-export function archiveTenantGlassPackage(scope: TenantDataScope, glassPackageId: string) {
+export function archiveTenantGlassPackage(
+  scope: TenantDataScope,
+  glassPackageId: string,
+) {
   return tenantDataAccess.archiveTenantGlassPackage(scope, glassPackageId);
 }
 
@@ -2858,7 +3403,10 @@ export function listTenantHardwareKits(scope: TenantDataScope) {
   return tenantDataAccess.listTenantHardwareKits(scope);
 }
 
-export function getTenantHardwareKit(scope: TenantDataScope, hardwareKitId: string) {
+export function getTenantHardwareKit(
+  scope: TenantDataScope,
+  hardwareKitId: string,
+) {
   return tenantDataAccess.getTenantHardwareKit(scope, hardwareKitId);
 }
 
@@ -2877,7 +3425,10 @@ export function updateTenantHardwareKit(
   return tenantDataAccess.updateTenantHardwareKit(scope, hardwareKitId, data);
 }
 
-export function archiveTenantHardwareKit(scope: TenantDataScope, hardwareKitId: string) {
+export function archiveTenantHardwareKit(
+  scope: TenantDataScope,
+  hardwareKitId: string,
+) {
   return tenantDataAccess.archiveTenantHardwareKit(scope, hardwareKitId);
 }
 
@@ -2885,7 +3436,10 @@ export function listTenantColorFinishes(scope: TenantDataScope) {
   return tenantDataAccess.listTenantColorFinishes(scope);
 }
 
-export function getTenantColorFinish(scope: TenantDataScope, colorFinishId: string) {
+export function getTenantColorFinish(
+  scope: TenantDataScope,
+  colorFinishId: string,
+) {
   return tenantDataAccess.getTenantColorFinish(scope, colorFinishId);
 }
 
@@ -2904,7 +3458,10 @@ export function updateTenantColorFinish(
   return tenantDataAccess.updateTenantColorFinish(scope, colorFinishId, data);
 }
 
-export function archiveTenantColorFinish(scope: TenantDataScope, colorFinishId: string) {
+export function archiveTenantColorFinish(
+  scope: TenantDataScope,
+  colorFinishId: string,
+) {
   return tenantDataAccess.archiveTenantColorFinish(scope, colorFinishId);
 }
 
@@ -2912,11 +3469,17 @@ export function listTenantAccessories(scope: TenantDataScope) {
   return tenantDataAccess.listTenantAccessories(scope);
 }
 
-export function getTenantAccessory(scope: TenantDataScope, accessoryId: string) {
+export function getTenantAccessory(
+  scope: TenantDataScope,
+  accessoryId: string,
+) {
   return tenantDataAccess.getTenantAccessory(scope, accessoryId);
 }
 
-export function createTenantAccessory(scope: TenantDataScope, data: TenantAccessoryWriteInput) {
+export function createTenantAccessory(
+  scope: TenantDataScope,
+  data: TenantAccessoryWriteInput,
+) {
   return tenantDataAccess.createTenantAccessory(scope, data);
 }
 
@@ -2928,7 +3491,10 @@ export function updateTenantAccessory(
   return tenantDataAccess.updateTenantAccessory(scope, accessoryId, data);
 }
 
-export function archiveTenantAccessory(scope: TenantDataScope, accessoryId: string) {
+export function archiveTenantAccessory(
+  scope: TenantDataScope,
+  accessoryId: string,
+) {
   return tenantDataAccess.archiveTenantAccessory(scope, accessoryId);
 }
 
@@ -2936,11 +3502,17 @@ export function listTenantServiceItems(scope: TenantDataScope) {
   return tenantDataAccess.listTenantServiceItems(scope);
 }
 
-export function getTenantServiceItem(scope: TenantDataScope, serviceItemId: string) {
+export function getTenantServiceItem(
+  scope: TenantDataScope,
+  serviceItemId: string,
+) {
   return tenantDataAccess.getTenantServiceItem(scope, serviceItemId);
 }
 
-export function createTenantServiceItem(scope: TenantDataScope, data: TenantServiceItemWriteInput) {
+export function createTenantServiceItem(
+  scope: TenantDataScope,
+  data: TenantServiceItemWriteInput,
+) {
   return tenantDataAccess.createTenantServiceItem(scope, data);
 }
 
@@ -2952,7 +3524,10 @@ export function updateTenantServiceItem(
   return tenantDataAccess.updateTenantServiceItem(scope, serviceItemId, data);
 }
 
-export function archiveTenantServiceItem(scope: TenantDataScope, serviceItemId: string) {
+export function archiveTenantServiceItem(
+  scope: TenantDataScope,
+  serviceItemId: string,
+) {
   return tenantDataAccess.archiveTenantServiceItem(scope, serviceItemId);
 }
 
@@ -2964,7 +3539,10 @@ export function getTenantTaxRate(scope: TenantDataScope, taxRateId: string) {
   return tenantDataAccess.getTenantTaxRate(scope, taxRateId);
 }
 
-export function createTenantTaxRate(scope: TenantDataScope, data: TenantTaxRateWriteInput) {
+export function createTenantTaxRate(
+  scope: TenantDataScope,
+  data: TenantTaxRateWriteInput,
+) {
   return tenantDataAccess.createTenantTaxRate(scope, data);
 }
 
@@ -2976,7 +3554,10 @@ export function updateTenantTaxRate(
   return tenantDataAccess.updateTenantTaxRate(scope, taxRateId, data);
 }
 
-export function archiveTenantTaxRate(scope: TenantDataScope, taxRateId: string) {
+export function archiveTenantTaxRate(
+  scope: TenantDataScope,
+  taxRateId: string,
+) {
   return tenantDataAccess.archiveTenantTaxRate(scope, taxRateId);
 }
 
@@ -2984,11 +3565,17 @@ export function listTenantPriceLists(scope: TenantDataScope) {
   return tenantDataAccess.listTenantPriceLists(scope);
 }
 
-export function getTenantPriceList(scope: TenantDataScope, priceListId: string) {
+export function getTenantPriceList(
+  scope: TenantDataScope,
+  priceListId: string,
+) {
   return tenantDataAccess.getTenantPriceList(scope, priceListId);
 }
 
-export function createTenantPriceList(scope: TenantDataScope, data: TenantPriceListWriteInput) {
+export function createTenantPriceList(
+  scope: TenantDataScope,
+  data: TenantPriceListWriteInput,
+) {
   return tenantDataAccess.createTenantPriceList(scope, data);
 }
 
@@ -3000,7 +3587,10 @@ export function updateTenantPriceList(
   return tenantDataAccess.updateTenantPriceList(scope, priceListId, data);
 }
 
-export function archiveTenantPriceList(scope: TenantDataScope, priceListId: string) {
+export function archiveTenantPriceList(
+  scope: TenantDataScope,
+  priceListId: string,
+) {
   return tenantDataAccess.archiveTenantPriceList(scope, priceListId);
 }
 
@@ -3011,7 +3601,10 @@ export function listTenantPriceListItems(
   return tenantDataAccess.listTenantPriceListItems(scope, options);
 }
 
-export function getTenantPriceListItem(scope: TenantDataScope, priceListItemId: string) {
+export function getTenantPriceListItem(
+  scope: TenantDataScope,
+  priceListItemId: string,
+) {
   return tenantDataAccess.getTenantPriceListItem(scope, priceListItemId);
 }
 
@@ -3027,10 +3620,17 @@ export function updateTenantPriceListItem(
   priceListItemId: string,
   data: TenantPriceListItemWriteInput,
 ) {
-  return tenantDataAccess.updateTenantPriceListItem(scope, priceListItemId, data);
+  return tenantDataAccess.updateTenantPriceListItem(
+    scope,
+    priceListItemId,
+    data,
+  );
 }
 
-export function archiveTenantPriceListItem(scope: TenantDataScope, priceListItemId: string) {
+export function archiveTenantPriceListItem(
+  scope: TenantDataScope,
+  priceListItemId: string,
+) {
   return tenantDataAccess.archiveTenantPriceListItem(scope, priceListItemId);
 }
 
@@ -3081,7 +3681,9 @@ function companySettingsWriteData(data: TenantCompanySettingsWriteInput) {
   };
 }
 
-function quoteNumberSettingsWriteData(data: TenantQuoteNumberSettingsWriteInput) {
+function quoteNumberSettingsWriteData(
+  data: TenantQuoteNumberSettingsWriteInput,
+) {
   return {
     prefix: normalizedQuoteNumberPrefix(data.prefix),
     nextNumber: Math.max(1, Math.trunc(data.nextNumber)),
@@ -3212,6 +3814,15 @@ function isDraftVersionMutable(quoteVersion: QuoteVersion) {
   );
 }
 
+function isLockedVersionReadyForSend(quoteVersion: QuoteVersion) {
+  return (
+    quoteVersion.status === QuoteVersionStatus.LOCKED &&
+    quoteVersion.isLocked &&
+    Boolean(quoteVersion.lockedAt) &&
+    !quoteVersion.sentAt
+  );
+}
+
 function emptyDraftItemTotalsSnapshot() {
   return {
     subtotalMinor: 0,
@@ -3238,7 +3849,9 @@ function archiveCatalogRecordData() {
 function latestQuoteVersion(versions: QuoteVersion[]) {
   return versions.reduce<QuoteVersion | null>(
     (latest, version) =>
-      !latest || version.versionNumber > latest.versionNumber ? version : latest,
+      !latest || version.versionNumber > latest.versionNumber
+        ? version
+        : latest,
     null,
   );
 }
@@ -3251,7 +3864,9 @@ function cloneJsonValue<TValue>(value: TValue): TValue {
   return JSON.parse(JSON.stringify(value)) as TValue;
 }
 
-function cloneNullableJsonValue<TValue>(value: TValue | null | undefined): TValue | null {
+function cloneNullableJsonValue<TValue>(
+  value: TValue | null | undefined,
+): TValue | null {
   return value === null || value === undefined ? null : cloneJsonValue(value);
 }
 
@@ -3390,7 +4005,11 @@ function hasValidQuoteDiscountValue(
       return amountMinor > BigInt(0);
     }
 
-    return typeof amountMinor === "number" && Number.isInteger(amountMinor) && amountMinor > 0;
+    return (
+      typeof amountMinor === "number" &&
+      Number.isInteger(amountMinor) &&
+      amountMinor > 0
+    );
   }
 
   return (
@@ -3443,8 +4062,8 @@ function isPrismaUniqueConstraintError(
 ): error is { code: "P2002"; meta?: { target?: unknown } } {
   return Boolean(
     error &&
-      typeof error === "object" &&
-      "code" in error &&
-      (error as { code?: unknown }).code === "P2002",
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002",
   );
 }
