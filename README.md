@@ -50,7 +50,7 @@ production formulas.
 - Prisma configured for PostgreSQL
 - Pure packages for calculation, drawing, and PDF rendering
 - Document storage provider abstraction with local development storage under ignored
-  `.local-storage`
+  `.local-storage/documents`
 - GitHub Actions CI for install, Prisma generate, lint, typecheck, test, and build
 
 ## Local Setup
@@ -105,6 +105,10 @@ production formulas.
    pnpm db:seed
    ```
 
+   The repository currently has a Prisma schema and synthetic seed script, but no committed
+   `prisma/migrations` directory. `pnpm prisma migrate dev` creates local development migration
+   files and applies the schema to your local database.
+
 6. Start the web app:
 
    ```powershell
@@ -130,7 +134,7 @@ Use only synthetic data in fixtures, screenshots, and docs.
 Generated PDFs are stored through the provider selected by `DOCUMENT_STORAGE_PROVIDER`.
 
 The default provider is `local`, which writes to ignored local storage. By default this is
-`.local-storage` at the repo root. Override it with:
+`.local-storage/documents` at the repo root. Override it with:
 
 ```powershell
 $env:DOCUMENT_STORAGE_PROVIDER="local"
@@ -139,7 +143,7 @@ $env:DOCUMENT_STORAGE_ROOT="E:\path\to\storage"
 
 The `s3` provider is a deployment stub. It validates S3-compatible environment values and then
 returns a controlled "not implemented" storage error for reads and writes until an SDK-backed adapter
-is added:
+is added. Do not use it for live PDF delivery yet:
 
 ```powershell
 $env:DOCUMENT_STORAGE_PROVIDER="s3"
@@ -151,9 +155,9 @@ $env:DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY="replace-in-secret-store"
 $env:DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE="true"
 ```
 
-PDF generation writes storage bytes before creating the immutable `Document` row. If metadata
-creation fails after storage succeeds, the app attempts to delete the newly written object so failed
-generations do not leave orphaned files.
+PDF generation passes a requested storage key to the provider, then persists the key returned by the
+provider on the immutable `Document` row. If metadata creation fails after storage succeeds, the app
+attempts to delete the returned storage key so failed generations do not leave orphaned files.
 
 ## Deployment Readiness
 
@@ -172,8 +176,10 @@ Before deploying, configure these server-side environment values in the target p
 
 Use a Node.js or Docker deployment target for the Next.js app; static export is not suitable because
 auth, tenant-scoped database access, PDF generation, and document downloads require server runtime
-behavior. Run `pnpm prisma generate`, `pnpm build`, and a migration command appropriate for the
-target database before starting `pnpm --filter web start`.
+behavior. Run `pnpm prisma generate` and `pnpm build` during deployment. Because committed Prisma
+migrations are not present yet, define the target database schema rollout explicitly before a real
+environment deploy; once migrations are committed, use the normal deployment migration command for
+the target database before starting `pnpm --filter web start`.
 
 Do not enable development login in production, do not store S3 credentials in source control, and do
 not use the `s3` provider for live PDF delivery until the SDK-backed adapter replaces the current

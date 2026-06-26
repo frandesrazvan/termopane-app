@@ -227,9 +227,63 @@ describe("quote PDF generation", () => {
     expect(storage.storedKeys()).toEqual([]);
   });
 
+  it("stores the provider-returned key in Document metadata and keeps quote download scope", async () => {
+    const state = testState();
+    const storage = memoryDocumentStorageProvider({
+      returnedKeyPrefix: "object-store",
+    });
+    const result = await generateTenantQuotePdf(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      "version-a",
+      {
+        ...generatorOptions(state.client, "provider-returned-key"),
+        storageProvider: storage.provider,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+
+    if (!result.ok) {
+      throw new Error(result.reason);
+    }
+
+    const requestedStorageKey = storage.requestedKeys[0];
+    const returnedStorageKey = `object-store/${requestedStorageKey}`;
+
+    expect(requestedStorageKey).toContain("documents/tenant-a/version-a/");
+    expect(result.storageKey).toBe(returnedStorageKey);
+    expect(result.document.storageKey).toBe(returnedStorageKey);
+    expect(state.documents[0]?.storageKey).toBe(returnedStorageKey);
+    expect(storage.storedKeys()).toEqual([returnedStorageKey]);
+
+    const data = createTenantDataAccess(state.client);
+
+    await expect(
+      data.getTenantQuoteDocument({ tenantId: "tenant-a" }, "quote-a", result.document.id),
+    ).resolves.toMatchObject({
+      document: {
+        id: result.document.id,
+        storageKey: returnedStorageKey,
+        tenantId: "tenant-a",
+      },
+      quoteVersion: {
+        id: "version-a",
+      },
+    });
+    await expect(
+      data.getTenantQuoteDocument({ tenantId: "tenant-b" }, "quote-a", result.document.id),
+    ).resolves.toBeNull();
+    await expect(
+      data.getTenantQuoteDocument({ tenantId: "tenant-a" }, "quote-b", result.document.id),
+    ).resolves.toBeNull();
+  });
+
   it("cleans up stored PDF bytes when Document metadata creation fails", async () => {
     const state = testState();
-    const storage = memoryDocumentStorageProvider();
+    const storage = memoryDocumentStorageProvider({
+      returnedKeyPrefix: "object-store",
+    });
     state.client.document = {
       ...state.client.document,
       async create() {
@@ -251,7 +305,8 @@ describe("quote PDF generation", () => {
     expect(state.auditLogs).toHaveLength(0);
     expect(storage.storedKeys()).toEqual([]);
     expect(storage.deletedKeys).toHaveLength(1);
-    expect(storage.deletedKeys[0]).toContain("documents/tenant-a/version-a/");
+    expect(storage.deletedKeys[0]).toBe(`object-store/${storage.requestedKeys[0]}`);
+    expect(storage.deletedKeys[0]).not.toBe(storage.requestedKeys[0]);
   });
 
   it("stores visible totals from the quote version snapshot", async () => {
@@ -419,9 +474,12 @@ function generatorOptions(client: TenantDataClient, nonce: string) {
   };
 }
 
-function memoryDocumentStorageProvider(options: { putError?: Error } = {}) {
+function memoryDocumentStorageProvider(
+  options: { putError?: Error; returnedKeyPrefix?: string } = {},
+) {
   const stored = new Map<string, Uint8Array>();
   const deletedKeys: string[] = [];
+  const requestedKeys: string[] = [];
   const provider: DocumentStorageProvider = {
     kind: "local",
     async put({ storageKey, bytes }) {
@@ -429,10 +487,15 @@ function memoryDocumentStorageProvider(options: { putError?: Error } = {}) {
         throw options.putError;
       }
 
-      stored.set(storageKey, bytes);
+      requestedKeys.push(storageKey);
+      const returnedStorageKey = options.returnedKeyPrefix
+        ? `${options.returnedKeyPrefix}/${storageKey}`
+        : storageKey;
+
+      stored.set(returnedStorageKey, bytes);
 
       return {
-        storageKey,
+        storageKey: returnedStorageKey,
         provider: "local",
       };
     },
@@ -454,6 +517,7 @@ function memoryDocumentStorageProvider(options: { putError?: Error } = {}) {
   return {
     deletedKeys,
     provider,
+    requestedKeys,
     storedKeys: () => [...stored.keys()],
   };
 }

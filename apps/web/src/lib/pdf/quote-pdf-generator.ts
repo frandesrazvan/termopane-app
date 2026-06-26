@@ -77,7 +77,7 @@ export async function generateTenantQuotePdf(
   const renderPdf = options.renderPdf ?? buildQuotePdf;
   const pdfBytes = renderPdf(snapshot);
   const checksum = sha256(pdfBytes);
-  const storageKey = documentStorageKey(
+  const requestedStorageKey = documentStorageKey(
     tenantIdFromScope(scope),
     quoteVersion,
     checksum,
@@ -86,11 +86,12 @@ export async function generateTenantQuotePdf(
   );
   const fileName = documentFileName(quoteState.quote.quoteNumber, quoteVersion, templateKey);
   let storageProvider: DocumentStorageProvider;
+  let storedStorageKey: string;
 
   try {
     storageProvider = options.storageProvider ?? createConfiguredDocumentStorageProvider(options);
-    await storageProvider.put({
-      storageKey,
+    const storedDocument = await storageProvider.put({
+      storageKey: requestedStorageKey,
       bytes: pdfBytes,
       contentType: PDF_MIME_TYPE,
       checksum,
@@ -100,6 +101,7 @@ export async function generateTenantQuotePdf(
         tenantId: tenantIdFromScope(scope),
       },
     });
+    storedStorageKey = storedDocument.storageKey;
   } catch {
     return { ok: false, reason: "storage_write_failed" };
   }
@@ -111,7 +113,7 @@ export async function generateTenantQuotePdf(
       actorUserId: options.actorUserId ?? null,
       templateKey,
       fileName,
-      storageKey,
+      storageKey: storedStorageKey,
       mimeType: PDF_MIME_TYPE,
       checksum,
       visibleTotalsSnapshot: {
@@ -121,13 +123,13 @@ export async function generateTenantQuotePdf(
       },
     });
   } catch {
-    await cleanupStoredDocument(storageProvider, storageKey);
+    await cleanupStoredDocument(storageProvider, storedStorageKey);
 
     return { ok: false, reason: "document_create_failed" };
   }
 
   if (!document) {
-    await cleanupStoredDocument(storageProvider, storageKey);
+    await cleanupStoredDocument(storageProvider, storedStorageKey);
 
     return { ok: false, reason: "not_found" };
   }
@@ -136,7 +138,7 @@ export async function generateTenantQuotePdf(
     ok: true,
     document,
     checksum,
-    storageKey,
+    storageKey: storedStorageKey,
   };
 }
 
