@@ -36,6 +36,9 @@ production formulas.
 - PWA metadata, install manifest, static app icons, conservative service-worker registration, mobile
   dashboard navigation, Romanian loading/error states, and sticky quote total/actions are present for
   mobile sales workflows.
+- Pilot reference-offer fixtures are prepared under `fixtures/reference-offers` with synthetic
+  redacted examples, a business-owner collection checklist, and a pure calculation harness for
+  recreating 10-20 validated historical quotes later.
 
 ## Stack
 

@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "packId": "synthetic-redacted-pilot-reference-offers",
+  "packType": "synthetic-pilot",
+  "dataClassification": "synthetic-redacted",
+  "description": "Synthetic redacted examples for business-owner review preparation. No real customer data or private PDFs are included.",
+  "requirementsChecklist": [
+    {
+      "key": "profilePriceList",
+      "label": "Real profile price list",
+      "status": "pending-business-owner"
+    },
+    {
+      "key": "glassDeductionRules",
+      "label": "Glass deduction rules",
+      "status": "pending-business-owner"
+    },
+    {
+      "key": "glassPriceList",
+      "label": "Glass price list",
+      "status": "pending-business-owner"
+    },
+    {
+      "key": "hardwareRules",
+      "label": "Hardware rules",
+      "status": "pending-business-owner"
+    },
+    {
+      "key": "accessoryServicePrices",
+      "label": "Accessory and service prices",
+      "status": "pending-business-owner"
+    },
+    {
+      "key": "commercialRules",
+      "label": "VAT, markup, and discount rules",
+      "status": "pending-business-owner"
+    },
+    {
+      "key": "preferredPdfTemplate",
+      "label": "Preferred PDF template",
+      "status": "pending-business-owner"
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "synthetic-offer-001",
+      "title": "Synthetic fixed window with manual service line",
+      "reviewStatus": "synthetic-baseline",
+      "dataClassification": "synthetic-redacted",
+      "preferredTemplateKey": "template-a",
+      "source": {
+        "kind": "synthetic-json",
+        "originalDocumentAvailable": false,
+        "privateArtifactsCommitted": false,
+        "notes": "Synthetic offer created only for harness validation."
+      },
+      "redaction": {
+        "customer": "synthetic",
+        "project": "synthetic",
+        "sourceDocuments": "none-committed"
+      },
+      "businessInputStatus": {
+        "profilePriceList": "synthetic",
+        "glassDeductionRules": "synthetic",
+        "glassPriceList": "synthetic",
+        "hardwareRules": "not-applicable",
+        "accessoryServicePrices": "synthetic",
+        "commercialRules": "synthetic",
+        "preferredPdfTemplate": "synthetic"
+      },
+      "calculationInput": {
+        "quoteId": "synthetic-offer-001",
+        "commercialRules": {
+          "markupBasisPoints": 2000,
+          "discountBasisPoints": 0,
+          "vatBasisPoints": 1900
+        },
+        "items": [
+          {
+            "elementId": "synthetic-offer-001-window-1",
+            "type": "fixed-window",
+            "quantity": 1,
+            "dimensions": {
+              "widthMm": 1200,
+              "heightMm": 1400
+            },
+            "glass": {
+              "id": "synthetic-glass-24",
+              "label": "Synthetic low-e 24mm",
+              "deductionWidthMm": 80,
+              "deductionHeightMm": 100,
+              "minBillableAreaM2": 1.5,
+              "unitPriceMinorPerM2": 10000
+            },
+            "frameProfile": {
+              "id": "synthetic-frame-a",
+              "label": "Synthetic PVC fixed frame",
+              "unitPriceMinorPerMeter": 1000
+            },
+            "explicitMaterialRequirements": [
+              {
+                "materialType": "accessory",
+                "catalogItemId": "synthetic-sill-a",
+                "label": "Synthetic exterior sill",
+                "unit": "linear-meter",
+                "quantity": 1.2,
+                "unitPriceMinor": 1500,
+                "sourceRule": "explicit-synthetic-fixture"
+              }
+            ]
+          },
+          {
+            "elementId": "synthetic-offer-001-service-1",
+            "type": "custom-line",
+            "description": "Synthetic installation service line",
+            "quantity": 1,
+            "unit": "fixed",
+            "unitPriceMinor": 25000
+          }
+        ]
+      },
+      "expected": {
+        "itemCount": 2,
+        "materialRequirementCount": 4,
+        "glassCutCount": 1,
+        "profileGroupCount": 1,
+        "warningCodes": [],
+        "totals": {
+          "materialCostMinor": 47000,
+          "markupMinor": 9400,
+          "itemDiscountMinor": 0,
+          "quoteDiscountMinor": 0,
+          "discountMinor": 0,
+          "subtotalAfterDiscountMinor": 56400,
+          "vatMinor": 10716,
+          "totalBeforeManualOverrideMinor": 67116,
+          "manualAdjustmentMinor": 0,
+          "totalWithVatMinor": 67116
+        }
+      }
+    },
+    {
+      "caseId": "synthetic-offer-002",
+      "title": "Synthetic hardware snapshot with final negotiated total",
+      "reviewStatus": "synthetic-baseline",
+      "dataClassification": "synthetic-redacted",
+      "preferredTemplateKey": "template-b",
+      "source": {
+        "kind": "synthetic-json",
+        "originalDocumentAvailable": false,
+        "privateArtifactsCommitted": false,
+        "notes": "Synthetic offer with explicit hardware and audited quote override placeholder."
+      },
+      "redaction": {
+        "customer": "synthetic",
+        "project": "synthetic",
+        "sourceDocuments": "none-committed"
+      },
+      "businessInputStatus": {
+        "profilePriceList": "synthetic",
+        "glassDeductionRules": "synthetic",
+        "glassPriceList": "synthetic",
+        "hardwareRules": "synthetic",
+        "accessoryServicePrices": "not-applicable",
+        "commercialRules": "synthetic",
+        "preferredPdfTemplate": "synthetic"
+      },
+      "calculationInput": {
+        "quoteId": "synthetic-offer-002",
+        "commercialRules": {
+          "markupBasisPoints": 1500,
+          "discountBasisPoints": 500,
+          "vatBasisPoints": 1900
+        },
+        "manualOverride": {
+          "target": "quoteTotalWithVat",
+          "amountMinor": 64000,
+          "reason": "Synthetic final negotiated total for pilot harness",
+          "actorId": "synthetic-reviewer",
+          "timestamp": "2026-06-26T00:00:00.000Z",
+          "auditReferenceId": "synthetic-audit-002"
+        },
+        "items": [
+          {
+            "elementId": "synthetic-offer-002-window-1",
+            "type": "fixed-window",
+            "quantity": 2,
+            "dimensions": {
+              "widthMm": 1000,
+              "heightMm": 1200
+            },
+            "glass": {
+              "id": "synthetic-glass-32",
+              "label": "Synthetic triple glass 32mm",
+              "deductionWidthMm": 70,
+              "deductionHeightMm": 90,
+              "minBillableAreaM2": 1.2,
+              "unitPriceMinorPerM2": 12000
+            },
+            "frameProfile": {
+              "id": "synthetic-frame-b",
+              "label": "Synthetic reinforced PVC frame",
+              "unitPriceMinorPerMeter": 1500
+            },
+            "explicitMaterialRequirements": [
+              {
+                "materialType": "hardware",
+                "catalogItemId": "synthetic-hardware-fixed",
+                "label": "Synthetic fixed hardware kit",
+                "unit": "each",
+                "quantity": 2,
+                "unitPriceMinor": 3500,
+                "sourceRule": "explicit-synthetic-fixture"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "itemCount": 1,
+        "materialRequirementCount": 3,
+        "glassCutCount": 1,
+        "profileGroupCount": 1,
+        "warningCodes": ["MANUAL_OVERRIDE_APPLIED"],
+        "totals": {
+          "materialCostMinor": 49000,
+          "markupMinor": 7350,
+          "itemDiscountMinor": 2818,
+          "quoteDiscountMinor": 0,
+          "discountMinor": 2818,
+          "subtotalAfterDiscountMinor": 53532,
+          "vatMinor": 10171,
+          "totalBeforeManualOverrideMinor": 63703,
+          "manualAdjustmentMinor": 297,
+          "totalWithVatMinor": 64000
+        }
+      }
+    }
+  ]
+}

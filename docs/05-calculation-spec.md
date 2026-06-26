@@ -128,3 +128,18 @@ Calculation tests should use synthetic fixtures. Cover:
 - manual override audit linkage;
 - old quote versions unaffected by changed live price lists;
 - restricted output hiding internal costs where applicable.
+
+## COD-024 reference offer harness notes
+
+Pilot reference-offer fixtures live under `fixtures/reference-offers`. The committed pack contains
+only synthetic redacted JSON examples and must not include private PDFs, real customer data, real
+addresses, phone numbers, emails, or supplier-confidential spreadsheets.
+
+The calculation harness in `packages/calculation/src/reference-offer-harness.ts` is the intended
+entry point for recreating 10-20 business-owner validated historical quotes later. It validates the
+required collection categories, enforces redaction guardrails, calculates each frozen snapshot with
+the pure calculation package, and compares expected totals and warning codes.
+
+Validated historical packs should contain between 10 and 20 cases. Unknown or unprovided business
+rules must stay marked as pending business-owner input or `requires business validation`; they must
+not be filled with invented production formulas.
