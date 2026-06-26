@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@hookform/resolvers": "^5.4.0",
     "@termopane/calculation": "workspace:*",
     "@termopane/drawing": "workspace:*",

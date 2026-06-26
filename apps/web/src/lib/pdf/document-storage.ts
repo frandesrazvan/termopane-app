@@ -24,7 +24,6 @@ export type DocumentStorageErrorCode =
   | "configuration"
   | "invalid_key"
   | "not_found"
-  | "not_implemented"
   | "unavailable";
 
 export class DocumentStorageError extends Error {

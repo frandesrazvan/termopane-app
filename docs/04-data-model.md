@@ -256,15 +256,22 @@ formula assumptions. Custom lines remain explicit manual-price snapshots.
 ## COD-025 document storage readiness notes
 
 Document storage now uses a provider abstraction around `Document.storageKey`. The local provider
-remains the default for development and tests, while the S3-compatible provider is a configuration
-stub that validates deployment environment values and fails with a controlled storage error until a
-real object-storage adapter is implemented.
+remains the default for development and tests, while the S3-compatible provider uses an SDK-backed
+server-side adapter for deployable object storage.
 
 `Document` rows remain tenant-owned metadata bound to quote versions. PDF generation passes a
 requested storage key to the provider, persists the provider-returned key on the immutable
 `Document` row, and includes that key in audit metadata. If metadata creation fails after storage
 succeeds, generation attempts to delete the provider-returned storage object to avoid orphaned files;
 no customer PII is added to storage logs or configuration.
+
+## COD-026 S3-compatible storage adapter notes
+
+The S3-compatible provider uses the AWS SDK v3 S3 client with tenant/document object keys generated
+by the PDF workflow. The provider writes content type plus user metadata for checksum,
+`quoteVersionId`, `templateKey`, and `tenantId` when those values are provided, reads object bytes
+for tenant-scoped download routes, and deletes objects during failed-generation cleanup. SDK errors
+are mapped to `DocumentStorageError` without exposing configured credentials.
 
 ## COD-020 manual commercial override notes
 
