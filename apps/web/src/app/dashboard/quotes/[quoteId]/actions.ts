@@ -7,6 +7,7 @@ import { z } from "zod";
 import { canApplyCommercialOverrides, canGeneratePdf, requireTenant } from "@/lib/auth";
 import { recalculateTenantCurrentQuoteVersion } from "@/lib/calculation/quote-calculation-adapter";
 import {
+  buildDoorCatalogSnapshot,
   buildFixedWindowCatalogSnapshot,
   isSelectableCatalogRecord,
   selectActiveCatalogPriceList,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/data";
 import {
   customLineDrawingSnapshot,
+  doorDrawingSnapshot,
   fixedWindowDrawingSnapshot,
 } from "@/lib/drawing/quote-item-drawings";
 import { generateTenantQuotePdf } from "@/lib/pdf/quote-pdf-generator";
@@ -53,6 +55,25 @@ const optionalCatalogIdSchema = z
   .trim()
   .max(191)
   .transform((value) => (value.length > 0 ? value : null));
+const optionalMoneySchema = z
+  .string()
+  .trim()
+  .transform((value, ctx) => {
+    if (value.length === 0) {
+      return null;
+    }
+
+    if (!/^\d+(\.\d{1,2})?$/.test(value)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Invalid money amount.",
+      });
+
+      return z.NEVER;
+    }
+
+    return moneyToMinor(value);
+  });
 
 const fixedWindowSchema = z.object({
   quantity: quantitySchema,
@@ -65,6 +86,23 @@ const fixedWindowSchema = z.object({
   glassPackageId: catalogIdSchema,
   colorFinishId: catalogIdSchema,
   hardwareKitId: optionalCatalogIdSchema,
+});
+
+const doorSchema = z.object({
+  quantity: quantitySchema,
+  widthMm: dimensionSchema,
+  heightMm: dimensionSchema,
+  customerDescription: descriptionSchema,
+  internalNotes: optionalText(1000),
+  profileSystemId: catalogIdSchema,
+  frameProfileId: optionalCatalogIdSchema,
+  thresholdProfileId: optionalCatalogIdSchema,
+  glassPackageId: optionalCatalogIdSchema,
+  colorFinishId: catalogIdSchema,
+  hardwareKitId: optionalCatalogIdSchema,
+  hardwareDescription: optionalText(200),
+  panelDescription: optionalText(400),
+  manualPanelPriceMinor: optionalMoneySchema,
 });
 
 const customLineSchema = z.object({
@@ -192,6 +230,49 @@ export async function addFixedWindowItemAction(quoteId: string, formData: FormDa
     context,
     quoteId,
     fixedWindowInput(parsed.data, quoteState.quote.currency, catalogSnapshot),
+  );
+
+  if (!item) {
+    redirectWithItemError(quoteId, "locked");
+  }
+
+  redirectToQuoteItems(quoteId);
+}
+
+export async function addDoorItemAction(quoteId: string, formData: FormData) {
+  const context = await requireTenant();
+  const quoteState = await requireMutableCurrentQuote(context, quoteId);
+  const parsed = doorSchema.safeParse({
+    quantity: formText(formData, "quantity"),
+    widthMm: formText(formData, "widthMm"),
+    heightMm: formText(formData, "heightMm"),
+    customerDescription: formText(formData, "customerDescription"),
+    internalNotes: formText(formData, "internalNotes"),
+    profileSystemId: formText(formData, "profileSystemId"),
+    frameProfileId: formText(formData, "frameProfileId"),
+    thresholdProfileId: formText(formData, "thresholdProfileId"),
+    glassPackageId: formText(formData, "glassPackageId"),
+    colorFinishId: formText(formData, "colorFinishId"),
+    hardwareKitId: formText(formData, "hardwareKitId"),
+    hardwareDescription: formText(formData, "hardwareDescription"),
+    panelDescription: formText(formData, "panelDescription"),
+    manualPanelPriceMinor: formText(formData, "manualPanelPrice"),
+  });
+
+  if (!parsed.success) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  const catalogSnapshot = await resolveDoorCatalogSnapshot(
+    context,
+    parsed.data,
+    quoteState.quote.currency,
+    quoteId,
+  );
+  const item = await createTenantQuoteItem(
+    context,
+    quoteId,
+    doorInput(parsed.data, quoteState.quote.currency, catalogSnapshot),
   );
 
   if (!item) {
@@ -467,6 +548,38 @@ async function parseItemUpdateInput(
     return fixedWindowInput(parsed.data, currency, catalogSnapshot);
   }
 
+  if (itemType === QuoteItemType.DOOR) {
+    const parsed = doorSchema.safeParse({
+      quantity: formText(formData, "quantity"),
+      widthMm: formText(formData, "widthMm"),
+      heightMm: formText(formData, "heightMm"),
+      customerDescription: formText(formData, "customerDescription"),
+      internalNotes: formText(formData, "internalNotes"),
+      profileSystemId: formText(formData, "profileSystemId"),
+      frameProfileId: formText(formData, "frameProfileId"),
+      thresholdProfileId: formText(formData, "thresholdProfileId"),
+      glassPackageId: formText(formData, "glassPackageId"),
+      colorFinishId: formText(formData, "colorFinishId"),
+      hardwareKitId: formText(formData, "hardwareKitId"),
+      hardwareDescription: formText(formData, "hardwareDescription"),
+      panelDescription: formText(formData, "panelDescription"),
+      manualPanelPriceMinor: formText(formData, "manualPanelPrice"),
+    });
+
+    if (!parsed.success) {
+      redirectWithItemError(quoteId, "validation");
+    }
+
+    const catalogSnapshot = await resolveDoorCatalogSnapshot(
+      context,
+      parsed.data,
+      currency,
+      quoteId,
+    );
+
+    return doorInput(parsed.data, currency, catalogSnapshot);
+  }
+
   if (itemType === QuoteItemType.CUSTOM) {
     const parsed = customLineSchema.safeParse({
       quantity: formText(formData, "quantity"),
@@ -560,6 +673,93 @@ async function resolveFixedWindowCatalogSnapshot(
   });
 }
 
+async function resolveDoorCatalogSnapshot(
+  context: TenantActionContext,
+  data: z.infer<typeof doorSchema>,
+  currency: string,
+  quoteId: string,
+) {
+  const [
+    profileSystem,
+    frameProfile,
+    thresholdProfile,
+    glassPackage,
+    colorFinish,
+    hardwareKit,
+    priceLists,
+  ] = await Promise.all([
+    getTenantProfileSystem(context, data.profileSystemId),
+    data.frameProfileId ? getTenantProfileItem(context, data.frameProfileId) : Promise.resolve(null),
+    data.thresholdProfileId
+      ? getTenantProfileItem(context, data.thresholdProfileId)
+      : Promise.resolve(null),
+    data.glassPackageId ? getTenantGlassPackage(context, data.glassPackageId) : Promise.resolve(null),
+    getTenantColorFinish(context, data.colorFinishId),
+    data.hardwareKitId ? getTenantHardwareKit(context, data.hardwareKitId) : Promise.resolve(null),
+    listTenantPriceLists(context),
+  ]);
+
+  if (
+    !profileSystem ||
+    !colorFinish ||
+    !isSelectableCatalogRecord(profileSystem) ||
+    !isSelectableCatalogRecord(colorFinish) ||
+    (colorFinish.profileSystemId && colorFinish.profileSystemId !== profileSystem.id)
+  ) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  if (
+    data.frameProfileId &&
+    (!frameProfile ||
+      !isSelectableCatalogRecord(frameProfile) ||
+      frameProfile.type !== ProfileItemType.FRAME ||
+      frameProfile.profileSystemId !== profileSystem.id)
+  ) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  if (
+    data.thresholdProfileId &&
+    (!thresholdProfile ||
+      !isSelectableCatalogRecord(thresholdProfile) ||
+      thresholdProfile.type !== ProfileItemType.THRESHOLD ||
+      thresholdProfile.profileSystemId !== profileSystem.id)
+  ) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  if (
+    data.glassPackageId &&
+    (!glassPackage || !isSelectableCatalogRecord(glassPackage))
+  ) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  if (data.hardwareKitId && (!hardwareKit || !isSelectableCatalogRecord(hardwareKit))) {
+    redirectWithItemError(quoteId, "validation");
+  }
+
+  const priceList = selectActiveCatalogPriceList(priceLists, currency);
+  const priceListItems = priceList
+    ? await listTenantPriceListItems(context, { priceListId: priceList.id })
+    : [];
+
+  return buildDoorCatalogSnapshot({
+    profileSystem,
+    frameProfile,
+    thresholdProfile,
+    glassPackage,
+    colorFinish,
+    hardwareKit,
+    panelDescription: data.panelDescription,
+    manualPanelPriceMinor: data.manualPanelPriceMinor,
+    currency,
+    priceList,
+    priceListItems,
+  });
+}
+
 function fixedWindowInput(
   data: z.infer<typeof fixedWindowSchema>,
   currency: string,
@@ -602,6 +802,62 @@ function fixedWindowInput(
     catalogSnapshot: selectedCatalogSnapshot(
       "Selecția de catalog este amânată pentru această fereastră fixă în ciornă.",
     ),
+    totalsSnapshot: emptyTotalsSnapshot(),
+  };
+}
+
+function doorInput(
+  data: z.infer<typeof doorSchema>,
+  currency: string,
+  catalogSnapshot: Record<string, unknown>,
+): TenantQuoteItemWriteInput {
+  return {
+    type: QuoteItemType.DOOR,
+    quantity: data.quantity,
+    widthMm: data.widthMm,
+    heightMm: data.heightMm,
+    customerDescription: data.customerDescription,
+    internalNotes: data.internalNotes,
+    configurationSnapshot: {
+      kind: "door",
+      quantity: data.quantity,
+      widthMm: data.widthMm,
+      heightMm: data.heightMm,
+      currency,
+      catalogSelection: {
+        profileSystemId: data.profileSystemId,
+        frameProfileId: data.frameProfileId,
+        thresholdProfileId: data.thresholdProfileId,
+        glassPackageId: data.glassPackageId,
+        colorFinishId: data.colorFinishId,
+        hardwareKitId: data.hardwareKitId,
+      },
+      panel: {
+        description: data.panelDescription,
+        manualPricing:
+          data.manualPanelPriceMinor === null
+            ? null
+            : {
+                unitPriceMinor: data.manualPanelPriceMinor,
+                currency,
+                source: "explicit-manual-panel-snapshot",
+              },
+      },
+      hardware: {
+        description: data.hardwareDescription,
+      },
+      drawing: doorDrawingSnapshot({
+        widthMm: data.widthMm,
+        heightMm: data.heightMm,
+        label: data.customerDescription,
+        split: doorDrawingSplit(data.glassPackageId, data.panelDescription),
+        panelLabel: data.panelDescription,
+      }),
+      source: "quote-item-draft-editor",
+      requiresCalculation: true,
+      calculationMode: "rough-explicit-snapshot-only",
+    },
+    catalogSnapshot,
     totalsSnapshot: emptyTotalsSnapshot(),
   };
 }
@@ -662,6 +918,25 @@ function emptyTotalsSnapshot() {
     pendingCalculation: true,
     source: "quote-item-draft-editor",
   };
+}
+
+function doorDrawingSplit(
+  glassPackageId: string | null,
+  panelDescription: string | null,
+) {
+  if (glassPackageId && panelDescription) {
+    return "glass-panel" as const;
+  }
+
+  if (glassPackageId) {
+    return "glass" as const;
+  }
+
+  if (panelDescription) {
+    return "panel" as const;
+  }
+
+  return "none" as const;
 }
 
 function isDraftVersionMutable(quoteVersion: {

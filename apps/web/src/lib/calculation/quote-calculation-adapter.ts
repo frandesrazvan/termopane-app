@@ -14,6 +14,7 @@ import {
   type CalculationUnit,
   type CommercialRulesSnapshot,
   type CustomManualLineItemInput,
+  type DoorElementInput,
   type ExplicitMaterialRequirementInput,
   type FixedWindowElementInput,
   type ManualOverrideInput,
@@ -210,6 +211,10 @@ function calculationItemFromQuoteItem(
     return customLineInput(item, configuration, quoteRules);
   }
 
+  if (item.type === QuoteItemType.DOOR || itemKind === "door") {
+    return doorInput(item, configuration, quoteRules);
+  }
+
   return {
     elementId: item.id,
     type: itemKind ?? item.type,
@@ -291,6 +296,61 @@ function fixedWindowInput(
     explicitMaterialRequirements: explicitMaterialRequirementsFromSnapshot(
       configuration.explicitMaterialRequirements ?? catalog?.explicitMaterialRequirements,
     ),
+  };
+}
+
+function doorInput(
+  item: QuoteItem,
+  configuration: JsonRecord,
+  quoteRules: CommercialRulesSnapshot,
+): DoorElementInput {
+  const catalog = toNullableJsonRecord(item.catalogSnapshot);
+  const panel = firstRecord(configuration.panel, catalog?.panel);
+  const glass = firstRecord(
+    catalog?.glass,
+    catalog?.glassSnapshot,
+    catalog?.glassPackage,
+    configuration.glass,
+    configuration.glassSnapshot,
+    configuration.glassPackage,
+  );
+  const hardware = firstRecord(
+    catalog?.hardware,
+    catalog?.hardwareKit,
+    catalog?.hardwareSnapshot,
+    configuration.hardware,
+    configuration.hardwareKit,
+  );
+  const explicitMaterials = [
+    ...(explicitMaterialRequirementsFromSnapshot(
+      configuration.explicitMaterialRequirements ?? catalog?.explicitMaterialRequirements,
+    ) ?? []),
+    ...doorExplicitMaterialRequirements(item, configuration, catalog),
+  ];
+
+  return {
+    elementId: item.id,
+    type: "door",
+    quantity: numberFrom(item.quantity, configuration.quantity) ?? 0,
+    dimensions: {
+      widthMm: numberFrom(item.widthMm, configuration.widthMm) ?? 0,
+      heightMm: numberFrom(item.heightMm, configuration.heightMm) ?? 0,
+    },
+    description:
+      item.customerDescription ??
+      stringFrom(configuration.description, configuration.customerDescription),
+    panelDescription: stringFrom(panel?.description, configuration.panelDescription),
+    glassLabel: stringFrom(glass?.label, glass?.name, glass?.compositionLabel),
+    hardwareLabel: stringFrom(
+      hardware?.label,
+      hardware?.name,
+      hardware?.category,
+      firstRecord(configuration.hardware)?.description,
+    ),
+    commercialRules: commercialRulesFromSnapshot(configuration.commercialRules) ?? quoteRules,
+    manualOverride: manualOverrideFromSnapshot(configuration.manualOverride),
+    explicitMaterialRequirements:
+      explicitMaterials.length > 0 ? Object.freeze(explicitMaterials) : undefined,
   };
 }
 
@@ -401,6 +461,63 @@ function manualOverrideFromSnapshot(value: unknown): ManualOverrideInput | undef
     timestamp: stringFrom(record.timestamp),
     auditReferenceId: stringFrom(record.auditReferenceId),
   };
+}
+
+function doorExplicitMaterialRequirements(
+  item: QuoteItem,
+  configuration: JsonRecord,
+  catalog: JsonRecord | null,
+): ExplicitMaterialRequirementInput[] {
+  const quantity = numberFrom(item.quantity, configuration.quantity) ?? 0;
+  const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
+  const panel = firstRecord(configuration.panel, catalog?.panel);
+  const panelPricing = firstRecord(panel?.manualPricing, configuration.manualPanelPricing);
+  const panelPriceMinor = numberFrom(panelPricing?.unitPriceMinor);
+  const panelDescription = stringFrom(panel?.description, configuration.panelDescription);
+  const hardware = firstRecord(
+    catalog?.hardware,
+    catalog?.hardwareKit,
+    catalog?.hardwareSnapshot,
+    configuration.hardware,
+    configuration.hardwareKit,
+  );
+  const hardwarePrice = firstRecord(hardware?.priceListItem, hardware?.price);
+  const hardwareUnit = calculationUnitFromSnapshot(hardwarePrice?.calculationUnit, hardwarePrice?.unit);
+  const hardwarePriceMinor =
+    hardwareUnit === "each" || hardwareUnit === "fixed"
+      ? numberFrom(hardwarePrice?.saleMinor, hardwarePrice?.unitPriceMinor)
+      : undefined;
+  const requirements: ExplicitMaterialRequirementInput[] = [];
+
+  if (panelPriceMinor !== undefined) {
+    requirements.push({
+      materialType: "panel",
+      catalogItemId: `manual-panel-${item.id}`,
+      label: panelDescription ?? "Panou ușă manual",
+      unit: "each",
+      quantity: safeQuantity,
+      unitPriceMinor: panelPriceMinor,
+      sourceRule: "manual-panel-price-snapshot",
+    });
+  }
+
+  if (
+    hardware &&
+    hardwarePriceMinor !== undefined &&
+    (hardwareUnit === "each" || hardwareUnit === "fixed")
+  ) {
+    requirements.push({
+      materialType: "hardware",
+      catalogItemId: stringFrom(hardware.id, hardware.catalogItemId) ?? `hardware-${item.id}`,
+      label: stringFrom(hardware.label, hardware.name, hardware.category) ?? "Feronerie ușă",
+      unit: hardwareUnit,
+      quantity: safeQuantity,
+      unitPriceMinor: hardwarePriceMinor,
+      sourceRule: "explicit-door-hardware-snapshot",
+    });
+  }
+
+  return requirements;
 }
 
 function explicitMaterialRequirementsFromSnapshot(
@@ -599,15 +716,27 @@ function unitPriceMinorFromSnapshot(
   return numberFrom(priceSnapshot?.saleMinor, priceSnapshot?.unitPriceMinor);
 }
 
-function calculationUnitFromSnapshot(value: unknown): CalculationUnit | undefined {
-  const unit = stringFrom(value);
+function calculationUnitFromSnapshot(...values: unknown[]): CalculationUnit | undefined {
+  const unit = stringFrom(...values);
+  const normalized =
+    unit === "EACH"
+      ? "each"
+      : unit === "LINEAR_METER"
+        ? "linear-meter"
+        : unit === "SQUARE_METER"
+          ? "square-meter"
+          : unit === "HOUR"
+            ? "hour"
+            : unit === "FIXED"
+              ? "fixed"
+              : unit;
 
-  return unit === "each" ||
-    unit === "linear-meter" ||
-    unit === "square-meter" ||
-    unit === "hour" ||
-    unit === "fixed"
-    ? unit
+  return normalized === "each" ||
+    normalized === "linear-meter" ||
+    normalized === "square-meter" ||
+    normalized === "hour" ||
+    normalized === "fixed"
+    ? normalized
     : undefined;
 }
 
@@ -616,6 +745,7 @@ function isExplicitMaterialType(
 ): value is ExplicitMaterialRequirementInput["materialType"] {
   return (
     value === "hardware" ||
+    value === "panel" ||
     value === "reinforcement" ||
     value === "labor" ||
     value === "accessory" ||

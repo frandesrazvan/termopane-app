@@ -143,3 +143,14 @@ the pure calculation package, and compares expected totals and warning codes.
 Validated historical packs should contain between 10 and 20 cases. Unknown or unprovided business
 rules must stay marked as pending business-owner input or `requires business validation`; they must
 not be filled with invented production formulas.
+
+## COD-028 door MVP calculation notes
+
+Door quote items are supported as rough MVP calculation inputs with `type: "door"`. The calculator
+validates dimensions and quantity, accepts explicit snapshot material prices such as a manual panel
+price or safely-priced hardware, and returns customer totals from those explicit values only.
+
+The calculator emits `MISSING_DOOR_FORMULA` for door items because panel sizing, locks, thresholds,
+reinforcement, and door-specific fabrication formulas are not validated. Door glass, panel, profile,
+threshold, and hardware quantities must not be derived from hard-coded assumptions; future production
+behavior needs tenant-provided configuration or business-validated formulas.

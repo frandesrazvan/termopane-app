@@ -10,6 +10,7 @@ export type CalculationWarningCode =
   | "MISSING_GLASS_PRICE"
   | "MISSING_PROFILE_PRICE"
   | "MISSING_CUSTOM_LINE_PRICE"
+  | "MISSING_DOOR_FORMULA"
   | "MISSING_EXPLICIT_MATERIAL_PRICE"
   | "UNSUPPORTED_ITEM_TYPE"
   | "QUOTE_DISCOUNT_APPLIED"
@@ -42,6 +43,7 @@ export type CalculationUnit =
 export type MaterialRequirementType =
   | "glass"
   | "profile"
+  | "panel"
   | "custom-line"
   | "hardware"
   | "reinforcement"
@@ -130,6 +132,23 @@ export type CustomManualLineItemInput = Readonly<{
   explicitMaterialRequirements?: readonly ExplicitMaterialRequirementInput[];
 }>;
 
+export type DoorElementInput = Readonly<{
+  elementId: string;
+  type: "door";
+  quantity: number;
+  dimensions: Readonly<{
+    widthMm: number;
+    heightMm: number;
+  }>;
+  description?: string;
+  panelDescription?: string;
+  glassLabel?: string;
+  hardwareLabel?: string;
+  commercialRules?: CommercialRulesSnapshot;
+  manualOverride?: ManualOverrideInput;
+  explicitMaterialRequirements?: readonly ExplicitMaterialRequirementInput[];
+}>;
+
 export type UnsupportedCalculationItemInput = Readonly<{
   elementId: string;
   type: string;
@@ -140,6 +159,7 @@ export type UnsupportedCalculationItemInput = Readonly<{
 
 export type CalculationItemInput =
   | FixedWindowElementInput
+  | DoorElementInput
   | CustomManualLineItemInput
   | UnsupportedCalculationItemInput;
 
@@ -397,6 +417,10 @@ function calculateItem(
     return calculateCustomLine(input as CustomManualLineItemInput, commercialRules, path);
   }
 
+  if (input.type === "door") {
+    return calculateDoor(input as DoorElementInput, commercialRules, path);
+  }
+
   return unsupportedItem(input, path);
 }
 
@@ -582,6 +606,121 @@ function calculateCustomLine(
     profiles: Object.freeze([]),
     profileLinearMeters: Object.freeze([]),
     materialRequirements,
+    totals,
+    warnings: Object.freeze(warnings),
+    trace: Object.freeze(trace),
+  });
+}
+
+function calculateDoor(
+  input: DoorElementInput,
+  commercialRules: CommercialRulesSnapshot,
+  path: string,
+): ElementCalculationResult {
+  const warnings: CalculationWarning[] = [];
+  const trace: CalculationTraceEntry[] = [];
+  const quantity = input.quantity;
+  const hasValidWidth = isPositiveFinite(input.dimensions.widthMm);
+  const hasValidHeight = isPositiveFinite(input.dimensions.heightMm);
+  const hasValidDimensions = hasValidWidth && hasValidHeight;
+  const hasValidQuantity = Number.isInteger(quantity) && quantity > 0;
+
+  if (!hasValidWidth) {
+    warnings.push(
+      warning(
+        "INVALID_DIMENSION",
+        "Door width must be a positive millimeter value.",
+        `${path}.dimensions.widthMm`,
+      ),
+    );
+  }
+
+  if (!hasValidHeight) {
+    warnings.push(
+      warning(
+        "INVALID_DIMENSION",
+        "Door height must be a positive millimeter value.",
+        `${path}.dimensions.heightMm`,
+      ),
+    );
+  }
+
+  if (!hasValidQuantity) {
+    warnings.push(
+      warning("INVALID_QUANTITY", "Door quantity must be a positive integer.", `${path}.quantity`),
+    );
+  }
+
+  warnings.push(
+    warning(
+      "MISSING_DOOR_FORMULA",
+      "Door MVP uses explicit snapshot prices only; panel, lock, threshold, and reinforcement formulas are not validated.",
+      path,
+    ),
+  );
+
+  if (!hasValidDimensions) {
+    warnings.push(
+      warning(
+        "CALCULATION_BLOCKED",
+        "Door rough calculation was blocked because dimensions are invalid.",
+        `${path}.dimensions`,
+      ),
+    );
+  }
+
+  const explicitMaterials = calculateExplicitMaterialRequirements(
+    input.elementId,
+    input.explicitMaterialRequirements ?? [],
+    path,
+    warnings,
+    trace,
+  );
+  const explicitMaterialCostMinor = hasValidQuantity
+    ? sumMoney(explicitMaterials.map((material) => material.costMinor))
+    : 0;
+
+  trace.push({
+    step: "doorMvpCalculation",
+    itemId: input.elementId,
+    inputs: {
+      widthMm: input.dimensions.widthMm,
+      heightMm: input.dimensions.heightMm,
+      quantity,
+      explicitMaterialCount: explicitMaterials.length,
+      panelDescription: input.panelDescription,
+      glassLabel: input.glassLabel,
+      hardwareLabel: input.hardwareLabel,
+    },
+    output: { explicitMaterialCostMinor },
+    note: "Door MVP totals use explicit snapshot materials only; no production door formulas applied.",
+  });
+
+  const totals = calculateCommercialTotals(
+    explicitMaterialCostMinor,
+    commercialRules,
+    input.manualOverride,
+    hasValidDimensions && hasValidQuantity,
+    `${path}.manualOverride`,
+    warnings,
+    trace,
+    {
+      glassCostMinor: 0,
+      profileCostMinor: 0,
+      explicitMaterialCostMinor,
+      customLineCostMinor: 0,
+    },
+  );
+
+  return Object.freeze({
+    elementId: input.elementId,
+    type: input.type,
+    quantity,
+    glass: null,
+    glassCuts: Object.freeze([]),
+    profiles: Object.freeze([]),
+    profileLinearMeters: Object.freeze([]),
+    materialRequirements: explicitMaterials,
     totals,
     warnings: Object.freeze(warnings),
     trace: Object.freeze(trace),

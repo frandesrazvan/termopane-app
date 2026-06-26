@@ -2,7 +2,7 @@ export type DrawingPackageInfo = Readonly<{
   packageName: "@termopane/drawing";
   status: "mvp";
   supportedOutputs: readonly ["svg"];
-  supportedItems: readonly ["fixed-window", "custom-placeholder"];
+  supportedItems: readonly ["fixed-window", "door", "custom-placeholder"];
 }>;
 
 export type FixedWindowDrawingJson = Readonly<{
@@ -19,8 +19,19 @@ export type CustomPlaceholderDrawingJson = Readonly<{
   note?: string;
 }>;
 
+export type DoorDrawingJson = Readonly<{
+  type: "door";
+  widthMm: number;
+  heightMm: number;
+  label?: string;
+  split?: "glass-panel" | "glass" | "panel" | "none";
+  glassLabel?: string;
+  panelLabel?: string;
+}>;
+
 export type QuoteItemDrawingJson =
   | FixedWindowDrawingJson
+  | DoorDrawingJson
   | CustomPlaceholderDrawingJson;
 
 export type QuoteItemDrawingSnapshot = Readonly<{
@@ -45,7 +56,7 @@ export function getDrawingPackageInfo(): DrawingPackageInfo {
     packageName: "@termopane/drawing",
     status: "mvp",
     supportedOutputs: ["svg"] as const,
-    supportedItems: ["fixed-window", "custom-placeholder"] as const,
+    supportedItems: ["fixed-window", "door", "custom-placeholder"] as const,
   });
 }
 
@@ -68,6 +79,10 @@ export function createQuoteItemDrawingSnapshot(
 export function renderQuoteItemSvg(input: QuoteItemDrawingJson): string {
   if (input.type === "fixed-window") {
     return renderFixedWindowSvg(input);
+  }
+
+  if (input.type === "door") {
+    return renderDoorSvg(input);
   }
 
   return renderCustomPlaceholderSvg(input);
@@ -102,6 +117,56 @@ export function renderFixedWindowSvg(input: FixedWindowDrawingJson): string {
       <line x1="217" y1="${DRAWING_TOP + DRAWING_HEIGHT}" x2="227" y2="${DRAWING_TOP + DRAWING_HEIGHT}" stroke="#475569" stroke-width="1.5"/>
       <text x="245" y="${DRAWING_TOP + DRAWING_HEIGHT / 2}" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" transform="rotate(90 245 ${DRAWING_TOP + DRAWING_HEIGHT / 2})">${escapeXml(heightLabel)}</text>
       <text x="${DRAWING_LEFT + DRAWING_WIDTH / 2}" y="18" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#334155">Schemă orientativă</text>
+    </svg>
+  `);
+}
+
+export function renderDoorSvg(input: DoorDrawingJson): string {
+  const widthMm = safePositiveNumber(input.widthMm);
+  const heightMm = safePositiveNumber(input.heightMm);
+  const widthLabel = `${formatDimension(widthMm)} mm`;
+  const heightLabel = `${formatDimension(heightMm)} mm`;
+  const title = input.label?.trim() || `Ușă ${widthLabel} x ${heightLabel}`;
+  const split = input.split ?? "glass-panel";
+  const panelInset = FRAME_STROKE;
+  const innerX = DRAWING_LEFT + panelInset;
+  const innerY = DRAWING_TOP + panelInset;
+  const innerWidth = DRAWING_WIDTH - panelInset * 2;
+  const innerHeight = DRAWING_HEIGHT - panelInset * 2;
+  const splitY = innerY + Math.round(innerHeight * 0.46);
+  const glassHeight = splitY - innerY;
+  const panelHeight = innerY + innerHeight - splitY;
+  const showGlass = split === "glass-panel" || split === "glass";
+  const showPanel = split === "glass-panel" || split === "panel";
+  const panelOnlyY = showGlass && showPanel ? splitY : innerY;
+  const panelOnlyHeight = showGlass && showPanel ? panelHeight : innerHeight;
+
+  return compactSvg(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="${SVG_WIDTH}" height="${SVG_HEIGHT}" viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}" role="img" aria-label="${escapeXml(title)}">
+      <title>${escapeXml(title)}</title>
+      <rect x="0" y="0" width="${SVG_WIDTH}" height="${SVG_HEIGHT}" rx="8" fill="#f8fafc"/>
+      <rect x="${DRAWING_LEFT}" y="${DRAWING_TOP}" width="${DRAWING_WIDTH}" height="${DRAWING_HEIGHT}" fill="#fefce8" stroke="#1f2937" stroke-width="${FRAME_STROKE}"/>
+      ${
+        showGlass
+          ? `<rect x="${innerX}" y="${innerY}" width="${innerWidth}" height="${showPanel ? glassHeight : innerHeight}" fill="#e0f2fe" stroke="#64748b" stroke-width="1"/><text x="${innerX + innerWidth / 2}" y="${innerY + (showPanel ? glassHeight : innerHeight) / 2 + 4}" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#0369a1">${escapeXml(input.glassLabel?.trim() || "Sticlă")}</text>`
+          : ""
+      }
+      ${
+        showPanel
+          ? `<rect x="${innerX}" y="${panelOnlyY}" width="${innerWidth}" height="${panelOnlyHeight}" fill="#fff7ed" stroke="#64748b" stroke-width="1"/><text x="${innerX + innerWidth / 2}" y="${panelOnlyY + panelOnlyHeight / 2 + 4}" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#9a3412">${escapeXml(input.panelLabel?.trim() || "Panou")}</text>`
+          : ""
+      }
+      ${split === "none" ? `<line x1="${innerX}" y1="${innerY}" x2="${innerX + innerWidth}" y2="${innerY + innerHeight}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 5"/>` : ""}
+      <circle cx="${DRAWING_LEFT + DRAWING_WIDTH - 18}" cy="${DRAWING_TOP + DRAWING_HEIGHT / 2}" r="3.5" fill="#334155"/>
+      <line x1="${DRAWING_LEFT}" y1="158" x2="${DRAWING_LEFT + DRAWING_WIDTH}" y2="158" stroke="#475569" stroke-width="1.5"/>
+      <line x1="${DRAWING_LEFT}" y1="153" x2="${DRAWING_LEFT}" y2="163" stroke="#475569" stroke-width="1.5"/>
+      <line x1="${DRAWING_LEFT + DRAWING_WIDTH}" y1="153" x2="${DRAWING_LEFT + DRAWING_WIDTH}" y2="163" stroke="#475569" stroke-width="1.5"/>
+      <text x="${DRAWING_LEFT + DRAWING_WIDTH / 2}" y="178" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a">${escapeXml(widthLabel)}</text>
+      <line x1="222" y1="${DRAWING_TOP}" x2="222" y2="${DRAWING_TOP + DRAWING_HEIGHT}" stroke="#475569" stroke-width="1.5"/>
+      <line x1="217" y1="${DRAWING_TOP}" x2="227" y2="${DRAWING_TOP}" stroke="#475569" stroke-width="1.5"/>
+      <line x1="217" y1="${DRAWING_TOP + DRAWING_HEIGHT}" x2="227" y2="${DRAWING_TOP + DRAWING_HEIGHT}" stroke="#475569" stroke-width="1.5"/>
+      <text x="245" y="${DRAWING_TOP + DRAWING_HEIGHT / 2}" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" transform="rotate(90 245 ${DRAWING_TOP + DRAWING_HEIGHT / 2})">${escapeXml(heightLabel)}</text>
+      <text x="${DRAWING_LEFT + DRAWING_WIDTH / 2}" y="18" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#334155">Schemă orientativă ușă</text>
     </svg>
   `);
 }

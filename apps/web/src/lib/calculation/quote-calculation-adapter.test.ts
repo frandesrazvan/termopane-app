@@ -234,6 +234,41 @@ describe("quote calculation adapter", () => {
     });
   });
 
+  it("recalculates a door MVP item from explicit panel and hardware snapshots with warnings", async () => {
+    const state = testState({ items: [doorItem()] });
+    const result = await recalculateTenantCurrentQuoteVersion(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      { client: state.client },
+    );
+
+    expectCalculationOk(result);
+    expect(result.quoteVersion).toMatchObject({
+      subtotalMinor: 34_000,
+      vatMinor: 6_460,
+      totalMinor: 40_460,
+    });
+    expect(result.quoteVersion.warningsSnapshot).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "MISSING_DOOR_FORMULA" })]),
+    );
+    expect(state.quoteItems[0]?.totalsSnapshot).toMatchObject({
+      subtotalMinor: 34_000,
+      totalMinor: 40_460,
+    });
+
+    const outputSnapshot = asRecord(state.calculationResults[0]?.outputSnapshot);
+    const outputItems = outputSnapshot?.items as Array<Record<string, unknown>>;
+    const materialRequirements = outputSnapshot?.materialRequirements as Array<Record<string, unknown>>;
+
+    expect(outputItems[0]?.type).toBe("door");
+    expect(materialRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ materialType: "panel", costMinor: 24_000 }),
+        expect.objectContaining({ materialType: "hardware", costMinor: 10_000 }),
+      ]),
+    );
+  });
+
   it("stores manual override and quote discount totals for commercial review", async () => {
     const state = testState({
       items: [
@@ -640,6 +675,62 @@ function customLineItem(overrides: Partial<QuoteItem> = {}) {
         unitPriceMinor: 5_000,
         currency: "RON",
         isFormula: false,
+      },
+    },
+    calculationSnapshot: null,
+    totalsSnapshot: { subtotalMinor: 0, vatMinor: 0, totalMinor: 0, pendingCalculation: true },
+    createdAt: new Date("2026-06-25T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-25T00:00:00.000Z"),
+    ...overrides,
+  } as unknown as QuoteItem;
+}
+
+function doorItem(overrides: Partial<QuoteItem> = {}) {
+  return {
+    id: "item-door",
+    tenantId: "tenant-a",
+    quoteVersionId: "version-a",
+    type: QuoteItemType.DOOR,
+    sortOrder: 0,
+    quantity: 2,
+    widthMm: 900,
+    heightMm: 2_100,
+    customerDescription: "Synthetic entrance door",
+    internalNotes: null,
+    configurationSnapshot: {
+      kind: "door",
+      quantity: 2,
+      widthMm: 900,
+      heightMm: 2_100,
+      panel: {
+        description: "Synthetic decorative panel",
+        manualPricing: {
+          unitPriceMinor: 12_000,
+          currency: "RON",
+          source: "explicit-manual-panel-snapshot",
+        },
+      },
+      hardware: {
+        description: "Synthetic handle and lock",
+      },
+    },
+    catalogSnapshot: {
+      hardwareKit: {
+        id: "hardware-door",
+        name: "Synthetic door hardware",
+        priceListItem: {
+          id: "price-hardware-door",
+          unit: "EACH",
+          saleMinor: 5_000,
+        },
+      },
+      panel: {
+        description: "Synthetic decorative panel",
+        manualPricing: {
+          unitPriceMinor: 12_000,
+          currency: "RON",
+          isFormula: false,
+        },
       },
     },
     calculationSnapshot: null,

@@ -76,3 +76,14 @@ numbering, and per-user dashboard preferences. Company and PDF defaults affect n
 snapshots only; locked historical versions continue to render from their stored snapshots. Tenant
 quote numbers are generated from tenant-owned numbering settings with collision retries instead of
 temporary random app-side numbers.
+
+## COD-028 door item MVP notes
+
+Draft quotes now offer the first `DOOR` item flow alongside fixed windows and custom lines. Door
+items capture quantity, dimensions, customer description, profile system, optional frame/threshold
+profile, optional glass package, panel/manual panel text and price, color, hardware placeholder, and
+internal notes. Door drawings are simple customer-review schematics only.
+
+Door calculation remains rough MVP behavior. It uses explicit selected snapshot prices such as manual
+panel price or safely-priced hardware where present, stores warnings for missing door-specific
+formulas, and does not invent panel, lock, threshold, reinforcement, or fabrication rules.

@@ -1741,6 +1741,63 @@ describe("tenant repositories", () => {
     });
   });
 
+  it("adds, edits, and deletes a door item in the current mutable draft", async () => {
+    const data = createTenantDataAccess(testClient());
+    const created = await data.createTenantQuoteItem(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      doorQuoteItemInput({
+        customerDescription: "Ușă intrare sintetică",
+        panelDescription: "Panou decorativ sintetic",
+      }),
+    );
+
+    expect(created).toMatchObject({
+      tenantId: "tenant-a",
+      quoteVersionId: "version-a",
+      type: QuoteItemType.DOOR,
+      quantity: 1,
+      widthMm: 900,
+      heightMm: 2100,
+      customerDescription: "Ușă intrare sintetică",
+      configurationSnapshot: {
+        kind: "door",
+        panel: {
+          description: "Panou decorativ sintetic",
+        },
+      },
+    });
+
+    const updated = await data.updateTenantQuoteItem(
+      { tenantId: "tenant-a" },
+      created!.id,
+      doorQuoteItemInput({
+        quantity: 2,
+        widthMm: 950,
+        customerDescription: "Ușă intrare actualizată",
+        panelDescription: "Panou plin actualizat",
+      }),
+    );
+
+    expect(updated).toMatchObject({
+      id: created?.id,
+      type: QuoteItemType.DOOR,
+      quantity: 2,
+      widthMm: 950,
+      customerDescription: "Ușă intrare actualizată",
+      configurationSnapshot: {
+        kind: "door",
+        panel: {
+          description: "Panou plin actualizat",
+        },
+      },
+    });
+    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, created!.id)).resolves.toMatchObject({
+      id: created?.id,
+      type: QuoteItemType.DOOR,
+    });
+  });
+
   it("applies an audited item-level manual override to a current draft item", async () => {
     const auditLogs: AuditLog[] = [];
     const data = createTenantDataAccess(testClient({ auditLogs }));
@@ -1856,10 +1913,12 @@ describe("tenant repositories", () => {
         { tenantId: "tenant-a" },
         "quote-locked",
         {
-          type: QuoteItemType.CUSTOM,
+          type: QuoteItemType.DOOR,
           quantity: 1,
-          customerDescription: "Blocked custom line",
-          configurationSnapshot: { kind: "custom-line" },
+          widthMm: 900,
+          heightMm: 2100,
+          customerDescription: "Blocked door line",
+          configurationSnapshot: { kind: "door" },
         },
       ),
     ).resolves.toBeNull();
@@ -1936,6 +1995,28 @@ describe("tenant repositories", () => {
         targetStatus: QuoteVersionStatus.LOCKED,
       },
     });
+  });
+
+  it("rejects door item edits and deletes after the draft version is locked", async () => {
+    const data = createTenantDataAccess(testClient());
+    const created = await data.createTenantQuoteItem(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      doorQuoteItemInput(),
+    );
+
+    expect(created).not.toBeNull();
+    await data.lockTenantQuoteVersion(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      { actorUserId: "user-a" },
+    );
+    await expect(
+      data.updateTenantQuoteItem({ tenantId: "tenant-a" }, created!.id, {
+        customerDescription: "Blocked locked door edit",
+      }),
+    ).resolves.toBeNull();
+    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, created!.id)).resolves.toBeNull();
   });
 
   it("creates a revision from a locked version while preserving the old version and copying item snapshots", async () => {
@@ -2057,6 +2138,27 @@ describe("tenant repositories", () => {
     ).resolves.toBeNull();
   });
 
+  it("rejects cross-tenant door item access and mutations", async () => {
+    const data = createTenantDataAccess(testClient());
+    const tenantBDoor = await data.createTenantQuoteItem(
+      { tenantId: "tenant-b" },
+      "quote-b",
+      doorQuoteItemInput({ customerDescription: "Ușă tenant B" }),
+    );
+
+    expect(tenantBDoor).toMatchObject({
+      tenantId: "tenant-b",
+      type: QuoteItemType.DOOR,
+    });
+    await expect(data.getTenantQuoteItem({ tenantId: "tenant-a" }, tenantBDoor!.id)).resolves.toBeNull();
+    await expect(
+      data.updateTenantQuoteItem({ tenantId: "tenant-a" }, tenantBDoor!.id, {
+        customerDescription: "Blocked cross-tenant door edit",
+      }),
+    ).resolves.toBeNull();
+    await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, tenantBDoor!.id)).resolves.toBeNull();
+  });
+
   it("creates tenant-scoped quote PDF document metadata with an audit entry", async () => {
     const auditLogs: AuditLog[] = [];
     const data = createTenantDataAccess(testClient({ auditLogs }));
@@ -2115,4 +2217,62 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function doorQuoteItemInput(
+  overrides: {
+    customerDescription?: string;
+    heightMm?: number;
+    panelDescription?: string;
+    quantity?: number;
+    widthMm?: number;
+  } = {},
+) {
+  const quantity = overrides.quantity ?? 1;
+  const widthMm = overrides.widthMm ?? 900;
+  const heightMm = overrides.heightMm ?? 2100;
+  const panelDescription = overrides.panelDescription ?? "Panou decorativ";
+
+  return {
+    type: QuoteItemType.DOOR,
+    quantity,
+    widthMm,
+    heightMm,
+    customerDescription: overrides.customerDescription ?? "Ușă intrare",
+    internalNotes: "Door synthetic internal note",
+    configurationSnapshot: {
+      kind: "door",
+      quantity,
+      widthMm,
+      heightMm,
+      panel: {
+        description: panelDescription,
+        manualPricing: {
+          unitPriceMinor: 12_000,
+          currency: "RON",
+          source: "explicit-manual-panel-snapshot",
+        },
+      },
+      source: "quote-item-draft-editor",
+    },
+    catalogSnapshot: {
+      source: "tenant-catalog",
+      snapshotVersion: "cod-028-door-catalog-v1",
+      panel: {
+        description: panelDescription,
+        manualPricing: {
+          unitPriceMinor: 12_000,
+          currency: "RON",
+          isFormula: false,
+        },
+      },
+      requiresBusinessValidation: true,
+    },
+    totalsSnapshot: {
+      subtotalMinor: 0,
+      vatMinor: 0,
+      totalMinor: 0,
+      pendingCalculation: true,
+    },
+  };
 }

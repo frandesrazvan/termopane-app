@@ -42,6 +42,43 @@ describe("QuoteItemDrawingPreview", () => {
     expect(markup).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(markup).not.toContain("<script>");
   });
+
+  it("renders a door item preview with Romanian glass and panel labels", () => {
+    const markup = renderToStaticMarkup(
+      <QuoteItemDrawingPreview
+        item={quoteItem({
+          id: "item-door",
+          type: QuoteItemType.DOOR,
+          widthMm: 900,
+          heightMm: 2_100,
+          customerDescription: "Ușă intrare",
+          configurationSnapshot: {
+            kind: "door",
+            widthMm: 900,
+            heightMm: 2_100,
+            drawing: {
+              input: {
+                type: "door",
+                widthMm: 900,
+                heightMm: 2_100,
+                label: "Ușă intrare",
+                split: "glass-panel",
+                glassLabel: "Sticlă mată",
+                panelLabel: "Panou plin",
+              },
+            },
+          },
+        })}
+      />,
+    );
+
+    expect(markup).toContain("<svg");
+    expect(markup).toContain("900 mm");
+    expect(markup).toContain("2100 mm");
+    expect(markup).toContain("Sticlă mată");
+    expect(markup).toContain("Panou plin");
+    expect(markup).toContain("Schemă orientativă ușă");
+  });
 });
 
 function quoteItem(overrides: Partial<QuoteItem> = {}) {

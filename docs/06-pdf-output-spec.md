@@ -163,3 +163,12 @@ Company settings now include the default PDF template key. New quote versions sn
 the other company settings, and preview/PDF generation uses the snapshotted default when no explicit
 template is selected. Generated documents still persist the actual template key used, so later
 settings changes do not rewrite historical PDF metadata or locked quote-version output.
+
+## COD-028 door output notes
+
+Door quote items render in customer-facing HTML/PDF output as `Ușă`. The visible line includes
+quantity, dimensions, glass/panel text, hardware text, schematic drawing, and customer totals. Door
+internal notes, internal material costs, and calculation traces remain excluded from customer output.
+
+Door drawings are schematic only. They show a rectangular door with optional glass/panel split and
+dimension labels; they do not represent production fabrication geometry.

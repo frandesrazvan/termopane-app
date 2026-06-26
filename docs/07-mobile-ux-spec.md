@@ -123,6 +123,17 @@ numbering, and personal shortcuts. OWNER/ADMIN users can edit company settings, 
 edit numbering, and restricted roles see read-only controls for tenant-wide settings. The quote-number
 preview must remain visible near prefix/date/next-number inputs on small screens.
 
+## COD-028 door item UX notes
+
+The quote detail draft editor now exposes three first-step item choices: `Fereastră fixă`, `Ușă`, and
+`Poziție personalizată`. The door form keeps quantity, width, height, customer description, catalog
+selection, panel/manual price, hardware placeholder, and internal notes in one compact mobile-first
+section.
+
+Door drawings are orientative rectangular schematics with optional glass/panel split and dimensions.
+Calculation warnings for missing door formulas must stay visible before document generation so users
+understand the MVP door total is based only on explicit snapshot prices.
+
 ## Accessibility and responsiveness
 
 - Tap targets should be large enough for mobile use.

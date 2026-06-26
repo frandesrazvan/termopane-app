@@ -291,6 +291,19 @@ next number only after the quote shell is created. Unique quote-number collision
 tenant sequence number before returning a controlled collision error. Company and quote-number
 changes create `AuditLog` rows with `SETTINGS_UPDATED` or `QUOTE_NUMBERING_UPDATED`.
 
+## COD-028 door item notes
+
+`QuoteItemType.DOOR` is now used by the draft quote editor. Door items remain tenant-owned
+`QuoteItem` rows and store the MVP door fields in `configurationSnapshot`: dimensions, quantity,
+panel/manual pricing text, hardware placeholder text, and the reusable drawing snapshot. Selected
+profile system, optional frame profile, optional threshold profile, optional glass package, color,
+optional hardware kit, active price-list references, and safe sale-price snapshots are stored in
+`catalogSnapshot`.
+
+Door snapshots intentionally do not encode production panel, lock, threshold, reinforcement, or cut
+formulas. The calculation adapter reads the frozen snapshots and converts only explicit safe values,
+such as manual panel price or per-door hardware price, into calculation input.
+
 ## COD-020 manual commercial override notes
 
 Tenant memberships now include `canApplyCommercialOverrides` so override permission is separate from

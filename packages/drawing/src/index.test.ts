@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createQuoteItemDrawingSnapshot,
   getDrawingPackageInfo,
+  renderDoorSvg,
   renderFixedWindowSvg,
   renderQuoteItemSvg,
 } from "./index.js";
@@ -57,6 +58,27 @@ describe("drawing package MVP renderer", () => {
     expect(svg).not.toContain("<unsafe>");
   });
 
+  it("renders a Romanian-safe door schematic with panel and glass split", () => {
+    const svg = renderDoorSvg({
+      type: "door",
+      widthMm: 900,
+      heightMm: 2_100,
+      label: 'Ușă <intrare>',
+      split: "glass-panel",
+      glassLabel: "Sticlă mată",
+      panelLabel: "Panou plin",
+    });
+
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("900 mm");
+    expect(svg).toContain("2100 mm");
+    expect(svg).toContain("Sticlă mată");
+    expect(svg).toContain("Panou plin");
+    expect(svg).toContain("Schemă orientativă ușă");
+    expect(svg).toContain("Ușă &lt;intrare&gt;");
+    expect(svg).not.toContain("<intrare>");
+  });
+
   it("creates a reusable drawing snapshot", () => {
     const snapshot = createQuoteItemDrawingSnapshot({
       type: "fixed-window",
@@ -81,7 +103,7 @@ describe("drawing package MVP renderer", () => {
     expect(getDrawingPackageInfo()).toMatchObject({
       status: "mvp",
       supportedOutputs: ["svg"],
-      supportedItems: ["fixed-window", "custom-placeholder"],
+      supportedItems: ["fixed-window", "door", "custom-placeholder"],
     });
   });
 });

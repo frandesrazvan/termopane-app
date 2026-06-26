@@ -4,6 +4,7 @@ import {
   calculateQuote,
   type CalculationItemInput,
   type CustomManualLineItemInput,
+  type DoorElementInput,
   type FixedWindowElementInput,
 } from "./index.js";
 
@@ -44,6 +45,40 @@ const customLine: CustomManualLineItemInput = {
   quantity: 2,
   unit: "each",
   unitPriceMinor: 5_000,
+  commercialRules,
+};
+
+const doorInput: DoorElementInput = {
+  elementId: "door-1",
+  type: "door",
+  quantity: 2,
+  dimensions: {
+    widthMm: 900,
+    heightMm: 2_100,
+  },
+  description: "Ușă intrare sintetică",
+  panelDescription: "Panou decorativ manual",
+  hardwareLabel: "Feronerie ușă explicită",
+  explicitMaterialRequirements: [
+    {
+      materialType: "panel",
+      catalogItemId: "manual-panel-door-1",
+      label: "Panou decorativ manual",
+      unit: "each",
+      quantity: 2,
+      unitPriceMinor: 12_000,
+      sourceRule: "manual-panel-price-snapshot",
+    },
+    {
+      materialType: "hardware",
+      catalogItemId: "hardware-door",
+      label: "Feronerie ușă explicită",
+      unit: "each",
+      quantity: 2,
+      unitPriceMinor: 5_000,
+      sourceRule: "explicit-door-hardware-snapshot",
+    },
+  ],
   commercialRules,
 };
 
@@ -274,6 +309,35 @@ describe("calculateElement", () => {
 });
 
 describe("calculateQuote", () => {
+  it("supports rough door MVP items from explicit snapshot prices and warnings", () => {
+    const quote = calculateQuote({
+      quoteId: "quote-door",
+      commercialRules,
+      items: [doorInput],
+    });
+
+    expect(quote.items[0]?.type).toBe("door");
+    expect(quote.items[0]?.totals.explicitMaterialCostMinor).toBe(34_000);
+    expect(quote.items[0]?.materialRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          materialType: "panel",
+          quantity: 2,
+          costMinor: 24_000,
+          sourceRule: "manual-panel-price-snapshot",
+        }),
+        expect.objectContaining({
+          materialType: "hardware",
+          quantity: 2,
+          costMinor: 10_000,
+          sourceRule: "explicit-door-hardware-snapshot",
+        }),
+      ]),
+    );
+    expect(quote.warnings.map((warning) => warning.code)).toContain("MISSING_DOOR_FORMULA");
+    expect(quote.trace.some((entry) => entry.step === "doorMvpCalculation")).toBe(true);
+  });
+
   it("supports custom manual line items with explicit snapshot prices", () => {
     const quote = calculateQuote({
       quoteId: "quote-custom",

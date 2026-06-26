@@ -27,6 +27,12 @@ production formulas.
   price-list references, and sale-price snapshots are frozen on `QuoteItem.catalogSnapshot`.
 - Quote calculation uses selected fixed-window glass/profile price and deduction snapshots where
   available. Missing prices or deduction values still produce warnings instead of invented formulas.
+- Draft quotes can now add fixed-window, door, or custom lines. Door items store dimensions, profile
+  system, optional frame/threshold/glass/hardware selections, panel/manual pricing notes, color, and
+  an orientative door schematic.
+- Door calculation is a rough MVP path only: it uses explicit panel/hardware snapshot prices where
+  present and emits warnings for missing door-specific panel, lock, threshold, and reinforcement
+  formulas instead of inventing production rules.
 - Draft quote workflow exposes audited commercial controls: authorized OWNER/ADMIN users and
   explicitly permitted ESTIMATOR users can apply item-level final-total overrides and quote-level
   discounts with a required reason. DEALER users remain blocked from these override actions.
@@ -221,7 +227,8 @@ pnpm verify
 
 - Real bucket integration tests and deployment-specific storage smoke tests.
 - Email sending or customer delivery workflow.
-- Door, accessory, service, and advanced pricing-rule selection inside the quote builder.
+- Accessory, service, and advanced pricing-rule selection inside the quote builder.
+- Production-ready door formulas for panels, locks, thresholds, reinforcement, and fabrication.
 - Real production formulas or supplier-specific pricing rules.
 - Logo upload and richer account/user-management workflows.
 - Invoicing, ERP, CNC export, stock, or accounting integrations.
