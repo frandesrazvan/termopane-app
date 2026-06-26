@@ -67,6 +67,15 @@ export function buildQuotePdfOfferSnapshot(
   };
 }
 
+export function defaultQuotePdfTemplateKeyFromVersion(
+  quoteVersion: QuoteVersion,
+): QuotePdfTemplateKey {
+  const settings = asRecord(quoteVersion.companySettingsSnapshot);
+  const templateKey = settings?.defaultPdfTemplate;
+
+  return templateKey === "template-b" ? "template-b" : "template-a";
+}
+
 export function isQuoteVersionLockedForCustomerOutput(quoteVersion: {
   status: QuoteVersionStatus;
   isLocked: boolean;

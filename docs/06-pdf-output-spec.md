@@ -156,3 +156,10 @@ tenant id. Get operations return bytes to the existing tenant/quote-scoped downl
 operations are used by failed generation cleanup. Missing objects map to `not_found`; invalid keys
 map to `invalid_key`; credential, endpoint, or network failures map to controlled storage errors
 without leaking secret values.
+
+## COD-027 settings-backed PDF defaults
+
+Company settings now include the default PDF template key. New quote versions snapshot that key with
+the other company settings, and preview/PDF generation uses the snapshotted default when no explicit
+template is selected. Generated documents still persist the actual template key used, so later
+settings changes do not rewrite historical PDF metadata or locked quote-version output.

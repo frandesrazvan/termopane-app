@@ -3,6 +3,8 @@ export {
   canApplyCommercialOverrides,
   canGeneratePdf,
   canManageCatalog,
+  canManageCompanySettings,
+  canManageQuoteNumbering,
   canManageUsers,
   canViewInternalCosts,
   isActiveMembership,

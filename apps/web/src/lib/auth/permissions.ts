@@ -43,6 +43,26 @@ export function canManageUsers(membership: PermissionMembership | null | undefin
   return membership.role === TenantRole.OWNER;
 }
 
+export function canManageCompanySettings(
+  membership: PermissionMembership | null | undefined,
+) {
+  if (!isActiveMembership(membership)) {
+    return false;
+  }
+
+  return membership.role === TenantRole.OWNER || membership.role === TenantRole.ADMIN;
+}
+
+export function canManageQuoteNumbering(
+  membership: PermissionMembership | null | undefined,
+) {
+  if (!isActiveMembership(membership)) {
+    return false;
+  }
+
+  return membership.role === TenantRole.OWNER;
+}
+
 export function canApplyCommercialOverrides(
   membership: PermissionMembership | null | undefined,
 ) {

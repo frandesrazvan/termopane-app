@@ -8,12 +8,14 @@ describe("dashboard navigation", () => {
       "Clienți",
       "Oferte",
       "Catalog",
+      "Setări",
     ]);
     expect(dashboardNavItems.map((item) => item.href)).toEqual([
       "/dashboard",
       "/dashboard/customers",
       "/dashboard/quotes",
       "/dashboard/catalog",
+      "/dashboard/settings",
     ]);
     expect(dashboardNavItems.every((item) => item.href !== "#")).toBe(true);
   });

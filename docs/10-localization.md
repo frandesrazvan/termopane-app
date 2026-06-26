@@ -148,6 +148,29 @@ The mobile shell and PWA states use Romanian labels including:
 The formal mobile audit widths are `360px`, `390px`, and `430px`; labels above must remain readable
 on those widths.
 
+## COD-027 Settings Labels
+
+The settings UI uses Romanian labels including:
+
+- `Setări`;
+- `Companie și PDF`;
+- `Nume afișat`;
+- `Denumire legală`;
+- `Cod fiscal`;
+- `Număr Registrul Comerțului`;
+- `Monedă implicită`;
+- `Șablon PDF implicit`;
+- `Termeni de plată`;
+- `Garanție`;
+- `Livrare`;
+- `Avans`;
+- `Footer PDF`;
+- `Numerotare oferte`;
+- `Următorul număr`;
+- `Model dată`;
+- `Preferințe utilizator`;
+- `Scurtături panou`.
+
 ## Testing Expectations
 
 When a task changes user-facing offer output, update package/app tests so Romanian labels remain

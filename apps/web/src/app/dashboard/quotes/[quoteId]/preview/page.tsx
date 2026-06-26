@@ -8,7 +8,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/auth";
 import { getTenantQuoteWithCurrentVersion, listTenantQuoteItems } from "@/lib/data";
-import { buildQuotePdfOfferSnapshot } from "@/lib/pdf/template-a-snapshot";
+import {
+  buildQuotePdfOfferSnapshot,
+  defaultQuotePdfTemplateKeyFromVersion,
+} from "@/lib/pdf/template-a-snapshot";
 
 export const dynamic = "force-dynamic";
 
@@ -21,13 +24,16 @@ export default async function QuotePreviewPage({ params, searchParams }: QuotePr
   const context = await requireTenant();
   const { quoteId } = await params;
   const paramsValue = await searchParams;
-  const templateKey = selectedTemplateKey(paramsValue.template);
   const quoteState = await getTenantQuoteWithCurrentVersion(context, quoteId);
 
   if (!quoteState?.currentVersion) {
     notFound();
   }
 
+  const templateKey = selectedTemplateKey(
+    paramsValue.template,
+    defaultQuotePdfTemplateKeyFromVersion(quoteState.currentVersion),
+  );
   const items = await listTenantQuoteItems(context, quoteState.currentVersion.id);
   const snapshot = buildQuotePdfOfferSnapshot(
     quoteState.quote,
@@ -93,8 +99,11 @@ export default async function QuotePreviewPage({ params, searchParams }: QuotePr
   );
 }
 
-function selectedTemplateKey(value: string | undefined): QuotePdfTemplateKey {
-  return value && isQuotePdfTemplateKey(value) ? value : "template-a";
+function selectedTemplateKey(
+  value: string | undefined,
+  fallback: QuotePdfTemplateKey,
+): QuotePdfTemplateKey {
+  return value && isQuotePdfTemplateKey(value) ? value : fallback;
 }
 
 function quoteTemplateLabel(templateKey: QuotePdfTemplateKey) {

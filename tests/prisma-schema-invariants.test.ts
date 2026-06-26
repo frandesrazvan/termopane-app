@@ -11,6 +11,8 @@ const seed = readFileSync(seedPath, "utf8");
 const tenantOwnedModels = [
   "TenantMember",
   "CompanySettings",
+  "QuoteNumberSettings",
+  "UserPreference",
   "Supplier",
   "ProfileSystem",
   "ProfileItem",
@@ -62,6 +64,8 @@ const requiredSeedOperations = [
   "user",
   "tenantMember",
   "companySettings",
+  "quoteNumberSettings",
+  "userPreference",
   "supplier",
   "profileSystem",
   "profileItem",

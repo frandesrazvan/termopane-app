@@ -17,8 +17,17 @@ isolation, quote-version immutability, and snapshot behavior.
   - unique per tenant/user pair unless the auth model requires otherwise.
 - CompanySettings:
   - `id`, `tenantId`, company legal/display name, address, contact details, logo reference,
-    default currency, VAT/tax defaults, PDF terms, warranty, delivery, advance-payment text;
+    default currency, VAT/tax defaults, default PDF template, PDF terms, warranty, delivery,
+    advance-payment text;
   - changes affect new quote versions only unless intentionally snapshotted into a draft.
+- QuoteNumberSettings:
+  - `id`, `tenantId`, prefix, next number, optional year/month pattern, timestamps;
+  - quote creation reserves generated numbers tenant-side and still relies on a tenant-scoped unique
+    quote-number constraint as the final collision guard.
+- UserPreference:
+  - `id`, `tenantId`, `userId`, default PDF template preference, dashboard shortcuts, language,
+    timestamps;
+  - stores personal workflow preferences without changing tenant-wide quote snapshots.
 
 ## Catalog and pricing
 
@@ -272,6 +281,15 @@ by the PDF workflow. The provider writes content type plus user metadata for che
 `quoteVersionId`, `templateKey`, and `tenantId` when those values are provided, reads object bytes
 for tenant-scoped download routes, and deletes objects during failed-generation cleanup. SDK errors
 are mapped to `DocumentStorageError` without exposing configured credentials.
+
+## COD-027 company settings, preferences, and numbering notes
+
+`CompanySettings.defaultPdfTemplate`, `QuoteNumberSettings`, and `UserPreference` are tenant-owned
+Prisma records. Draft quote creation snapshots company settings, uses `CompanySettings.defaultCurrency`
+when no currency is supplied, generates quote numbers from `QuoteNumberSettings`, and advances the
+next number only after the quote shell is created. Unique quote-number collisions retry the next
+tenant sequence number before returning a controlled collision error. Company and quote-number
+changes create `AuditLog` rows with `SETTINGS_UPDATED` or `QUOTE_NUMBERING_UPDATED`.
 
 ## COD-020 manual commercial override notes
 

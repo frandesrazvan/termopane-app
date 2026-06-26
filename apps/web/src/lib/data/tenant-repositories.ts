@@ -17,6 +17,7 @@ import {
   ProfileSystem,
   QuoteStatus,
   QuoteItemType,
+  QuoteNumberDatePattern,
   QuoteVersionStatus,
   Supplier,
   TaxRate,
@@ -29,8 +30,10 @@ import {
   type Quote,
   type QuoteCalculationResult,
   type QuoteItem,
+  type QuoteNumberSettings,
   type QuoteVersion,
   type SavedFilter,
+  type UserPreference,
 } from "@prisma/client";
 import type { TenantContext } from "../auth/tenant-context";
 import { prisma } from "../prisma";
@@ -99,18 +102,20 @@ export type TenantDataClient = {
   quoteCalculationResult: TenantWritableModelDelegate<QuoteCalculationResult>;
   document: TenantWritableModelDelegate<Document>;
   auditLog: TenantWritableModelDelegate<AuditLog>;
-  companySettings: TenantModelDelegate<CompanySettings>;
+  companySettings: TenantWritableModelDelegate<CompanySettings>;
+  quoteNumberSettings: TenantWritableModelDelegate<QuoteNumberSettings>;
   savedFilter: TenantWritableModelDelegate<SavedFilter>;
   serviceItem: TenantWritableModelDelegate<ServiceItem>;
   supplier: TenantWritableModelDelegate<Supplier>;
   taxRate: TenantWritableModelDelegate<TaxRate>;
+  userPreference: TenantWritableModelDelegate<UserPreference>;
   $transaction?: <TResult>(
     operation: (transactionClient: TenantDataClient) => Promise<TResult>,
   ) => Promise<TResult>;
 };
 
 export type CreateTenantDataAccessOptions = {
-  quoteNumberGenerator?: () => string;
+  now?: () => Date;
 };
 
 export type TenantCustomerWriteInput = {
@@ -168,6 +173,44 @@ export type TenantSavedFilterWriteInput = {
   entityType?: string;
   filter: Record<string, unknown>;
   isDefault?: boolean;
+};
+
+export type TenantCompanySettingsWriteInput = {
+  legalName: string;
+  displayName: string;
+  taxIdentifier?: string | null;
+  registrationNumber?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  country?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  defaultCurrency: string;
+  defaultPdfTemplate: string;
+  vatRateBasisPoints?: number | null;
+  offerValidityDays?: number | null;
+  paymentTermsText?: string | null;
+  warrantyText?: string | null;
+  deliveryText?: string | null;
+  advancePaymentText?: string | null;
+  pdfFooterText?: string | null;
+  actorUserId?: string | null;
+};
+
+export type TenantQuoteNumberSettingsWriteInput = {
+  prefix: string;
+  nextNumber: number;
+  datePattern: QuoteNumberDatePattern;
+  actorUserId?: string | null;
+};
+
+export type TenantUserPreferenceWriteInput = {
+  userId: string;
+  defaultPdfTemplate?: string | null;
+  dashboardShortcuts?: string[];
+  language?: string;
 };
 
 export type TenantQuoteDraftInput = {
@@ -234,6 +277,11 @@ export type TenantQuoteDiscountInput = {
 };
 
 export type TenantCommercialAdjustmentResult<TRecord> = {
+  record: TRecord;
+  auditLog: AuditLog;
+};
+
+export type TenantAuditedSettingsResult<TRecord> = {
   record: TRecord;
   auditLog: AuditLog;
 };
@@ -407,6 +455,8 @@ export class QuoteNumberCollisionError extends Error {
 }
 
 const GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS = 3;
+const defaultQuoteNumberPrefix = "OF";
+const quoteNumberPadding = 4;
 
 export function tenantIdFromScope(scope: TenantDataScope) {
   const tenantId = "tenantId" in scope ? scope.tenantId : scope.tenant.id;
@@ -465,7 +515,7 @@ export function createTenantDataAccess(
   client: TenantDataClient = prisma as unknown as TenantDataClient,
   options: CreateTenantDataAccessOptions = {},
 ) {
-  const quoteNumberGenerator = options.quoteNumberGenerator ?? generateQuoteNumber;
+  const now = options.now ?? (() => new Date());
 
   const access = {
     listTenantSuppliers(scope: TenantDataScope) {
@@ -1303,6 +1353,155 @@ export function createTenantDataAccess(
       });
     },
 
+    getTenantCompanySettings(scope: TenantDataScope) {
+      return client.companySettings.findFirst({
+        where: tenantWhere(scope),
+      });
+    },
+
+    getTenantCompanySettingsById(scope: TenantDataScope, settingsId: string) {
+      return client.companySettings.findFirst({
+        where: tenantWhere(scope, { id: settingsId }),
+      });
+    },
+
+    async updateTenantCompanySettings(
+      scope: TenantDataScope,
+      settingsId: string | null,
+      data: TenantCompanySettingsWriteInput,
+    ): Promise<TenantAuditedSettingsResult<CompanySettings> | null> {
+      return runTenantDataTransaction(client, async (transactionClient) => {
+        const transactionAccess = createTenantDataAccess(transactionClient, options);
+        const existing = settingsId
+          ? await transactionAccess.getTenantCompanySettingsById(scope, settingsId)
+          : await transactionAccess.getTenantCompanySettings(scope);
+
+        if (settingsId && !existing) {
+          return null;
+        }
+
+        const writeData = companySettingsWriteData(data);
+        const record = existing
+          ? await transactionClient.companySettings.update({
+              where: { id: existing.id },
+              data: writeData,
+            })
+          : await transactionClient.companySettings.create({
+              data: {
+                tenantId: tenantIdFromScope(scope),
+                ...writeData,
+              },
+            });
+
+        const auditLog = await transactionClient.auditLog.create({
+          data: {
+            tenantId: tenantIdFromScope(scope),
+            actorUserId: data.actorUserId ?? null,
+            action: AuditAction.SETTINGS_UPDATED,
+            entityType: "CompanySettings",
+            entityId: record.id,
+            beforeSnapshot: existing ? companySettingsAuditSnapshot(existing) : null,
+            afterSnapshot: companySettingsAuditSnapshot(record),
+            metadata: {
+              settingsType: "company",
+              defaultPdfTemplate: record.defaultPdfTemplate,
+            },
+          },
+        });
+
+        return { record, auditLog };
+      });
+    },
+
+    getTenantQuoteNumberSettings(scope: TenantDataScope) {
+      return client.quoteNumberSettings.findFirst({
+        where: tenantWhere(scope),
+      });
+    },
+
+    getTenantQuoteNumberSettingsById(scope: TenantDataScope, settingsId: string) {
+      return client.quoteNumberSettings.findFirst({
+        where: tenantWhere(scope, { id: settingsId }),
+      });
+    },
+
+    async updateTenantQuoteNumberSettings(
+      scope: TenantDataScope,
+      settingsId: string | null,
+      data: TenantQuoteNumberSettingsWriteInput,
+    ): Promise<TenantAuditedSettingsResult<QuoteNumberSettings> | null> {
+      return runTenantDataTransaction(client, async (transactionClient) => {
+        const transactionAccess = createTenantDataAccess(transactionClient, options);
+        const existing = settingsId
+          ? await transactionAccess.getTenantQuoteNumberSettingsById(scope, settingsId)
+          : await transactionAccess.getTenantQuoteNumberSettings(scope);
+
+        if (settingsId && !existing) {
+          return null;
+        }
+
+        const writeData = quoteNumberSettingsWriteData(data);
+        const record = existing
+          ? await transactionClient.quoteNumberSettings.update({
+              where: { id: existing.id },
+              data: writeData,
+            })
+          : await transactionClient.quoteNumberSettings.create({
+              data: {
+                tenantId: tenantIdFromScope(scope),
+                ...writeData,
+              },
+            });
+
+        const auditLog = await transactionClient.auditLog.create({
+          data: {
+            tenantId: tenantIdFromScope(scope),
+            actorUserId: data.actorUserId ?? null,
+            action: AuditAction.QUOTE_NUMBERING_UPDATED,
+            entityType: "QuoteNumberSettings",
+            entityId: record.id,
+            beforeSnapshot: existing ? quoteNumberSettingsAuditSnapshot(existing) : null,
+            afterSnapshot: quoteNumberSettingsAuditSnapshot(record),
+            metadata: {
+              settingsType: "quote-numbering",
+              nextQuoteNumberPreview: previewTenantQuoteNumber(record, now()),
+            },
+          },
+        });
+
+        return { record, auditLog };
+      });
+    },
+
+    getTenantUserPreference(scope: TenantDataScope, userId: string) {
+      return client.userPreference.findFirst({
+        where: tenantWhere(scope, { userId }),
+      });
+    },
+
+    async upsertTenantUserPreference(
+      scope: TenantDataScope,
+      data: TenantUserPreferenceWriteInput,
+    ) {
+      const existing = await access.getTenantUserPreference(scope, data.userId);
+      const writeData = userPreferenceWriteData(data);
+
+      if (existing) {
+        return client.userPreference.update({
+          where: { id: existing.id },
+          data: writeData,
+        });
+      }
+
+      return client.userPreference.create({
+        data: {
+          tenantId: tenantIdFromScope(scope),
+          userId: data.userId,
+          ...writeData,
+        },
+      });
+    },
+
     listTenantSavedFilters(
       scope: TenantDataScope,
       options: ListTenantSavedFiltersOptions = {},
@@ -1377,18 +1576,29 @@ export function createTenantDataAccess(
         }
       }
 
-      const currency = data.currency ?? "RON";
       const requestedQuoteNumber = data.quoteNumber?.trim() || null;
       const attemptCount = requestedQuoteNumber ? 1 : GENERATED_QUOTE_NUMBER_MAX_ATTEMPTS;
 
       for (let attempt = 0; attempt < attemptCount; attempt += 1) {
-        const quoteNumber = requestedQuoteNumber ?? quoteNumberGenerator();
-
         try {
           return await runTenantDataTransaction(client, async (transactionClient) => {
+            const quoteNumberSettings = requestedQuoteNumber
+              ? null
+              : await getOrCreateTenantQuoteNumberSettings(transactionClient, scope);
+            const generatedSequenceNumber = quoteNumberSettings
+              ? quoteNumberSettings.nextNumber + attempt
+              : null;
+            const quoteNumber =
+              requestedQuoteNumber ??
+              previewTenantQuoteNumber({
+                datePattern: quoteNumberSettings?.datePattern ?? QuoteNumberDatePattern.YEAR,
+                nextNumber: generatedSequenceNumber ?? 1,
+                prefix: quoteNumberSettings?.prefix ?? defaultQuoteNumberPrefix,
+              }, now());
             const companySettings = await transactionClient.companySettings.findFirst({
               where: tenantWhere(scope),
             });
+            const currency = data.currency ?? companySettings?.defaultCurrency ?? "RON";
             const quote = await transactionClient.quote.create({
               data: {
                 tenantId,
@@ -1437,6 +1647,15 @@ export function createTenantDataAccess(
                 currentVersionId: currentVersion.id,
               },
             });
+
+            if (quoteNumberSettings && generatedSequenceNumber) {
+              await transactionClient.quoteNumberSettings.update({
+                where: { id: quoteNumberSettings.id },
+                data: {
+                  nextNumber: generatedSequenceNumber + 1,
+                },
+              });
+            }
 
             return {
               quote: updatedQuote,
@@ -2287,6 +2506,49 @@ export function upsertTenantSavedFilter(
   return tenantDataAccess.upsertTenantSavedFilter(scope, data);
 }
 
+export function getTenantCompanySettings(scope: TenantDataScope) {
+  return tenantDataAccess.getTenantCompanySettings(scope);
+}
+
+export function getTenantCompanySettingsById(scope: TenantDataScope, settingsId: string) {
+  return tenantDataAccess.getTenantCompanySettingsById(scope, settingsId);
+}
+
+export function updateTenantCompanySettings(
+  scope: TenantDataScope,
+  settingsId: string | null,
+  data: TenantCompanySettingsWriteInput,
+) {
+  return tenantDataAccess.updateTenantCompanySettings(scope, settingsId, data);
+}
+
+export function getTenantQuoteNumberSettings(scope: TenantDataScope) {
+  return tenantDataAccess.getTenantQuoteNumberSettings(scope);
+}
+
+export function getTenantQuoteNumberSettingsById(scope: TenantDataScope, settingsId: string) {
+  return tenantDataAccess.getTenantQuoteNumberSettingsById(scope, settingsId);
+}
+
+export function updateTenantQuoteNumberSettings(
+  scope: TenantDataScope,
+  settingsId: string | null,
+  data: TenantQuoteNumberSettingsWriteInput,
+) {
+  return tenantDataAccess.updateTenantQuoteNumberSettings(scope, settingsId, data);
+}
+
+export function getTenantUserPreference(scope: TenantDataScope, userId: string) {
+  return tenantDataAccess.getTenantUserPreference(scope, userId);
+}
+
+export function upsertTenantUserPreference(
+  scope: TenantDataScope,
+  data: TenantUserPreferenceWriteInput,
+) {
+  return tenantDataAccess.upsertTenantUserPreference(scope, data);
+}
+
 export function createTenantQuoteDraft(scope: TenantDataScope, data: TenantQuoteDraftInput) {
   return tenantDataAccess.createTenantQuoteDraft(scope, data);
 }
@@ -2704,6 +2966,119 @@ function customerSnapshot(customer: Customer) {
   };
 }
 
+function companySettingsWriteData(data: TenantCompanySettingsWriteInput) {
+  return {
+    legalName: data.legalName,
+    displayName: data.displayName,
+    taxIdentifier: data.taxIdentifier ?? null,
+    registrationNumber: data.registrationNumber ?? null,
+    addressLine1: data.addressLine1 ?? null,
+    addressLine2: data.addressLine2 ?? null,
+    city: data.city ?? null,
+    country: data.country ?? null,
+    phone: data.phone ?? null,
+    email: data.email ?? null,
+    website: data.website ?? null,
+    defaultCurrency: normalizedCurrency(data.defaultCurrency),
+    defaultPdfTemplate: normalizedTemplateKey(data.defaultPdfTemplate),
+    vatRateBasisPoints: data.vatRateBasisPoints ?? null,
+    offerValidityDays: data.offerValidityDays ?? null,
+    paymentTermsText: data.paymentTermsText ?? null,
+    warrantyText: data.warrantyText ?? null,
+    deliveryText: data.deliveryText ?? null,
+    advancePaymentText: data.advancePaymentText ?? null,
+    pdfFooterText: data.pdfFooterText ?? null,
+  };
+}
+
+function quoteNumberSettingsWriteData(data: TenantQuoteNumberSettingsWriteInput) {
+  return {
+    prefix: normalizedQuoteNumberPrefix(data.prefix),
+    nextNumber: Math.max(1, Math.trunc(data.nextNumber)),
+    datePattern: data.datePattern,
+  };
+}
+
+function userPreferenceWriteData(data: TenantUserPreferenceWriteInput) {
+  return {
+    defaultPdfTemplate: data.defaultPdfTemplate
+      ? normalizedTemplateKey(data.defaultPdfTemplate)
+      : null,
+    dashboardShortcuts: data.dashboardShortcuts ?? [],
+    language: data.language === "ro" ? "ro" : "ro",
+  };
+}
+
+async function getOrCreateTenantQuoteNumberSettings(
+  client: TenantDataClient,
+  scope: TenantDataScope,
+) {
+  const existing = await client.quoteNumberSettings.findFirst({
+    where: tenantWhere(scope),
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  return client.quoteNumberSettings.create({
+    data: {
+      tenantId: tenantIdFromScope(scope),
+      prefix: defaultQuoteNumberPrefix,
+      nextNumber: 1,
+      datePattern: QuoteNumberDatePattern.YEAR,
+    },
+  });
+}
+
+export function previewTenantQuoteNumber(
+  settings: Pick<QuoteNumberSettings, "datePattern" | "nextNumber" | "prefix">,
+  date: Date = new Date(),
+) {
+  const sequenceNumber = Math.max(1, Math.trunc(settings.nextNumber));
+  const parts = [
+    normalizedQuoteNumberPrefix(settings.prefix),
+    quoteNumberDateSegment(settings.datePattern, date),
+    String(sequenceNumber).padStart(quoteNumberPadding, "0"),
+  ].filter(Boolean);
+
+  return parts.join("-");
+}
+
+function quoteNumberDateSegment(pattern: QuoteNumberDatePattern, date: Date) {
+  const year = String(date.getUTCFullYear());
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+
+  switch (pattern) {
+    case QuoteNumberDatePattern.NONE:
+      return null;
+    case QuoteNumberDatePattern.YEAR_MONTH:
+      return `${year}${month}`;
+    case QuoteNumberDatePattern.YEAR:
+    default:
+      return year;
+  }
+}
+
+function normalizedQuoteNumberPrefix(value: string) {
+  return (
+    value
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 20)
+      .toUpperCase() || defaultQuoteNumberPrefix
+  );
+}
+
+function normalizedCurrency(value: string) {
+  return value.trim().toUpperCase().slice(0, 3) || "RON";
+}
+
+function normalizedTemplateKey(value: string) {
+  return value === "template-b" ? "template-b" : "template-a";
+}
+
 function companySettingsSnapshot(companySettings: CompanySettings | null) {
   if (!companySettings) {
     return {
@@ -2727,6 +3102,7 @@ function companySettingsSnapshot(companySettings: CompanySettings | null) {
     website: companySettings.website,
     logoUrl: companySettings.logoUrl,
     defaultCurrency: companySettings.defaultCurrency,
+    defaultPdfTemplate: companySettings.defaultPdfTemplate,
     vatRateBasisPoints: companySettings.vatRateBasisPoints,
     offerValidityDays: companySettings.offerValidityDays,
     paymentTermsText: companySettings.paymentTermsText,
@@ -2818,6 +3194,43 @@ function documentAuditSnapshot(document: Document) {
     checksum: document.checksum,
     generatedById: document.generatedById,
     createdAt: document.createdAt?.toISOString() ?? null,
+  };
+}
+
+function companySettingsAuditSnapshot(companySettings: CompanySettings) {
+  return {
+    id: companySettings.id,
+    tenantId: companySettings.tenantId,
+    legalName: companySettings.legalName,
+    displayName: companySettings.displayName,
+    taxIdentifier: companySettings.taxIdentifier,
+    registrationNumber: companySettings.registrationNumber,
+    addressLine1: companySettings.addressLine1,
+    addressLine2: companySettings.addressLine2,
+    city: companySettings.city,
+    country: companySettings.country,
+    phone: companySettings.phone,
+    email: companySettings.email,
+    website: companySettings.website,
+    defaultCurrency: companySettings.defaultCurrency,
+    defaultPdfTemplate: companySettings.defaultPdfTemplate,
+    vatRateBasisPoints: companySettings.vatRateBasisPoints,
+    offerValidityDays: companySettings.offerValidityDays,
+    paymentTermsText: companySettings.paymentTermsText,
+    warrantyText: companySettings.warrantyText,
+    deliveryText: companySettings.deliveryText,
+    advancePaymentText: companySettings.advancePaymentText,
+    pdfFooterText: companySettings.pdfFooterText,
+  };
+}
+
+function quoteNumberSettingsAuditSnapshot(settings: QuoteNumberSettings) {
+  return {
+    id: settings.id,
+    tenantId: settings.tenantId,
+    prefix: settings.prefix,
+    nextNumber: settings.nextNumber,
+    datePattern: settings.datePattern,
   };
 }
 
@@ -2944,13 +3357,4 @@ function isPrismaUniqueConstraintError(
       "code" in error &&
       (error as { code?: unknown }).code === "P2002",
   );
-}
-
-function generateQuoteNumber() {
-  // Temporary until tenant-configurable quote numbering exists. The database unique index remains
-  // the final guard and createTenantQuoteDraft retries generated collisions a few times.
-  const datePart = new Date().toISOString().slice(0, 10).replaceAll("-", "");
-  const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
-
-  return `Q-${datePart}-${randomPart}`;
 }

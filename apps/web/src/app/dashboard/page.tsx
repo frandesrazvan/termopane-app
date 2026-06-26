@@ -1,4 +1,5 @@
-import { ShieldCheck } from "lucide-react";
+import { Archive, FilePlus2, FileText, Settings, ShieldCheck, UsersRound } from "lucide-react";
+import Link from "next/link";
 import {
   canGeneratePdf,
   canManageCatalog,
@@ -7,19 +8,24 @@ import {
   listTenantMemberships,
   requireTenant,
 } from "@/lib/auth";
+import { getTenantUserPreference } from "@/lib/data";
 import { tenantMemberStatusLabel } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const context = await requireTenant();
-  const memberships = await listTenantMemberships(context.user.id);
+  const [memberships, userPreference] = await Promise.all([
+    listTenantMemberships(context.user.id),
+    getTenantUserPreference(context, context.user.id),
+  ]);
   const permissions = [
     { label: "Costuri interne", allowed: canViewInternalCosts(context.membership) },
     { label: "Administrare catalog", allowed: canManageCatalog(context.membership) },
     { label: "Administrare utilizatori", allowed: canManageUsers(context.membership) },
     { label: "Generare PDF", allowed: canGeneratePdf(context.membership) },
   ];
+  const shortcuts = dashboardShortcuts(userPreference?.dashboardShortcuts);
 
   return (
     <main className="px-4 py-6 sm:px-6 lg:px-8">
@@ -60,6 +66,22 @@ export default async function DashboardPage() {
         </div>
 
         <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
+          <h2 className="text-base font-semibold text-zinc-950">Scurtături</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {shortcuts.map((shortcut) => (
+              <Link
+                className="flex min-h-14 items-center gap-3 rounded-md bg-stone-100 px-3 text-sm font-semibold text-zinc-800 hover:bg-stone-200"
+                href={shortcut.href}
+                key={shortcut.href}
+              >
+                <shortcut.icon aria-hidden="true" size={17} />
+                {shortcut.label}
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-base font-semibold text-zinc-950">Context tenant</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <p className="rounded-md bg-stone-100 p-3 text-sm leading-6 text-zinc-700">
@@ -79,4 +101,20 @@ export default async function DashboardPage() {
       </div>
     </main>
   );
+}
+
+function dashboardShortcuts(value: unknown) {
+  const selected = Array.isArray(value)
+    ? value.flatMap((entry) => (typeof entry === "string" ? [entry] : []))
+    : ["new-quote", "quotes"];
+  const shortcuts = [
+    { key: "new-quote", label: "Ofertă nouă", href: "/dashboard/quotes/new", icon: FilePlus2 },
+    { key: "quotes", label: "Oferte", href: "/dashboard/quotes", icon: FileText },
+    { key: "customers", label: "Clienți", href: "/dashboard/customers", icon: UsersRound },
+    { key: "catalog", label: "Catalog", href: "/dashboard/catalog", icon: Archive },
+    { key: "settings", label: "Setări", href: "/dashboard/settings", icon: Settings },
+  ];
+  const filtered = shortcuts.filter((shortcut) => selected.includes(shortcut.key));
+
+  return filtered.length > 0 ? filtered : shortcuts.slice(0, 2);
 }

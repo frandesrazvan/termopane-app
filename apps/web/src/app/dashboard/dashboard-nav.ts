@@ -2,6 +2,7 @@ import {
   Archive,
   FileText,
   LayoutDashboard,
+  Settings,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -18,6 +19,7 @@ export const dashboardNavItems = [
   { label: "Clienți", icon: UsersRound, href: "/dashboard/customers" },
   { label: "Oferte", icon: FileText, href: "/dashboard/quotes" },
   { label: "Catalog", icon: Archive, href: "/dashboard/catalog" },
+  { label: "Setări", icon: Settings, href: "/dashboard/settings" },
 ] satisfies DashboardNavItem[];
 
 export function isDashboardNavItemActive(pathname: string, item: DashboardNavItem) {

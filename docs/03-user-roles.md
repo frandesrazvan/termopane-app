@@ -65,3 +65,11 @@ Platform support is not a tenant role and should be treated as exceptional acces
 - Do not log customer names, phone numbers, email addresses, addresses, or full PDF payloads.
 - Quote versions locked for sending must be immutable for every role; revisions create new versions.
 - Manual override audits must be visible to admins/owners and protected from normal editing.
+
+## COD-027 settings permissions
+
+Company settings are editable by OWNER and ADMIN memberships. Quote numbering settings are editable
+only by OWNER memberships because changing the next number affects tenant-wide commercial records.
+ESTIMATOR and DEALER memberships may view settings screens where exposed, but server actions reject
+company and numbering mutations for those roles. User preferences are scoped to the active tenant and
+current user.

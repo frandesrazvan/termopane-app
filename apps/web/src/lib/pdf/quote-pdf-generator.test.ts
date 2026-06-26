@@ -24,17 +24,23 @@ import {
   type Quote,
   type QuoteCalculationResult,
   type QuoteItem,
+  type QuoteNumberSettings,
   type QuoteVersion,
   type SavedFilter,
   type ServiceItem,
   type Supplier,
   type TaxRate,
+  type UserPreference,
 } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTenantDataAccess, type TenantDataClient } from "../data";
 import type { DocumentStorageProvider } from "./document-storage";
 import { resolveLocalDocumentPath } from "./local-document-storage";
 import { generateTenantQuotePdf } from "./quote-pdf-generator";
+import {
+  buildQuotePdfOfferSnapshot,
+  defaultQuotePdfTemplateKeyFromVersion,
+} from "./template-a-snapshot";
 
 type TenantRecord = {
   id: string;
@@ -151,10 +157,12 @@ function testState(): TestState {
     document: delegate(documents),
     auditLog: delegate(auditLogs),
     companySettings: delegate([] as CompanySettings[]),
+    quoteNumberSettings: delegate([] as QuoteNumberSettings[]),
     savedFilter: delegate([] as SavedFilter[]),
     serviceItem: delegate([] as ServiceItem[]),
     supplier: delegate([] as Supplier[]),
     taxRate: delegate([] as TaxRate[]),
+    userPreference: delegate([] as UserPreference[]),
   };
 
   client.$transaction = async (operation) => operation(client);
@@ -204,6 +212,59 @@ describe("quote PDF generation", () => {
       tenantId: "tenant-a",
       actorUserId: "user-a",
     });
+  });
+
+  it("uses the saved default PDF template when no explicit template is selected", async () => {
+    const state = testState();
+    await state.client.quoteVersion.update({
+      where: { id: "version-a" },
+      data: {
+        companySettingsSnapshot: {
+          displayName: "Synthetic Company",
+          defaultPdfTemplate: "template-b",
+          offerValidityDays: 30,
+        },
+      },
+    });
+
+    const result = await generateTenantQuotePdf(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      "version-a",
+      generatorOptions(state.client, "default-template"),
+    );
+
+    expect(result.ok).toBe(true);
+
+    if (!result.ok) {
+      throw new Error(result.reason);
+    }
+
+    expect(result.document).toMatchObject({
+      templateKey: "template-b",
+      fileName: "Q-001-v1-template-b.pdf",
+      visibleTotalsSnapshot: {
+        source: "template-b-pdf",
+        templateKey: "template-b",
+      },
+    });
+  });
+
+  it("uses the saved default PDF template for preview snapshots", () => {
+    const version = quoteVersion({
+      companySettingsSnapshot: {
+        displayName: "Synthetic Company",
+        defaultPdfTemplate: "template-b",
+      },
+    });
+    const snapshot = buildQuotePdfOfferSnapshot(
+      quote({}),
+      version,
+      [],
+      defaultQuotePdfTemplateKeyFromVersion(version),
+    );
+
+    expect(snapshot.templateKey).toBe("template-b");
   });
 
   it("returns a storage write failure without creating Document metadata", async () => {

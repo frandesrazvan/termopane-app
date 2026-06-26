@@ -35,6 +35,9 @@ production formulas.
 - Saved-offer workflow filters now persist per user with `SavedFilter`, with Romanian quick filters
   for draft/sent/accepted/rejected offers, expiring offers, generated PDFs, missing calculations,
   and warnings.
+- Company settings, user preferences, and configurable quote numbering are available at
+  `/dashboard/settings`. OWNER and ADMIN users can edit company/PDF defaults, OWNER users can edit
+  quote numbering, and all users can keep personal dashboard shortcuts.
 - PWA metadata, install manifest, static app icons, conservative service-worker registration, mobile
   dashboard navigation, Romanian loading/error states, and sticky quote total/actions are present for
   mobile sales workflows.
@@ -220,6 +223,7 @@ pnpm verify
 - Email sending or customer delivery workflow.
 - Door, accessory, service, and advanced pricing-rule selection inside the quote builder.
 - Real production formulas or supplier-specific pricing rules.
+- Logo upload and richer account/user-management workflows.
 - Invoicing, ERP, CNC export, stock, or accounting integrations.
 
 ## Scope Guardrails
