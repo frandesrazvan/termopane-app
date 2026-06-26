@@ -80,6 +80,19 @@ automatic distance lookup, route planning, installation scheduling, or labor for
   versions, not locked historical ones.
 - Unknown production rules should be labeled as requiring business validation rather than hidden.
 
+## COD-030 catalog CSV UX notes
+
+Catalog CSV import/export is visible only to OWNER/ADMIN users. Each catalog section exposes a
+mobile-friendly export action and an import form with a `Sectiune CSV` selector, file input,
+`Valideaza dry-run`, and `Importa CSV` actions. The price-list section can switch between
+`Liste de preturi` and `Pozitii de pret` because both records are maintained from the same catalog
+area.
+
+Dry-run and publish results must stay near the import controls and show row-level validation errors
+with `Rand`, `Camp`, and `Eroare` columns. Invalid rows block the whole publish action so admins can
+correct the CSV without partial catalog updates. The UI must not imply supplier integration,
+automatic formula execution, or changes to locked historical quote snapshots.
+
 ## PDF generation UX
 
 - Before generation, show the selected template, quote version, customer, totals, and unresolved

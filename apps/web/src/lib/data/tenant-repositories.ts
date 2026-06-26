@@ -11,6 +11,7 @@ import {
   PriceList,
   PriceListItem,
   PriceListItemType,
+  PriceListStatus,
   PricingRule,
   ProfileItem,
   ProfileItemType,
@@ -392,6 +393,18 @@ export type TenantTaxRateWriteInput = {
   validFrom?: Date | null;
   validTo?: Date | null;
   configuration?: Record<string, unknown> | null;
+  isActive?: boolean;
+};
+
+export type TenantPriceListWriteInput = {
+  name: string;
+  version: string;
+  currency?: string;
+  status?: PriceListStatus;
+  effectiveFrom?: Date | null;
+  effectiveTo?: Date | null;
+  notes?: string | null;
+  createdById?: string | null;
   isActive?: boolean;
 };
 
@@ -1112,6 +1125,63 @@ export function createTenantDataAccess(
     getTenantPriceList(scope: TenantDataScope, priceListId: string) {
       return client.priceList.findFirst({
         where: tenantWhere(scope, { id: priceListId }),
+      });
+    },
+
+    createTenantPriceList(scope: TenantDataScope, data: TenantPriceListWriteInput) {
+      return client.priceList.create({
+        data: {
+          name: data.name,
+          version: data.version,
+          currency: normalizedCurrency(data.currency ?? "RON"),
+          status: data.status ?? PriceListStatus.DRAFT,
+          effectiveFrom: data.effectiveFrom ?? null,
+          effectiveTo: data.effectiveTo ?? null,
+          notes: data.notes ?? null,
+          createdById: data.createdById ?? null,
+          tenantId: tenantIdFromScope(scope),
+          isActive: data.isActive ?? true,
+          deletedAt: null,
+        },
+      });
+    },
+
+    async updateTenantPriceList(
+      scope: TenantDataScope,
+      priceListId: string,
+      data: TenantPriceListWriteInput,
+    ) {
+      const existingPriceList = await access.getTenantPriceList(scope, priceListId);
+
+      if (!existingPriceList) {
+        return null;
+      }
+
+      return client.priceList.update({
+        where: { id: priceListId },
+        data: compactRecord({
+          name: data.name,
+          version: data.version,
+          currency: normalizedCurrency(data.currency ?? existingPriceList.currency),
+          status: data.status ?? existingPriceList.status,
+          effectiveFrom: data.effectiveFrom ?? null,
+          effectiveTo: data.effectiveTo ?? null,
+          notes: data.notes ?? null,
+          isActive: data.isActive ?? true,
+        }),
+      });
+    },
+
+    async archiveTenantPriceList(scope: TenantDataScope, priceListId: string) {
+      const existingPriceList = await access.getTenantPriceList(scope, priceListId);
+
+      if (!existingPriceList) {
+        return null;
+      }
+
+      return client.priceList.update({
+        where: { id: priceListId },
+        data: archiveCatalogRecordData(),
       });
     },
 
@@ -2912,6 +2982,26 @@ export function archiveTenantTaxRate(scope: TenantDataScope, taxRateId: string) 
 
 export function listTenantPriceLists(scope: TenantDataScope) {
   return tenantDataAccess.listTenantPriceLists(scope);
+}
+
+export function getTenantPriceList(scope: TenantDataScope, priceListId: string) {
+  return tenantDataAccess.getTenantPriceList(scope, priceListId);
+}
+
+export function createTenantPriceList(scope: TenantDataScope, data: TenantPriceListWriteInput) {
+  return tenantDataAccess.createTenantPriceList(scope, data);
+}
+
+export function updateTenantPriceList(
+  scope: TenantDataScope,
+  priceListId: string,
+  data: TenantPriceListWriteInput,
+) {
+  return tenantDataAccess.updateTenantPriceList(scope, priceListId, data);
+}
+
+export function archiveTenantPriceList(scope: TenantDataScope, priceListId: string) {
+  return tenantDataAccess.archiveTenantPriceList(scope, priceListId);
 }
 
 export function listTenantPriceListItems(

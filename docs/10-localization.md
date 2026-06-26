@@ -199,6 +199,27 @@ Door quote item UI and customer-facing output use Romanian labels including:
 - `Sticlă/panou`;
 - `Schemă orientativă ușă`.
 
+## COD-030 Catalog CSV Labels
+
+Catalog CSV import/export UI uses Romanian labels including:
+
+- `Import/export CSV`;
+- `Exporta`;
+- `Sectiune CSV`;
+- `Fisier CSV`;
+- `Valideaza dry-run`;
+- `Importa CSV`;
+- `Rand`;
+- `Camp`;
+- `Eroare`;
+- `Dry-run valid`;
+- `Dry-run invalid`;
+- `Liste de preturi`;
+- `Pozitii de pret`.
+
+CSV column names remain machine-readable field keys such as `profileSystemId`, `priceListId`, and
+`saleMinor`; do not translate them because exported files are intended for stable re-import.
+
 ## Testing Expectations
 
 When a task changes user-facing offer output, update package/app tests so Romanian labels remain
