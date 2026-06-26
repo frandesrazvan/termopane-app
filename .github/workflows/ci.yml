@@ -37,6 +37,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm prisma generate
 
+      - name: Check production env defaults
+        run: pnpm env:check-defaults
+
       - name: Lint
         run: pnpm lint
 

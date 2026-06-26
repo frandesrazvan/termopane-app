@@ -13,7 +13,10 @@
     "format": "prettier --write .",
     "prisma": "prisma",
     "prisma:generate": "prisma generate",
-    "db:seed": "prisma db seed"
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "env:check-defaults": "tsx scripts/check-production-env-defaults.ts",
+    "storage:smoke": "tsx scripts/smoke-document-storage.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
