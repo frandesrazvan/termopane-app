@@ -304,6 +304,20 @@ Door snapshots intentionally do not encode production panel, lock, threshold, re
 formulas. The calculation adapter reads the frozen snapshots and converts only explicit safe values,
 such as manual panel price or per-door hardware price, into calculation input.
 
+## COD-029 accessory/service quote line notes
+
+Draft quote accessory, service, transport, and installation selections are stored as tenant-owned
+`QuoteItem` rows with `type = CUSTOM` and a line-specific `configurationSnapshot.kind`
+(`accessory-line`, `service-line`, `transport-line`, or `installation-line`). The matching
+`catalogSnapshot` freezes the selected tenant `Accessory` or `ServiceItem`, selected catalog id,
+unit, active price-list reference, and sale-price snapshot.
+
+The integer `QuoteItem.quantity` remains a compatibility/display value, while the exact line
+quantity used for calculation is stored in `configurationSnapshot.quantity`. Calculation and PDF
+serialization prefer that frozen explicit quantity for these line kinds. Transport and installation
+are manual catalog/service lines only; no route distance lookup, installation formula, stock/order
+generation, or supplier integration is modeled.
+
 ## COD-020 manual commercial override notes
 
 Tenant memberships now include `canApplyCommercialOverrides` so override permission is separate from

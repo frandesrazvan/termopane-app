@@ -1,4 +1,5 @@
 import {
+  type Accessory,
   ProfileItemType,
   type ColorFinish,
   type GlassPackage,
@@ -6,6 +7,7 @@ import {
   type PriceList,
   type ProfileItem,
   type ProfileSystem,
+  type ServiceItem,
 } from "@prisma/client";
 
 export type FixedWindowCatalogFormOptions = {
@@ -15,6 +17,8 @@ export type FixedWindowCatalogFormOptions = {
   glassPackages: GlassPackage[];
   colorFinishes: ColorFinish[];
   hardwareKits: HardwareKit[];
+  accessories: Accessory[];
+  serviceItems: ServiceItem[];
   activePriceList: PriceList | null;
 };
 
@@ -25,6 +29,11 @@ export type FixedWindowCatalogFieldDefaults = {
   glassPackageId?: string;
   colorFinishId?: string;
   hardwareKitId?: string;
+};
+
+export type CatalogLineFieldDefaults = {
+  accessoryId?: string;
+  serviceItemId?: string;
 };
 
 export function FixedWindowCatalogFields({
@@ -214,6 +223,68 @@ export function DoorCatalogFields({
   );
 }
 
+export function AccessoryLineCatalogFields({
+  defaults = {},
+  options,
+}: {
+  defaults?: CatalogLineFieldDefaults;
+  options: FixedWindowCatalogFormOptions;
+}) {
+  return (
+    <div className="grid gap-3">
+      {options.accessories.length > 0 ? null : (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          Nu există accesorii active în catalog pentru această ofertă.
+        </p>
+      )}
+      <SelectField
+        label="Accesoriu"
+        name="catalogItemId"
+        options={options.accessories.map((accessory) => ({
+          label: catalogLineOptionLabel(accessory),
+          value: accessory.id,
+        }))}
+        placeholder="Alege accesoriul"
+        defaultValue={defaults.accessoryId}
+        required
+      />
+    </div>
+  );
+}
+
+export function ServiceLineCatalogFields({
+  defaults = {},
+  label = "Serviciu",
+  options,
+  placeholder = "Alege serviciul",
+}: {
+  defaults?: CatalogLineFieldDefaults;
+  label?: string;
+  options: FixedWindowCatalogFormOptions;
+  placeholder?: string;
+}) {
+  return (
+    <div className="grid gap-3">
+      {options.serviceItems.length > 0 ? null : (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          Nu există servicii active în catalog pentru această ofertă.
+        </p>
+      )}
+      <SelectField
+        label={label}
+        name="catalogItemId"
+        options={options.serviceItems.map((serviceItem) => ({
+          label: catalogLineOptionLabel(serviceItem),
+          value: serviceItem.id,
+        }))}
+        placeholder={placeholder}
+        defaultValue={defaults.serviceItemId}
+        required
+      />
+    </div>
+  );
+}
+
 export function hasRequiredFixedWindowCatalogOptions(options: FixedWindowCatalogFormOptions) {
   return (
     options.profileSystems.length > 0 &&
@@ -231,6 +302,8 @@ export function emptyFixedWindowCatalogFormOptions(): FixedWindowCatalogFormOpti
     glassPackages: [],
     colorFinishes: [],
     hardwareKits: [],
+    accessories: [],
+    serviceItems: [],
     activePriceList: null,
   };
 }
@@ -294,4 +367,33 @@ function colorFinishOptionLabel(colorFinish: ColorFinish, profileSystems: Profil
   const baseLabel = catalogOptionLabel(colorFinish);
 
   return profileSystem ? `${baseLabel} - ${profileSystem.name}` : `${baseLabel} - general`;
+}
+
+function catalogLineOptionLabel(record: {
+  category: string | null;
+  code: string | null;
+  name: string;
+  unit: { toString(): string };
+}) {
+  const codeLabel = record.code ? ` (${record.code})` : "";
+  const categoryLabel = record.category ? ` - ${record.category}` : "";
+
+  return `${record.name}${codeLabel}${categoryLabel} - ${unitLabel(record.unit.toString())}`;
+}
+
+function unitLabel(value: string) {
+  switch (value) {
+    case "EACH":
+      return "buc.";
+    case "LINEAR_METER":
+      return "ml";
+    case "SQUARE_METER":
+      return "mp";
+    case "HOUR":
+      return "oră";
+    case "FIXED":
+      return "lot";
+    default:
+      return value;
+  }
 }

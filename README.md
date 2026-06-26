@@ -33,6 +33,11 @@ production formulas.
 - Door calculation is a rough MVP path only: it uses explicit panel/hardware snapshot prices where
   present and emits warnings for missing door-specific panel, lock, threshold, and reinforcement
   formulas instead of inventing production rules.
+- Draft quote builder can add catalog-backed accessory, service, transport, and installation lines.
+  These lines store frozen `Accessory` or `ServiceItem` snapshots plus active price-list sale-price
+  references, and calculation uses only the explicit snapshot quantity/unit/sale price. Transport and
+  installation remain manual catalog lines; no distance API or automatic installation formula is
+  implemented.
 - Draft quote workflow exposes audited commercial controls: authorized OWNER/ADMIN users and
   explicitly permitted ESTIMATOR users can apply item-level final-total overrides and quote-level
   discounts with a required reason. DEALER users remain blocked from these override actions.
@@ -227,7 +232,7 @@ pnpm verify
 
 - Real bucket integration tests and deployment-specific storage smoke tests.
 - Email sending or customer delivery workflow.
-- Accessory, service, and advanced pricing-rule selection inside the quote builder.
+- Advanced pricing-rule selection inside the quote builder.
 - Production-ready door formulas for panels, locks, thresholds, reinforcement, and fabrication.
 - Real production formulas or supplier-specific pricing rules.
 - Logo upload and richer account/user-management workflows.

@@ -110,6 +110,17 @@ totals and checksum metadata, and writes an `AuditLog` entry with `DOCUMENT_GENE
 does not overwrite existing document records or files; production object storage remains a future
 deployment concern.
 
+## COD-029 accessory/service line output notes
+
+Template A and Template B customer-facing snapshots include catalog-backed accessory, service,
+transport, and installation quote lines as normal ordered quote items. The visible item label is
+Romanian (`Accesoriu`, `Serviciu`, `Transport`, or `Montaj`), and unit labels are rendered from the
+frozen snapshot (`buc.`, `ml`, `mp`, `oră`, or `lot`).
+
+PDF/HTML output reads line quantity, unit, unit sale price, subtotal, VAT, and total from stored
+quote item snapshots and calculated totals. It must not query live catalog prices during rendering
+and must not expose internal costs, supplier prices, or trace data.
+
 ## COD-021 Template B compact proposal notes
 
 Template B is available as a tenant-selected template key during quote preview and PDF generation.

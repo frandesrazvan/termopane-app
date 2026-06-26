@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateElement,
   calculateQuote,
+  type CatalogLineItemInput,
   type CalculationItemInput,
   type CustomManualLineItemInput,
   type DoorElementInput,
@@ -45,6 +46,30 @@ const customLine: CustomManualLineItemInput = {
   quantity: 2,
   unit: "each",
   unitPriceMinor: 5_000,
+  commercialRules,
+};
+
+const accessoryLine: CatalogLineItemInput = {
+  elementId: "accessory-1",
+  type: "accessory-line",
+  description: "Glaf interior sintetic",
+  catalogItemId: "accessory-sill",
+  catalogItemLabel: "Glaf interior sintetic",
+  quantity: 1.5,
+  unit: "linear-meter",
+  unitPriceMinor: 2_000,
+  commercialRules,
+};
+
+const installationLine: CatalogLineItemInput = {
+  elementId: "installation-1",
+  type: "installation-line",
+  description: "Montaj explicit sintetic",
+  catalogItemId: "service-installation",
+  catalogItemLabel: "Montaj explicit sintetic",
+  quantity: 1,
+  unit: "fixed",
+  unitPriceMinor: 15_000,
   commercialRules,
 };
 
@@ -355,6 +380,83 @@ describe("calculateQuote", () => {
         costMinor: 10_000,
       }),
     ]);
+  });
+
+  it("supports accessory, service, transport, and installation lines from explicit catalog snapshots", () => {
+    const quote = calculateQuote({
+      quoteId: "quote-catalog-lines",
+      commercialRules,
+      items: [
+        accessoryLine,
+        {
+          ...installationLine,
+          elementId: "service-1",
+          type: "service-line",
+          unitPriceMinor: 8_000,
+        },
+        {
+          ...installationLine,
+          elementId: "transport-1",
+          type: "transport-line",
+          catalogItemId: "service-transport",
+          catalogItemLabel: "Transport explicit sintetic",
+          description: "Transport explicit sintetic",
+          unitPriceMinor: 10_000,
+        },
+        installationLine,
+      ],
+    });
+
+    expect(quote.items.map((item) => item.type)).toEqual([
+      "accessory-line",
+      "service-line",
+      "transport-line",
+      "installation-line",
+    ]);
+    expect(quote.materialRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          materialType: "accessory",
+          catalogItemId: "accessory-sill",
+          quantity: 1.5,
+          costMinor: 3_000,
+          sourceRule: "accessory-line-explicit-snapshot",
+        }),
+        expect.objectContaining({
+          materialType: "service",
+          catalogItemId: "service-transport",
+          costMinor: 10_000,
+          sourceRule: "transport-line-explicit-snapshot",
+        }),
+        expect.objectContaining({
+          materialType: "service",
+          catalogItemId: "service-installation",
+          costMinor: 15_000,
+          sourceRule: "installation-line-explicit-snapshot",
+        }),
+      ]),
+    );
+    expect(quote.totals.totalWithVatMinor).toBeGreaterThan(0);
+    expect(quote.trace.filter((entry) => entry.step === "catalogLineCost")).toHaveLength(4);
+  });
+
+  it("warns when catalog line price or quantity snapshots are missing", () => {
+    const quote = calculateQuote({
+      quoteId: "quote-catalog-line-warning",
+      commercialRules,
+      items: [
+        {
+          ...accessoryLine,
+          quantity: 0,
+          unitPriceMinor: undefined,
+        },
+      ],
+    });
+
+    expect(quote.totals.totalWithVatMinor).toBe(0);
+    expect(quote.warnings.map((warning) => warning.code)).toEqual(
+      expect.arrayContaining(["INVALID_QUANTITY", "MISSING_EXPLICIT_MATERIAL_PRICE"]),
+    );
   });
 
   it("aggregates quote totals, material requirements, glass cuts, and grouped profile meters", () => {

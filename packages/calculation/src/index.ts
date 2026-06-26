@@ -132,6 +132,25 @@ export type CustomManualLineItemInput = Readonly<{
   explicitMaterialRequirements?: readonly ExplicitMaterialRequirementInput[];
 }>;
 
+export type CatalogLineItemType =
+  | "accessory-line"
+  | "service-line"
+  | "transport-line"
+  | "installation-line";
+
+export type CatalogLineItemInput = Readonly<{
+  elementId: string;
+  type: CatalogLineItemType;
+  quantity: number;
+  description: string;
+  catalogItemId: string;
+  catalogItemLabel: string;
+  unit: CalculationUnit;
+  unitPriceMinor?: MoneyMinor;
+  commercialRules?: CommercialRulesSnapshot;
+  manualOverride?: ManualOverrideInput;
+}>;
+
 export type DoorElementInput = Readonly<{
   elementId: string;
   type: "door";
@@ -160,6 +179,7 @@ export type UnsupportedCalculationItemInput = Readonly<{
 export type CalculationItemInput =
   | FixedWindowElementInput
   | DoorElementInput
+  | CatalogLineItemInput
   | CustomManualLineItemInput
   | UnsupportedCalculationItemInput;
 
@@ -419,6 +439,10 @@ function calculateItem(
 
   if (input.type === "door") {
     return calculateDoor(input as DoorElementInput, commercialRules, path);
+  }
+
+  if (isCatalogLineItemType(input.type)) {
+    return calculateCatalogLine(input as CatalogLineItemInput, commercialRules, path);
   }
 
   return unsupportedItem(input, path);
@@ -758,6 +782,88 @@ function unsupportedItem(input: UnsupportedCalculationItemInput, path: string): 
     totals: zeroTotals,
     warnings,
     trace,
+  });
+}
+
+function calculateCatalogLine(
+  input: CatalogLineItemInput,
+  commercialRules: CommercialRulesSnapshot,
+  path: string,
+): ElementCalculationResult {
+  const warnings: CalculationWarning[] = [];
+  const trace: CalculationTraceEntry[] = [];
+  const quantity = input.quantity;
+  const hasValidQuantity = Number.isFinite(quantity) && quantity > 0;
+
+  if (!hasValidQuantity) {
+    warnings.push(
+      warning("INVALID_QUANTITY", "Catalog line quantity must be a positive value.", `${path}.quantity`),
+    );
+  }
+
+  const materialRequirement = calculateExplicitMaterialRequirements(
+    input.elementId,
+    [
+      {
+        materialType: materialTypeForCatalogLine(input.type),
+        catalogItemId: input.catalogItemId,
+        label: input.catalogItemLabel || input.description,
+        unit: input.unit,
+        quantity,
+        unitPriceMinor: input.unitPriceMinor,
+        sourceRule: `${input.type}-explicit-snapshot`,
+      },
+    ],
+    path,
+    warnings,
+    trace,
+  );
+  const explicitMaterialCostMinor = hasValidQuantity
+    ? sumMoney(materialRequirement.map((material) => material.costMinor))
+    : 0;
+
+  trace.push({
+    step: "catalogLineCost",
+    itemId: input.elementId,
+    inputs: {
+      lineType: input.type,
+      catalogItemId: input.catalogItemId,
+      quantity,
+      unit: input.unit,
+      unitPriceMinor: input.unitPriceMinor,
+    },
+    output: { explicitMaterialCostMinor },
+    note: "Catalog accessory/service line uses explicit snapshot quantity and sale price only.",
+  });
+
+  const totals = calculateCommercialTotals(
+    explicitMaterialCostMinor,
+    commercialRules,
+    input.manualOverride,
+    hasValidQuantity,
+    `${path}.manualOverride`,
+    warnings,
+    trace,
+    {
+      glassCostMinor: 0,
+      profileCostMinor: 0,
+      explicitMaterialCostMinor,
+      customLineCostMinor: 0,
+    },
+  );
+
+  return Object.freeze({
+    elementId: input.elementId,
+    type: input.type,
+    quantity: hasValidQuantity ? quantity : 0,
+    glass: null,
+    glassCuts: Object.freeze([]),
+    profiles: Object.freeze([]),
+    profileLinearMeters: Object.freeze([]),
+    materialRequirements: materialRequirement,
+    totals,
+    warnings: Object.freeze(warnings),
+    trace: Object.freeze(trace),
   });
 }
 
@@ -1484,6 +1590,21 @@ function roundMeasurement(value: number): number {
 
 function isPositiveFinite(value: number): boolean {
   return Number.isFinite(value) && value > 0;
+}
+
+function isCatalogLineItemType(value: string): value is CatalogLineItemType {
+  return (
+    value === "accessory-line" ||
+    value === "service-line" ||
+    value === "transport-line" ||
+    value === "installation-line"
+  );
+}
+
+function materialTypeForCatalogLine(
+  value: CatalogLineItemType,
+): Extract<MaterialRequirementType, "accessory" | "service"> {
+  return value === "accessory-line" ? "accessory" : "service";
 }
 
 function warning(
