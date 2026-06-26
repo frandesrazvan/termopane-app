@@ -151,7 +151,7 @@ export default async function QuoteDetailPage({
     : emptyFixedWindowCatalogFormOptions();
 
   return (
-    <main className="min-h-screen bg-stone-50 px-4 py-5 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-stone-50 px-4 pt-5 pb-44 sm:px-6 lg:px-8 lg:pb-8">
       <div className="mx-auto w-full max-w-5xl">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -385,6 +385,15 @@ export default async function QuoteDetailPage({
             </p>
           )}
         </section>
+
+        <QuoteMobileActionBar
+          canCreateRevision={canCreateRevision}
+          canGenerateDocuments={canGenerateDocuments}
+          canRecalculate={canEditItems}
+          currentVersion={currentVersion}
+          currency={quote.currency}
+          quoteId={quote.id}
+        />
       </div>
     </main>
   );
@@ -694,6 +703,114 @@ function VersionLifecyclePanel({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function QuoteMobileActionBar({
+  canCreateRevision,
+  canGenerateDocuments,
+  canRecalculate,
+  currentVersion,
+  currency,
+  quoteId,
+}: {
+  canCreateRevision: boolean;
+  canGenerateDocuments: boolean;
+  canRecalculate: boolean;
+  currentVersion: QuoteVersion | null;
+  currency: string;
+  quoteId: string;
+}) {
+  const canGeneratePdfForVersion =
+    canGenerateDocuments && currentVersion ? isLockedOrSentVersion(currentVersion) : false;
+
+  return (
+    <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-30 lg:hidden">
+      <div className="mx-auto max-w-md rounded-md border border-zinc-200 bg-white/95 p-3 shadow-[0_12px_36px_rgba(24,24,27,0.18)] backdrop-blur">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase text-zinc-500">Total curent</p>
+            <p className="mt-1 truncate text-base font-semibold text-zinc-950">
+              {formatMinor(currentVersion?.totalMinor, currency)}
+            </p>
+          </div>
+          <span className="shrink-0 rounded-md bg-stone-100 px-2 py-1 text-xs font-semibold text-zinc-700">
+            Vers. {currentVersion?.versionNumber ?? "-"}
+          </span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Link
+            href={`/dashboard/quotes/${quoteId}/preview`}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm active:bg-stone-100"
+          >
+            <FileText aria-hidden="true" size={15} />
+            Previzualizare
+          </Link>
+          <QuoteMobilePrimaryAction
+            canCreateRevision={canCreateRevision}
+            canGeneratePdfForVersion={canGeneratePdfForVersion}
+            canRecalculate={canRecalculate}
+            currentVersion={currentVersion}
+            quoteId={quoteId}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuoteMobilePrimaryAction({
+  canCreateRevision,
+  canGeneratePdfForVersion,
+  canRecalculate,
+  currentVersion,
+  quoteId,
+}: {
+  canCreateRevision: boolean;
+  canGeneratePdfForVersion: boolean;
+  canRecalculate: boolean;
+  currentVersion: QuoteVersion | null;
+  quoteId: string;
+}) {
+  if (canRecalculate) {
+    return (
+      <form action={recalculateCurrentQuoteVersionAction.bind(null, quoteId)}>
+        <button className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm active:bg-zinc-800">
+          <RefreshCw aria-hidden="true" size={15} />
+          Recalculează
+        </button>
+      </form>
+    );
+  }
+
+  if (currentVersion && canGeneratePdfForVersion) {
+    return (
+      <form action={generateQuotePdfAction.bind(null, quoteId, currentVersion.id)}>
+        <input name="templateKey" type="hidden" value="template-a" />
+        <button className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm active:bg-zinc-800">
+          <Download aria-hidden="true" size={15} />
+          Generează PDF
+        </button>
+      </form>
+    );
+  }
+
+  if (canCreateRevision) {
+    return (
+      <form action={createQuoteRevisionAction.bind(null, quoteId)}>
+        <button className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-3 text-sm font-semibold text-white shadow-sm active:bg-zinc-800">
+          <Plus aria-hidden="true" size={15} />
+          Revizie
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <span className="inline-flex h-11 items-center justify-center rounded-md bg-stone-100 px-3 text-sm font-semibold text-zinc-600">
+      Doar citire
+    </span>
   );
 }
 

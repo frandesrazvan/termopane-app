@@ -129,6 +129,25 @@ The saved-offers workflow uses these Romanian labels:
 - `Versiune Trimisă`;
 - `Versiune Înlocuită`.
 
+## COD-023 Mobile/PWA Labels
+
+The mobile shell and PWA states use Romanian labels including:
+
+- `Se încarcă spațiul de lucru`;
+- `Nu am putut încărca acest ecran`;
+- `Panou`;
+- `Clienți`;
+- `Oferte`;
+- `Catalog`;
+- `Total curent`;
+- `Previzualizare`;
+- `Recalculează`;
+- `Generează PDF`;
+- `Revizie`.
+
+The formal mobile audit widths are `360px`, `390px`, and `430px`; labels above must remain readable
+on those widths.
+
 ## Testing Expectations
 
 When a task changes user-facing offer output, update package/app tests so Romanian labels remain

@@ -4,17 +4,17 @@ import {
   Calculator,
   FileText,
   LayoutDashboard,
-  Settings,
   ShieldCheck,
   Sparkles,
+  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 
 const navItems = [
-  { label: "Panou", icon: LayoutDashboard, active: true },
-  { label: "Oferte", icon: FileText },
-  { label: "Catalog", icon: Archive },
-  { label: "Setări", icon: Settings },
+  { label: "Panou", icon: LayoutDashboard, href: "/dashboard", active: true },
+  { label: "Clienți", icon: UsersRound, href: "/dashboard/customers" },
+  { label: "Oferte", icon: FileText, href: "/dashboard/quotes" },
+  { label: "Catalog", icon: Archive, href: "/dashboard/catalog" },
 ];
 
 const readinessItems = [
@@ -74,9 +74,9 @@ export default function Home() {
           <aside className="hidden border-r border-zinc-200 px-4 py-6 lg:block">
             <nav className="space-y-1" aria-label="Navigare principală">
               {navItems.map((item) => (
-                <a
+                <Link
                   key={item.label}
-                  href="#"
+                  href={item.href}
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${
                     item.active
                       ? "bg-zinc-950 text-white"
@@ -85,7 +85,7 @@ export default function Home() {
                 >
                   <item.icon aria-hidden="true" size={18} />
                   {item.label}
-                </a>
+                </Link>
               ))}
             </nav>
           </aside>
@@ -181,16 +181,16 @@ export default function Home() {
         >
           <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
             {navItems.map((item) => (
-              <a
+              <Link
                 key={item.label}
-                href="#"
+                href={item.href}
                 className={`flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium ${
                   item.active ? "bg-zinc-950 text-white" : "text-zinc-600"
                 }`}
               >
                 <item.icon aria-hidden="true" size={18} />
                 {item.label}
-              </a>
+              </Link>
             ))}
           </div>
         </nav>
