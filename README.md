@@ -9,10 +9,10 @@ production formulas.
 ## Current MVP status
 
 - Authentication, tenant context, role permissions, customer/project records, saved quote shells,
-  draft quote items, calculation wiring, quote lifecycle, and Template A HTML preview foundations
-  are present.
-- PDF generation, local document storage, immutable `Document` records, and audit logging are
-  present for generated quote documents.
+  draft quote items, calculation wiring, quote lifecycle, and Template A/B HTML previews are
+  present.
+- PDF generation, local document storage, immutable `Document` records, selected template keys, and
+  audit logging are present for generated quote documents.
 - Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
   glass packages, hardware kits, colors, accessories, services, tax rates, price lists, price-list
   items, and pricing rules.
@@ -147,7 +147,7 @@ pnpm verify
 - `apps/web`: Next.js web app.
 - `packages/calculation`: pure quote calculation package.
 - `packages/drawing`: deterministic SVG schematic renderer.
-- `packages/pdf`: Template A HTML/PDF rendering package.
+- `packages/pdf`: Template A and Template B HTML/PDF rendering package.
 - `prisma`: schema, migrations, and synthetic seed entrypoint.
 - `docs`: product, data, calculation, PDF, UX, and tasking docs.
 
@@ -156,7 +156,6 @@ pnpm verify
 - Production object storage.
 - Email sending or customer delivery workflow.
 - Door, accessory, service, and advanced pricing-rule selection inside the quote builder.
-- Template B.
 - Real production formulas or supplier-specific pricing rules.
 - Invoicing, ERP, CNC export, stock, or accounting integrations.
 

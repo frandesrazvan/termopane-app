@@ -92,6 +92,22 @@ Template A HTML previews and generated PDFs must use Romanian labels, including:
 Customer-facing PDF/HTML output must continue to hide internal costs and calculation traces unless
 a future task explicitly adds an authorized internal document view.
 
+## COD-021 Template B Labels
+
+Template B compact proposal previews and PDFs use Romanian customer-facing labels, including:
+
+- `Propunere compactă`;
+- `Poziții ofertă`;
+- `UM`;
+- `Cant.`;
+- `Preț unitar`;
+- `Total poziție`;
+- `Total m²`;
+- `Valoare totală document`.
+
+The quote document UI exposes the template choices as `Template A - ofertă detaliată` and
+`Template B - propunere compactă`.
+
 ## Testing Expectations
 
 When a task changes user-facing offer output, update package/app tests so Romanian labels remain
