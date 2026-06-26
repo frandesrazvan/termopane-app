@@ -1464,6 +1464,101 @@ describe("tenant repositories", () => {
     });
   });
 
+  it("applies an audited item-level manual override to a current draft item", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+    const result = await data.applyTenantQuoteItemManualOverride(
+      { tenantId: "tenant-a" },
+      "item-a",
+      {
+        amountMinor: 25_000,
+        reason: "Synthetic negotiated item total",
+        actorUserId: "user-a",
+      },
+    );
+    const manualOverride = asRecord(asRecord(result?.record.configurationSnapshot)?.manualOverride);
+
+    expect(result?.record).toMatchObject({
+      id: "item-a",
+      tenantId: "tenant-a",
+      calculationSnapshot: null,
+    });
+    expect(result?.record.totalsSnapshot).toMatchObject({
+      pendingCalculation: true,
+      source: "manual-commercial-adjustment",
+    });
+    expect(manualOverride).toMatchObject({
+      target: "totalWithVat",
+      amountMinor: "25000",
+      reason: "Synthetic negotiated item total",
+      actorId: "user-a",
+      auditReferenceId: result?.auditLog.id,
+    });
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0]).toMatchObject({
+      id: result?.auditLog.id,
+      tenantId: "tenant-a",
+      actorUserId: "user-a",
+      action: AuditAction.PRICING_OVERRIDE_APPLIED,
+      entityType: "QuoteItem",
+      entityId: "item-a",
+      metadata: {
+        adjustmentType: "item-manual-override",
+        quoteId: "quote-a",
+        quoteVersionId: "version-a",
+        amountMinor: "25000",
+        reason: "Synthetic negotiated item total",
+      },
+    });
+  });
+
+  it("applies an audited quote-level discount to the current draft version", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+    const result = await data.applyTenantQuoteDiscount(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      {
+        basisPoints: 750,
+        reason: "Synthetic campaign discount",
+        actorUserId: "user-a",
+      },
+    );
+    const quoteDiscount = asRecord(asRecord(result?.record.priceSnapshot)?.quoteDiscount);
+
+    expect(result?.record).toMatchObject({
+      id: "version-a",
+      tenantId: "tenant-a",
+      quoteId: "quote-a",
+    });
+    expect(result?.record.totalsSnapshot).toMatchObject({
+      pendingCalculation: true,
+      source: "manual-commercial-adjustment",
+    });
+    expect(quoteDiscount).toMatchObject({
+      basisPoints: 750,
+      reason: "Synthetic campaign discount",
+      actorId: "user-a",
+      auditReferenceId: result?.auditLog.id,
+    });
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0]).toMatchObject({
+      id: result?.auditLog.id,
+      tenantId: "tenant-a",
+      actorUserId: "user-a",
+      action: AuditAction.PRICING_OVERRIDE_APPLIED,
+      entityType: "QuoteVersion",
+      entityId: "version-a",
+      metadata: {
+        adjustmentType: "quote-discount",
+        quoteId: "quote-a",
+        quoteVersionId: "version-a",
+        basisPoints: 750,
+        reason: "Synthetic campaign discount",
+      },
+    });
+  });
+
   it("deletes an item in the same tenant and current draft version", async () => {
     const data = createTenantDataAccess(testClient());
 
@@ -1498,6 +1593,20 @@ describe("tenant repositories", () => {
     ).resolves.toBeNull();
     await expect(
       data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-locked"),
+    ).resolves.toBeNull();
+    await expect(
+      data.applyTenantQuoteItemManualOverride({ tenantId: "tenant-a" }, "item-locked", {
+        amountMinor: 12_000,
+        reason: "Blocked locked override",
+        actorUserId: "user-a",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      data.applyTenantQuoteDiscount({ tenantId: "tenant-a" }, "quote-locked", {
+        amountMinor: 1_000,
+        reason: "Blocked locked discount",
+        actorUserId: "user-a",
+      }),
     ).resolves.toBeNull();
   });
 
@@ -1655,6 +1764,20 @@ describe("tenant repositories", () => {
       }),
     ).resolves.toBeNull();
     await expect(data.deleteTenantQuoteItem({ tenantId: "tenant-a" }, "item-b")).resolves.toBeNull();
+    await expect(
+      data.applyTenantQuoteItemManualOverride({ tenantId: "tenant-a" }, "item-b", {
+        amountMinor: 20_000,
+        reason: "Blocked cross-tenant override",
+        actorUserId: "user-a",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      data.applyTenantQuoteDiscount({ tenantId: "tenant-a" }, "quote-b", {
+        amountMinor: 1_000,
+        reason: "Blocked cross-tenant discount",
+        actorUserId: "user-a",
+      }),
+    ).resolves.toBeNull();
   });
 
   it("creates tenant-scoped quote PDF document metadata with an audit entry", async () => {
@@ -1710,3 +1833,9 @@ describe("tenant repositories", () => {
     });
   });
 });
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}

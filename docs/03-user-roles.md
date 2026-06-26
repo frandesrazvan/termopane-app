@@ -34,6 +34,10 @@ Estimators create and manage offers for customers.
 - View customer-facing prices and totals by default.
 - View internal material costs only when explicitly permitted.
 
+Implementation note: COD-020 models this permission with `TenantMember.canApplyCommercialOverrides`.
+OWNER and ADMIN users can override by role; ESTIMATOR users require the explicit flag; DEALER users
+remain blocked from manual override and quote-discount actions.
+
 ## Dealer or restricted user
 
 Dealer-style users may create or request offers but should have limited cost visibility.

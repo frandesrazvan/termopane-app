@@ -178,18 +178,19 @@ model User {
 }
 
 model TenantMember {
-  id                   String             @id @default(cuid())
-  tenantId             String
-  userId               String
-  role                 TenantRole
-  status               TenantMemberStatus @default(INVITED)
-  canViewInternalCosts Boolean            @default(false)
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  invitedAt            DateTime?
-  joinedAt             DateTime?
-  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                          String             @id @default(cuid())
+  tenantId                    String
+  userId                      String
+  role                        TenantRole
+  status                      TenantMemberStatus @default(INVITED)
+  canViewInternalCosts        Boolean            @default(false)
+  canApplyCommercialOverrides Boolean            @default(false)
+  createdAt                   DateTime           @default(now())
+  updatedAt                   DateTime           @updatedAt
+  invitedAt                   DateTime?
+  joinedAt                    DateTime?
+  tenant                      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user                        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, userId])
   @@index([tenantId, role])

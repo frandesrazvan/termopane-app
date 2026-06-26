@@ -1,5 +1,6 @@
 export { PermissionDeniedError, TenantRequiredError, AuthRequiredError } from "./errors";
 export {
+  canApplyCommercialOverrides,
   canGeneratePdf,
   canManageCatalog,
   canManageUsers,

@@ -1,6 +1,7 @@
 import { TenantMemberStatus, TenantRole, TenantStatus } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
+  canApplyCommercialOverrides,
   canGeneratePdf,
   canManageCatalog,
   canManageUsers,
@@ -19,6 +20,7 @@ function membership(
     role,
     status: TenantMemberStatus.ACTIVE,
     canViewInternalCosts: false,
+    canApplyCommercialOverrides: false,
     tenant: {
       id: "tenant-a",
       name: "Tenant A",
@@ -52,6 +54,7 @@ describe("tenant permission helpers", () => {
     expect(canViewInternalCosts(dealer)).toBe(false);
     expect(canGeneratePdf(dealer)).toBe(true);
     expect(canManageCatalog(dealer)).toBe(false);
+    expect(canApplyCommercialOverrides(dealer)).toBe(false);
   });
 
   it("allows explicit internal-cost visibility for restricted users", () => {
@@ -70,11 +73,23 @@ describe("tenant permission helpers", () => {
     expect(canManageCatalog(owner)).toBe(true);
     expect(canManageUsers(owner)).toBe(true);
     expect(canGeneratePdf(owner)).toBe(true);
+    expect(canApplyCommercialOverrides(owner)).toBe(true);
 
     expect(canViewInternalCosts(admin)).toBe(true);
     expect(canManageCatalog(admin)).toBe(true);
     expect(canManageUsers(admin)).toBe(false);
     expect(canGeneratePdf(admin)).toBe(true);
+    expect(canApplyCommercialOverrides(admin)).toBe(true);
+  });
+
+  it("allows estimator commercial overrides only with explicit permission", () => {
+    const estimator = membership(TenantRole.ESTIMATOR);
+    const permittedEstimator = membership(TenantRole.ESTIMATOR, {
+      canApplyCommercialOverrides: true,
+    });
+
+    expect(canApplyCommercialOverrides(estimator)).toBe(false);
+    expect(canApplyCommercialOverrides(permittedEstimator)).toBe(true);
   });
 
   it("does not grant permissions to disabled memberships", () => {
@@ -86,5 +101,6 @@ describe("tenant permission helpers", () => {
     expect(canManageCatalog(owner)).toBe(false);
     expect(canManageUsers(owner)).toBe(false);
     expect(canGeneratePdf(owner)).toBe(false);
+    expect(canApplyCommercialOverrides(owner)).toBe(false);
   });
 });

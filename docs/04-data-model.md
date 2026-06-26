@@ -252,3 +252,18 @@ The calculation adapter remains database-independent and reads only the frozen s
 selected glass/profile deduction and sale-price values when they are explicitly present with
 compatible units. Missing price or deduction configuration continues to produce warnings instead of
 formula assumptions. Custom lines remain explicit manual-price snapshots.
+
+## COD-020 manual commercial override notes
+
+Tenant memberships now include `canApplyCommercialOverrides` so override permission is separate from
+internal cost visibility. OWNER and ADMIN memberships can apply commercial overrides by role;
+ESTIMATOR memberships require the explicit flag; DEALER memberships remain blocked from manual
+override and quote-discount mutations.
+
+Item-level manual overrides are stored in `QuoteItem.configurationSnapshot.manualOverride` with
+target, amount, actor, timestamp, reason, and audit reference. Quote-level discounts are stored in
+`QuoteVersion.priceSnapshot.quoteDiscount` with amount or basis points plus the same audit context.
+Both write paths require a reason, reject locked/sent versions, create `AuditLog` rows with
+`PRICING_OVERRIDE_APPLIED`, and mark calculation snapshots pending until the draft version is
+recalculated. Stored totals preserve calculated values separately from manual adjustments so quote
+review can show base totals, discounts, overrides, and final totals.

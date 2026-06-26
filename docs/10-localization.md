@@ -59,6 +59,24 @@ Fixed-window quote item forms use these Romanian labels:
 
 The quote item catalog validation badge remains `necesită validare business`.
 
+## COD-020 Commercial Adjustment Labels
+
+Manual commercial controls in the quote workflow use Romanian labels:
+
+- `Ajustare preț poziție`
+- `Total final manual`
+- `Motiv override`
+- `Reducere ofertă`
+- `Tip reducere`
+- `Valoare reducere`
+- `Motiv reducere`
+- `Total calculat`
+- `Ajustări manuale`
+- `Total înainte de override`
+
+These labels are internal workflow UI labels, not database enum values. Audit action constants remain
+untranslated.
+
 ## Customer-Facing Output
 
 Template A HTML previews and generated PDFs must use Romanian labels, including:

@@ -25,6 +25,11 @@ production formulas.
   price-list references, and sale-price snapshots are frozen on `QuoteItem.catalogSnapshot`.
 - Quote calculation uses selected fixed-window glass/profile price and deduction snapshots where
   available. Missing prices or deduction values still produce warnings instead of invented formulas.
+- Draft quote workflow exposes audited commercial controls: authorized OWNER/ADMIN users and
+  explicitly permitted ESTIMATOR users can apply item-level final-total overrides and quote-level
+  discounts with a required reason. DEALER users remain blocked from these override actions.
+- Quote review screens separate calculated totals, quote discounts, manual adjustments, and final
+  overridden totals before locking or generating customer-facing documents.
 
 ## Stack
 
