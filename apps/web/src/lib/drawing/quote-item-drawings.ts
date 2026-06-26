@@ -2,6 +2,7 @@ import { QuoteItemType, type QuoteItem } from "@prisma/client";
 import {
   createQuoteItemDrawingSnapshot,
   type CustomPlaceholderDrawingJson,
+  type DoorDrawingJson,
   type FixedWindowDrawingJson,
   type QuoteItemDrawingJson,
   type QuoteItemDrawingSnapshot,
@@ -32,6 +33,25 @@ export function customLineDrawingSnapshot(input: {
   });
 }
 
+export function doorDrawingSnapshot(input: {
+  glassLabel?: string | null;
+  heightMm: number;
+  label?: string | null;
+  panelLabel?: string | null;
+  split?: DoorDrawingJson["split"];
+  widthMm: number;
+}): QuoteItemDrawingSnapshot {
+  return createQuoteItemDrawingSnapshot({
+    type: "door",
+    widthMm: input.widthMm,
+    heightMm: input.heightMm,
+    label: input.label ?? undefined,
+    split: input.split ?? "glass-panel",
+    glassLabel: input.glassLabel ?? undefined,
+    panelLabel: input.panelLabel ?? undefined,
+  });
+}
+
 export function quoteItemDrawingSnapshot(item: QuoteItem): QuoteItemDrawingSnapshot {
   const storedInput = drawingInputFromConfiguration(item.configurationSnapshot);
 
@@ -44,6 +64,17 @@ export function quoteItemDrawingSnapshot(item: QuoteItem): QuoteItemDrawingSnaps
       widthMm: item.widthMm ?? numberFromConfiguration(item.configurationSnapshot, "widthMm") ?? 0,
       heightMm: item.heightMm ?? numberFromConfiguration(item.configurationSnapshot, "heightMm") ?? 0,
       label: item.customerDescription,
+    });
+  }
+
+  if (item.type === QuoteItemType.DOOR) {
+    return doorDrawingSnapshot({
+      widthMm: item.widthMm ?? numberFromConfiguration(item.configurationSnapshot, "widthMm") ?? 0,
+      heightMm: item.heightMm ?? numberFromConfiguration(item.configurationSnapshot, "heightMm") ?? 0,
+      label: item.customerDescription,
+      split: doorSplitFromConfiguration(item.configurationSnapshot),
+      glassLabel: stringFromNestedConfiguration(item.configurationSnapshot, "glass", "label"),
+      panelLabel: stringFromNestedConfiguration(item.configurationSnapshot, "panel", "description"),
     });
   }
 
@@ -67,6 +98,10 @@ function drawingInputFromConfiguration(value: unknown): QuoteItemDrawingJson | n
 
   if (input.type === "custom-placeholder") {
     return customPlaceholderDrawingInput(input);
+  }
+
+  if (input.type === "door") {
+    return doorDrawingInput(input);
   }
 
   return null;
@@ -97,8 +132,44 @@ function customPlaceholderDrawingInput(input: JsonRecord): CustomPlaceholderDraw
   };
 }
 
+function doorDrawingInput(input: JsonRecord): DoorDrawingJson | null {
+  const widthMm = numberFrom(input.widthMm);
+  const heightMm = numberFrom(input.heightMm);
+
+  if (widthMm === undefined || heightMm === undefined) {
+    return null;
+  }
+
+  return {
+    type: "door",
+    widthMm,
+    heightMm,
+    label: stringFrom(input.label),
+    split: doorSplitFromValue(input.split),
+    glassLabel: stringFrom(input.glassLabel),
+    panelLabel: stringFrom(input.panelLabel),
+  };
+}
+
 function numberFromConfiguration(value: unknown, key: string) {
   return numberFrom(asRecord(value)?.[key]);
+}
+
+function stringFromNestedConfiguration(value: unknown, parentKey: string, childKey: string) {
+  return stringFrom(asRecord(asRecord(value)?.[parentKey])?.[childKey]);
+}
+
+function doorSplitFromConfiguration(value: unknown): DoorDrawingJson["split"] {
+  return doorSplitFromValue(asRecord(asRecord(value)?.drawing)?.split);
+}
+
+function doorSplitFromValue(value: unknown): DoorDrawingJson["split"] {
+  return value === "glass" ||
+    value === "panel" ||
+    value === "none" ||
+    value === "glass-panel"
+    ? value
+    : "glass-panel";
 }
 
 function asRecord(value: unknown): JsonRecord | null {

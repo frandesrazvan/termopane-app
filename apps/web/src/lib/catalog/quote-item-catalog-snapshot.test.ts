@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
+  buildDoorCatalogSnapshot,
   buildFixedWindowCatalogSnapshot,
   selectActiveCatalogPriceList,
 } from "./quote-item-catalog-snapshot";
@@ -137,6 +138,65 @@ describe("quote item catalog snapshots", () => {
       },
       hardwareKit: null,
     });
+  });
+
+  it("stores selected door catalog snapshots and manual panel pricing", () => {
+    const snapshot = buildDoorCatalogSnapshot({
+      profileSystem: profileSystem(),
+      frameProfile: profileItem(),
+      thresholdProfile: profileItem({
+        id: "profile-threshold",
+        name: "Profil prag sintetic",
+        code: "THRESH-A",
+        type: ProfileItemType.THRESHOLD,
+      }),
+      glassPackage: glassPackage(),
+      colorFinish: colorFinish(),
+      hardwareKit: hardwareKit(),
+      panelDescription: "Panou decorativ sintetic",
+      manualPanelPriceMinor: 12_000,
+      currency: "RON",
+      priceList: priceList(),
+      priceListItems: [
+        priceListItem({
+          id: "price-hardware",
+          itemType: PriceListItemType.HARDWARE_KIT,
+          catalogItemId: "hardware-basic",
+          unit: CatalogUnit.EACH,
+          saleMinor: BigInt(4_000),
+        }),
+      ],
+    });
+
+    expect(snapshot).toMatchObject({
+      source: "tenant-catalog",
+      snapshotVersion: "cod-028-door-catalog-v1",
+      selectedCatalogIds: {
+        profileSystemId: "system-pvc",
+        frameProfileId: "profile-frame",
+        thresholdProfileId: "profile-threshold",
+        glassPackageId: "glass-clear",
+        colorFinishId: "color-white",
+        hardwareKitId: "hardware-basic",
+      },
+      requiresBusinessValidation: true,
+      panel: {
+        description: "Panou decorativ sintetic",
+        manualPricing: {
+          unitPriceMinor: 12_000,
+          currency: "RON",
+          isFormula: false,
+        },
+      },
+      hardwareKit: {
+        id: "hardware-basic",
+        priceListItem: {
+          id: "price-hardware",
+          saleMinor: 4_000,
+        },
+      },
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("costMinor");
   });
 
   it("selects the active price list for the quote currency only", () => {

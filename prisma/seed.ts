@@ -28,6 +28,7 @@ const dealerUserId = "seed_user_dealer";
 const supplierId = "seed_supplier_catalog";
 const profileSystemId = "seed_profile_system_pvc";
 const frameProfileId = "seed_profile_item_frame";
+const thresholdProfileId = "seed_profile_item_threshold";
 const glassPackageId = "seed_glass_package_double";
 const hardwareKitId = "seed_hardware_kit_placeholder";
 const colorFinishId = "seed_color_finish_white";
@@ -431,6 +432,47 @@ async function main() {
     },
   });
 
+  const thresholdProfile = await prisma.profileItem.upsert({
+    where: { id: thresholdProfileId },
+    update: {
+      tenantId: tenant.id,
+      profileSystemId: profileSystem.id,
+      supplierId: supplier.id,
+      name: "Synthetic door threshold profile",
+      code: "SYN-THRESHOLD-70",
+      type: ProfileItemType.THRESHOLD,
+      unit: CatalogUnit.LINEAR_METER,
+      deductionRule: {
+        validationStatus: "requires business validation",
+      },
+      wasteRule: {
+        validationStatus: "requires business validation",
+      },
+      isActive: true,
+      deletedAt: null,
+    },
+    create: {
+      id: thresholdProfileId,
+      tenantId: tenant.id,
+      profileSystemId: profileSystem.id,
+      supplierId: supplier.id,
+      name: "Synthetic door threshold profile",
+      code: "SYN-THRESHOLD-70",
+      type: ProfileItemType.THRESHOLD,
+      unit: CatalogUnit.LINEAR_METER,
+      description: "Synthetic threshold profile for door MVP selection.",
+      deductionRule: {
+        validationStatus: "requires business validation",
+      },
+      wasteRule: {
+        validationStatus: "requires business validation",
+      },
+      configuration: {
+        note: "Door threshold formulas are not production validated.",
+      },
+    },
+  });
+
   const glassPackage = await prisma.glassPackage.upsert({
     where: { id: glassPackageId },
     update: {
@@ -641,6 +683,15 @@ async function main() {
       costMinor: 2400,
       saleMinor: 3600,
       description: "Synthetic frame profile price",
+    },
+    {
+      id: "seed_price_item_threshold",
+      itemType: PriceListItemType.PROFILE_ITEM,
+      catalogItemId: thresholdProfile.id,
+      unit: CatalogUnit.LINEAR_METER,
+      costMinor: 1800,
+      saleMinor: 2800,
+      description: "Synthetic door threshold profile price",
     },
     {
       id: "seed_price_item_glass",

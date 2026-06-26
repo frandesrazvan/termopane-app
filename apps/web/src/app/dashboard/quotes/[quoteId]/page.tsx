@@ -67,6 +67,7 @@ import {
 } from "@/lib/i18n";
 import { defaultQuotePdfTemplateKeyFromVersion } from "@/lib/pdf/template-a-snapshot";
 import {
+  addDoorItemAction,
   addCustomLineItemAction,
   addFixedWindowItemAction,
   applyItemManualOverrideAction,
@@ -79,6 +80,7 @@ import {
   updateQuoteItemAction,
 } from "./actions";
 import {
+  DoorCatalogFields,
   emptyFixedWindowCatalogFormOptions,
   FixedWindowCatalogFields,
   type FixedWindowCatalogFieldDefaults,
@@ -311,7 +313,7 @@ export default async function QuoteDetailPage({
               </div>
               <h3 className="mt-4 text-base font-semibold text-zinc-950">Nu există poziții încă</h3>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
-                Adaugă o fereastră fixă sau o poziție personalizată pentru a începe oferta.
+                Adaugă o fereastră fixă, o ușă sau o poziție personalizată pentru a începe oferta.
               </p>
             </div>
           )}
@@ -438,6 +440,12 @@ async function loadFixedWindowCatalogOptions(
         profileItem.type === ProfileItemType.FRAME &&
         selectableProfileSystems.some((profileSystem) => profileSystem.id === profileItem.profileSystemId),
     ),
+    thresholdProfiles: profileItems.filter(
+      (profileItem): profileItem is ProfileItem =>
+        isSelectableCatalogRecord(profileItem) &&
+        profileItem.type === ProfileItemType.THRESHOLD &&
+        selectableProfileSystems.some((profileSystem) => profileSystem.id === profileItem.profileSystemId),
+    ),
     glassPackages: glassPackages.filter(isSelectableGlassPackage),
     colorFinishes: colorFinishes.filter(
       (colorFinish): colorFinish is ColorFinish =>
@@ -460,7 +468,7 @@ function AddItemForms({
   quoteId: string;
 }) {
   return (
-    <div className="mt-5 grid gap-3 lg:grid-cols-2">
+    <div className="mt-5 grid gap-3 lg:grid-cols-3">
       <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
           <Plus aria-hidden="true" size={17} />
@@ -481,6 +489,46 @@ function AddItemForms({
           <TextAreaField label="Note interne" name="internalNotes" />
           <FixedWindowCatalogFields currency={currency} options={catalogOptions} />
           <SubmitButton label="Adaugă fereastră fixă" />
+        </form>
+      </details>
+
+      <details className="rounded-md border border-zinc-200 bg-stone-50 p-4">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-zinc-950">
+          <Plus aria-hidden="true" size={17} />
+          Ușă
+        </summary>
+        <form action={addDoorItemAction.bind(null, quoteId)} className="mt-4 grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            <NumberField label="Cantitate" name="quantity" min={1} defaultValue="1" />
+            <NumberField label="Lățime mm" name="widthMm" min={1} />
+            <NumberField label="Înălțime mm" name="heightMm" min={1} />
+          </div>
+          <TextField
+            label="Descriere pentru client"
+            name="customerDescription"
+            placeholder="Ușă intrare 900 x 2100"
+            required
+          />
+          <DoorCatalogFields currency={currency} options={catalogOptions} />
+          <TextAreaField
+            label="Descriere panou/manual"
+            name="panelDescription"
+          />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <TextField
+              label={`Preț manual panou (${currency})`}
+              name="manualPanelPrice"
+              inputMode="decimal"
+              placeholder="0.00"
+            />
+            <TextField
+              label="Feronerie placeholder"
+              name="hardwareDescription"
+              placeholder="Mâner, yală, balamale"
+            />
+          </div>
+          <TextAreaField label="Note interne" name="internalNotes" />
+          <SubmitButton label="Adaugă ușă" />
         </form>
       </details>
 
@@ -1311,13 +1359,14 @@ function QuoteItemEditForm({
   quoteId: string;
 }) {
   const catalogDefaults = catalogFieldDefaultsFromItem(item);
+  const doorDefaults = doorFieldDefaultsFromItem(item);
 
   return (
     <form action={updateQuoteItemAction.bind(null, quoteId, item.id)} className="mt-4 grid gap-3">
       <input type="hidden" name="itemType" value={item.type} />
       <div className="grid gap-3 sm:grid-cols-3">
         <NumberField label="Cantitate" name="quantity" min={1} defaultValue={String(item.quantity)} />
-        {item.type === QuoteItemType.WINDOW ? (
+        {item.type === QuoteItemType.WINDOW || item.type === QuoteItemType.DOOR ? (
           <>
             <NumberField
               label="Lățime mm"
@@ -1332,7 +1381,7 @@ function QuoteItemEditForm({
               defaultValue={item.heightMm ? String(item.heightMm) : ""}
             />
           </>
-        ) : (
+        ) : item.type === QuoteItemType.CUSTOM ? (
           <TextField
             label={`Preț unitar (${currency})`}
             name="unitPrice"
@@ -1340,7 +1389,7 @@ function QuoteItemEditForm({
             defaultValue={manualUnitPriceMinor === null ? "" : minorInput(manualUnitPriceMinor)}
             required
           />
-        )}
+        ) : null}
       </div>
       <TextField
         label="Descriere pentru client"
@@ -1355,6 +1404,38 @@ function QuoteItemEditForm({
           defaults={catalogDefaults}
           options={catalogOptions}
         />
+      ) : null}
+      {item.type === QuoteItemType.DOOR ? (
+        <>
+          <DoorCatalogFields
+            currency={currency}
+            defaults={catalogDefaults}
+            options={catalogOptions}
+          />
+          <TextAreaField
+            label="Descriere panou/manual"
+            name="panelDescription"
+            defaultValue={doorDefaults.panelDescription}
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextField
+              label={`Preț manual panou (${currency})`}
+              name="manualPanelPrice"
+              inputMode="decimal"
+              defaultValue={
+                doorDefaults.manualPanelPriceMinor === null
+                  ? ""
+                  : minorInput(doorDefaults.manualPanelPriceMinor)
+              }
+              placeholder="0.00"
+            />
+            <TextField
+              label="Feronerie placeholder"
+              name="hardwareDescription"
+              defaultValue={doorDefaults.hardwareDescription}
+            />
+          </div>
+        </>
       ) : null}
       <SubmitButton label="Salvează poziția" />
     </form>
@@ -1585,14 +1666,33 @@ function catalogFieldDefaultsFromItem(item: QuoteItem): FixedWindowCatalogFieldD
   return {
     profileSystemId: stringFrom(asRecord(catalog?.profileSystem)?.id),
     frameProfileId: stringFrom(asRecord(catalog?.frameProfile)?.id),
+    thresholdProfileId: stringFrom(asRecord(catalog?.thresholdProfile)?.id),
     glassPackageId: stringFrom(asRecord(catalog?.glassPackage)?.id),
     colorFinishId: stringFrom(asRecord(catalog?.colorFinish)?.id),
     hardwareKitId: stringFrom(asRecord(catalog?.hardwareKit)?.id),
   };
 }
 
+function doorFieldDefaultsFromItem(item: QuoteItem) {
+  const configuration = asRecord(item.configurationSnapshot);
+  const catalog = asRecord(item.catalogSnapshot);
+  const panel = firstRecord(configuration?.panel, catalog?.panel);
+  const hardware = firstRecord(configuration?.hardware, catalog?.hardwareKit);
+  const panelPricing = firstRecord(panel?.manualPricing);
+  const manualPanelPriceMinor = numberFrom(panelPricing?.unitPriceMinor);
+
+  return {
+    hardwareDescription: stringFrom(hardware?.description) ?? "",
+    manualPanelPriceMinor: manualPanelPriceMinor ?? null,
+    panelDescription: stringFrom(panel?.description) ?? "",
+  };
+}
+
 function catalogSummaryFromItem(item: QuoteItem) {
   const catalog = asRecord(item.catalogSnapshot);
+  const configuration = asRecord(item.configurationSnapshot);
+  const panel = firstRecord(configuration?.panel, catalog?.panel);
+  const hardwareConfiguration = firstRecord(configuration?.hardware);
 
   if (!catalog) {
     return [];
@@ -1601,9 +1701,12 @@ function catalogSummaryFromItem(item: QuoteItem) {
   return [
     catalogSummaryEntry("Sistem", catalog.profileSystem),
     catalogSummaryEntry("Profil toc", catalog.frameProfile),
+    catalogSummaryEntry("Profil prag", catalog.thresholdProfile),
     catalogSummaryEntry("Sticlă", catalog.glassPackage),
+    textSummaryEntry("Panou", stringFrom(panel?.description)),
     catalogSummaryEntry("Culoare", catalog.colorFinish),
     catalogSummaryEntry("Feronerie", catalog.hardwareKit),
+    textSummaryEntry("Feronerie placeholder", stringFrom(hardwareConfiguration?.description)),
   ].flatMap((entry) => (entry ? [entry] : []));
 }
 
@@ -1621,6 +1724,10 @@ function catalogSummaryEntry(label: string, value: unknown) {
     label,
     value: code ? `${name} (${code})` : name,
   };
+}
+
+function textSummaryEntry(label: string, value: string | undefined) {
+  return value ? { label, value } : null;
 }
 
 function catalogRequiresBusinessValidation(item: QuoteItem) {
@@ -1786,6 +1893,18 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function firstRecord(...values: unknown[]) {
+  for (const value of values) {
+    const record = asRecord(value);
+
+    if (record) {
+      return record;
+    }
+  }
+
+  return null;
 }
 
 function recordsFromArray(value: unknown): Record<string, unknown>[] {

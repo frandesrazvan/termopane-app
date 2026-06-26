@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 
 const FIXED_WINDOW_SNAPSHOT_VERSION = "cod-019-fixed-window-catalog-v1";
+const DOOR_SNAPSHOT_VERSION = "cod-028-door-catalog-v1";
 
 export type FixedWindowCatalogSnapshotInput = {
   profileSystem: ProfileSystem;
@@ -19,6 +20,20 @@ export type FixedWindowCatalogSnapshotInput = {
   glassPackage: GlassPackage;
   colorFinish: ColorFinish;
   hardwareKit?: HardwareKit | null;
+  priceList?: PriceList | null;
+  priceListItems?: readonly PriceListItem[];
+};
+
+export type DoorCatalogSnapshotInput = {
+  profileSystem: ProfileSystem;
+  colorFinish: ColorFinish;
+  frameProfile?: ProfileItem | null;
+  thresholdProfile?: ProfileItem | null;
+  glassPackage?: GlassPackage | null;
+  hardwareKit?: HardwareKit | null;
+  panelDescription?: string | null;
+  manualPanelPriceMinor?: number | null;
+  currency: string;
   priceList?: PriceList | null;
   priceListItems?: readonly PriceListItem[];
 };
@@ -184,6 +199,164 @@ export function buildFixedWindowCatalogSnapshot({
   };
 }
 
+export function buildDoorCatalogSnapshot({
+  colorFinish,
+  currency,
+  frameProfile = null,
+  glassPackage = null,
+  hardwareKit = null,
+  manualPanelPriceMinor = null,
+  panelDescription = null,
+  priceList = null,
+  priceListItems = [],
+  profileSystem,
+  thresholdProfile = null,
+}: DoorCatalogSnapshotInput): Record<string, unknown> {
+  const frameProfilePrice = frameProfile
+    ? priceSnapshotFor(
+        priceListItems,
+        PriceListItemType.PROFILE_ITEM,
+        frameProfile.id,
+        priceList?.id,
+      )
+    : null;
+  const thresholdProfilePrice = thresholdProfile
+    ? priceSnapshotFor(
+        priceListItems,
+        PriceListItemType.PROFILE_ITEM,
+        thresholdProfile.id,
+        priceList?.id,
+      )
+    : null;
+  const glassPackagePrice = glassPackage
+    ? priceSnapshotFor(
+        priceListItems,
+        PriceListItemType.GLASS_PACKAGE,
+        glassPackage.id,
+        priceList?.id,
+      )
+    : null;
+  const colorFinishPrice = priceSnapshotFor(
+    priceListItems,
+    PriceListItemType.COLOR_FINISH,
+    colorFinish.id,
+    priceList?.id,
+  );
+  const hardwareKitPrice = hardwareKit
+    ? priceSnapshotFor(
+        priceListItems,
+        PriceListItemType.HARDWARE_KIT,
+        hardwareKit.id,
+        priceList?.id,
+      )
+    : null;
+
+  return {
+    source: "tenant-catalog",
+    snapshotVersion: DOOR_SNAPSHOT_VERSION,
+    selectedCatalogIds: {
+      profileSystemId: profileSystem.id,
+      frameProfileId: frameProfile?.id ?? null,
+      thresholdProfileId: thresholdProfile?.id ?? null,
+      glassPackageId: glassPackage?.id ?? null,
+      colorFinishId: colorFinish.id,
+      hardwareKitId: hardwareKit?.id ?? null,
+    },
+    requiresBusinessValidation: true,
+    priceList: priceList ? priceListSnapshot(priceList) : null,
+    profileSystem: {
+      id: profileSystem.id,
+      name: profileSystem.name,
+      code: profileSystem.code,
+      materialType: profileSystem.materialType,
+      supplierId: profileSystem.supplierId,
+      requiresBusinessValidation: requiresBusinessValidation(profileSystem.configuration),
+    },
+    frameProfile: frameProfile
+      ? profileItemSnapshot(frameProfile, frameProfilePrice)
+      : null,
+    thresholdProfile: thresholdProfile
+      ? profileItemSnapshot(thresholdProfile, thresholdProfilePrice)
+      : null,
+    glassPackage: glassPackage
+      ? {
+          id: glassPackage.id,
+          name: glassPackage.name,
+          label: glassPackage.name,
+          code: glassPackage.code,
+          compositionLabel: glassPackage.compositionLabel,
+          unit: glassPackage.unit,
+          calculationUnit: catalogUnitToCalculationUnit(glassPackage.unit),
+          supplierId: glassPackage.supplierId,
+          minBillableAreaSquareMm: glassPackage.minBillableAreaSquareMm,
+          minBillableAreaM2: squareMillimetersToSquareMeters(
+            glassPackage.minBillableAreaSquareMm,
+          ),
+          deductionRule: jsonRecordOrNull(glassPackage.deductionRule),
+          requiresBusinessValidation: requiresBusinessValidation(
+            glassPackage.deductionRule,
+            glassPackage.configuration,
+          ),
+          priceListItem: glassPackagePrice,
+          unitPriceMinorPerM2:
+            glassPackagePrice?.unit === CatalogUnit.SQUARE_METER
+              ? glassPackagePrice.saleMinor
+              : null,
+        }
+      : null,
+    panel: {
+      description: panelDescription,
+      manualPricing:
+        manualPanelPriceMinor === null
+          ? null
+          : {
+              unitPriceMinor: manualPanelPriceMinor,
+              currency,
+              unit: CatalogUnit.EACH,
+              calculationUnit: "each",
+              isFormula: false,
+              source: "explicit-manual-panel-snapshot",
+            },
+    },
+    colorFinish: {
+      id: colorFinish.id,
+      name: colorFinish.name,
+      label: colorFinish.name,
+      code: colorFinish.code,
+      surface: colorFinish.surface,
+      profileSystemId: colorFinish.profileSystemId,
+      supplierId: colorFinish.supplierId,
+      unit: colorFinishPrice?.unit ?? null,
+      calculationUnit: colorFinishPrice
+        ? catalogUnitToCalculationUnit(colorFinishPrice.unit)
+        : null,
+      requiresBusinessValidation: requiresBusinessValidation(colorFinish.configuration),
+      priceListItem: colorFinishPrice,
+    },
+    hardwareKit: hardwareKit
+      ? {
+          id: hardwareKit.id,
+          name: hardwareKit.name,
+          label: hardwareKit.name,
+          code: hardwareKit.code,
+          category: hardwareKit.category,
+          openingType: hardwareKit.openingType,
+          unit: hardwareKit.unit,
+          calculationUnit: catalogUnitToCalculationUnit(hardwareKit.unit),
+          supplierId: hardwareKit.supplierId,
+          quantityRule: jsonRecordOrNull(hardwareKit.quantityRule),
+          requiresBusinessValidation: requiresBusinessValidation(
+            hardwareKit.quantityRule,
+            hardwareKit.configuration,
+          ),
+          priceListItem: hardwareKitPrice,
+        }
+      : null,
+    calculationNote:
+      "Door MVP stores selected catalog snapshots, but production door formulas remain unvalidated.",
+  };
+}
+
 export function selectActiveCatalogPriceList(
   priceLists: readonly PriceList[],
   currency: string,
@@ -204,6 +377,30 @@ export function isSelectableCatalogRecord(record: {
   deletedAt: Date | null;
 }) {
   return record.isActive && !record.deletedAt;
+}
+
+function profileItemSnapshot(profileItem: ProfileItem, priceListItem: PriceListItemSnapshot | null) {
+  return {
+    id: profileItem.id,
+    name: profileItem.name,
+    label: profileItem.name,
+    code: profileItem.code,
+    type: profileItem.type,
+    unit: profileItem.unit,
+    calculationUnit: catalogUnitToCalculationUnit(profileItem.unit),
+    profileSystemId: profileItem.profileSystemId,
+    supplierId: profileItem.supplierId,
+    deductionRule: jsonRecordOrNull(profileItem.deductionRule),
+    wasteRule: jsonRecordOrNull(profileItem.wasteRule),
+    requiresBusinessValidation: requiresBusinessValidation(
+      profileItem.deductionRule,
+      profileItem.wasteRule,
+      profileItem.configuration,
+    ),
+    priceListItem,
+    unitPriceMinorPerMeter:
+      priceListItem?.unit === CatalogUnit.LINEAR_METER ? priceListItem.saleMinor : null,
+  };
 }
 
 function priceSnapshotFor(

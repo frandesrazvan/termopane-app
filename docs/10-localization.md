@@ -171,6 +171,20 @@ The settings UI uses Romanian labels including:
 - `Preferințe utilizator`;
 - `Scurtături panou`.
 
+## COD-028 Door Item Labels
+
+Door quote item UI and customer-facing output use Romanian labels including:
+
+- `Ușă`;
+- `Profil toc ușă`;
+- `Profil prag`;
+- `Pachet sticlă opțional`;
+- `Descriere panou/manual`;
+- `Preț manual panou`;
+- `Feronerie placeholder`;
+- `Sticlă/panou`;
+- `Schemă orientativă ușă`.
+
 ## Testing Expectations
 
 When a task changes user-facing offer output, update package/app tests so Romanian labels remain

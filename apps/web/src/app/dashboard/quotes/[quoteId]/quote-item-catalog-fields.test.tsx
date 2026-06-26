@@ -12,7 +12,11 @@ import {
 } from "@prisma/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { FixedWindowCatalogFields, type FixedWindowCatalogFormOptions } from "./quote-item-catalog-fields";
+import {
+  DoorCatalogFields,
+  FixedWindowCatalogFields,
+  type FixedWindowCatalogFormOptions,
+} from "./quote-item-catalog-fields";
 
 describe("FixedWindowCatalogFields", () => {
   it("renders Romanian fixed-window catalog labels and select names", () => {
@@ -34,12 +38,33 @@ describe("FixedWindowCatalogFields", () => {
     expect(markup).toContain('name="colorFinishId"');
     expect(markup).toContain('name="hardwareKitId"');
   });
+
+  it("renders Romanian door catalog labels and optional select names", () => {
+    const markup = renderToStaticMarkup(
+      <form>
+        <DoorCatalogFields currency="RON" options={catalogOptions()} />
+      </form>,
+    );
+
+    expect(markup).toContain("Profil toc ușă");
+    expect(markup).toContain("Profil prag");
+    expect(markup).toContain("Pachet sticlă opțional");
+    expect(markup).toContain("Feronerie");
+    expect(markup).toContain("Listă de prețuri activă");
+    expect(markup).toContain('name="profileSystemId"');
+    expect(markup).toContain('name="frameProfileId"');
+    expect(markup).toContain('name="thresholdProfileId"');
+    expect(markup).toContain('name="glassPackageId"');
+    expect(markup).toContain('name="colorFinishId"');
+    expect(markup).toContain('name="hardwareKitId"');
+  });
 });
 
 function catalogOptions(): FixedWindowCatalogFormOptions {
   return {
     profileSystems: [profileSystem()],
     frameProfiles: [profileItem()],
+    thresholdProfiles: [profileItem({ id: "profile-threshold", type: ProfileItemType.THRESHOLD })],
     glassPackages: [glassPackage()],
     colorFinishes: [colorFinish()],
     hardwareKits: [hardwareKit()],
@@ -64,7 +89,7 @@ function profileSystem() {
   } as ProfileSystem;
 }
 
-function profileItem() {
+function profileItem(overrides: Partial<ProfileItem> = {}) {
   return {
     id: "profile-frame",
     tenantId: "tenant-a",
@@ -82,6 +107,7 @@ function profileItem() {
     deletedAt: null,
     createdAt: new Date("2026-06-25T00:00:00.000Z"),
     updatedAt: new Date("2026-06-25T00:00:00.000Z"),
+    ...overrides,
   } as ProfileItem;
 }
 

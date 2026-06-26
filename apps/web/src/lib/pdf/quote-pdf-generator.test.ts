@@ -267,6 +267,68 @@ describe("quote PDF generation", () => {
     expect(snapshot.templateKey).toBe("template-b");
   });
 
+  it("includes door customer-facing fields in preview snapshots without internal costs", () => {
+    const snapshot = buildQuotePdfOfferSnapshot(
+      quote({ id: "quote-door" }),
+      quoteVersion({ id: "version-door", quoteId: "quote-door" }),
+      [
+        quoteItem({
+          id: "item-door",
+          type: QuoteItemType.DOOR,
+          widthMm: 900,
+          heightMm: 2100,
+          customerDescription: "Ușă intrare cu panou",
+          internalNotes: "Supplier cost must stay hidden",
+          configurationSnapshot: {
+            kind: "door",
+            panel: {
+              description: "Panou decorativ",
+              manualPricing: {
+                unitPriceMinor: 12_000,
+              },
+            },
+            hardware: {
+              description: "Mâner și yală",
+            },
+            internalMaterialCostMinor: 9_999_99,
+          },
+          catalogSnapshot: {
+            glassPackage: {
+              id: "glass-door",
+              name: "Sticlă mată",
+              compositionLabel: "4 / 16 / 4 mat",
+            },
+            panel: {
+              description: "Panou decorativ",
+            },
+            hardwareKit: {
+              id: "hardware-door",
+              name: "Feronerie ușă",
+            },
+          },
+          totalsSnapshot: {
+            subtotalMinor: 20_000,
+            vatMinor: 3_800,
+            totalMinor: 23_800,
+          },
+        }),
+      ],
+    );
+    const doorItem = snapshot.items[0];
+
+    expect(doorItem).toMatchObject({
+      itemTypeLabel: "Ușă",
+      customerDescription: "Ușă intrare cu panou",
+      widthMm: 900,
+      heightMm: 2100,
+      glassLabel: "Sticlă mată / Panou decorativ",
+      hardwareLabel: "Feronerie ușă",
+      totalMinor: 23_800,
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("Supplier cost");
+    expect(JSON.stringify(snapshot)).not.toContain("internalMaterialCostMinor");
+  });
+
   it("returns a storage write failure without creating Document metadata", async () => {
     const state = testState();
     const storage = memoryDocumentStorageProvider({

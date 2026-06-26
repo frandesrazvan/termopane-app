@@ -205,11 +205,13 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
   const quantity = numberFrom(item.quantity, configuration?.quantity) ?? 1;
   const profile = firstRecord(
     catalog?.frameProfile,
+    catalog?.thresholdProfile,
     catalog?.profile,
     catalog?.profileSnapshot,
     configuration?.frameProfile,
     configuration?.profile,
   );
+  const panel = firstRecord(catalog?.panel, configuration?.panel);
   const glass = firstRecord(
     catalog?.glass,
     catalog?.glassSnapshot,
@@ -247,8 +249,13 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
     heightMm,
     surfaceAreaSquareMeters: surfaceAreaSquareMeters(widthMm, heightMm, quantity),
     profileLabel: stringFrom(profile?.label, profile?.name),
-    glassLabel: stringFrom(glass?.label, glass?.name, glass?.compositionLabel),
-    hardwareLabel: stringFrom(hardware?.label, hardware?.name, hardware?.category),
+    glassLabel: glassPanelLabel(glass, panel),
+    hardwareLabel: stringFrom(
+      hardware?.label,
+      hardware?.name,
+      hardware?.category,
+      hardware?.description,
+    ),
     unitPriceMinor: numberFrom(manualPricing?.unitPriceMinor, configuration?.unitPriceMinor),
     subtotalMinor: numberFrom(totals?.subtotalMinor),
     vatMinor: numberFrom(totals?.vatMinor),
@@ -256,6 +263,16 @@ function templateItemFromQuoteItem(item: QuoteItem): TemplateAItemSnapshot {
     totalsPending: totals?.pendingCalculation === true,
     drawingSvg: quoteItemDrawingSnapshot(item).svg,
   };
+}
+
+function glassPanelLabel(
+  glass: JsonRecord | null,
+  panel: JsonRecord | null,
+) {
+  const glassLabel = stringFrom(glass?.label, glass?.name, glass?.compositionLabel);
+  const panelLabel = stringFrom(panel?.description);
+
+  return compactText([glassLabel, panelLabel]).join(" / ") || undefined;
 }
 
 function itemTypeLabel(itemType: QuoteItemType) {
