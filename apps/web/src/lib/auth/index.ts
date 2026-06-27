@@ -17,3 +17,12 @@ export {
   resolveTenantMembership,
 } from "./tenant-context";
 export { clearSessionCookie, getSession, setSessionCookie } from "./session";
+export {
+  acceptTenantInvite,
+  buildInviteAcceptPath,
+  createTenantInvite,
+  hashInviteToken,
+  listTenantInvites,
+  normalizeInviteEmail,
+  TenantInviteError,
+} from "./invites";

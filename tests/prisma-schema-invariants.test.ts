@@ -12,6 +12,7 @@ const seed = readFileSync(seedPath, "utf8");
 
 const tenantOwnedModels = [
   "TenantMember",
+  "TenantInvite",
   "CompanySettings",
   "QuoteNumberSettings",
   "UserPreference",
@@ -56,6 +57,7 @@ const softDeleteCatalogModels = [
 const requiredUniqueConstraints = [
   { modelName: "Tenant", constraint: "@unique", field: "slug" },
   { modelName: "User", constraint: "@unique", field: "email" },
+  { modelName: "TenantInvite", constraint: "@unique", field: "tokenHash" },
   { modelName: "TenantMember", constraint: "@@unique([tenantId, userId])" },
   { modelName: "Quote", constraint: "@@unique([tenantId, quoteNumber])" },
   { modelName: "QuoteVersion", constraint: "@@unique([quoteId, versionNumber])" },

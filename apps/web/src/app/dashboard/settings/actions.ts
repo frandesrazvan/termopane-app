@@ -1,13 +1,18 @@
 "use server";
 
-import { QuoteNumberDatePattern } from "@prisma/client";
+import { QuoteNumberDatePattern, TenantRole } from "@prisma/client";
 import { isQuotePdfTemplateKey } from "@termopane/pdf";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
+  buildInviteAcceptPath,
+  canManageUsers,
   canManageCompanySettings,
   canManageQuoteNumbering,
+  createTenantInvite,
+  TenantInviteError,
   requireTenant,
 } from "@/lib/auth";
 import {
@@ -70,7 +75,19 @@ const quoteNumberSettingsSchema = z.object({
   datePattern: z.nativeEnum(QuoteNumberDatePattern),
 });
 
+const inviteSchema = z.object({
+  email: z.string().trim().email().max(160),
+  role: z.nativeEnum(TenantRole),
+});
+
 const shortcutValues = ["new-quote", "quotes", "customers", "catalog", "settings"];
+
+export type CreateInviteFormState = {
+  acceptUrl?: string;
+  expiresAt?: string;
+  message?: string;
+  status: "idle" | "created" | "error";
+};
 
 function formText(formData: FormData, field: string) {
   const value = formData.get(field);
@@ -184,4 +201,52 @@ export async function updateUserPreferencesAction(formData: FormData) {
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard");
   redirect("/dashboard/settings?saved=preferences");
+}
+
+export async function createInviteAction(
+  _state: CreateInviteFormState,
+  formData: FormData,
+): Promise<CreateInviteFormState> {
+  const context = await requireTenant();
+
+  if (!canManageUsers(context.membership)) {
+    redirect("/forbidden");
+  }
+
+  const parsed = inviteSchema.safeParse({
+    email: formText(formData, "email"),
+    role: formText(formData, "role"),
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Verifică emailul și rolul ales.",
+    };
+  }
+
+  try {
+    const result = await createTenantInvite(context, parsed.data);
+    const acceptPath = buildInviteAcceptPath(context.tenant.id, result.rawToken);
+    const requestHeaders = await headers();
+    const origin = requestHeaders.get("origin");
+    const acceptUrl = origin ? new URL(acceptPath, origin).toString() : acceptPath;
+
+    revalidatePath("/dashboard/settings");
+
+    return {
+      status: "created",
+      acceptUrl,
+      expiresAt: result.invite.expiresAt.toISOString(),
+      message: "Invitația a fost creată. Copiază linkul pentru livrarea manuală.",
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof TenantInviteError
+          ? "Invitația nu a putut fi creată pentru rolul sau emailul ales."
+          : "Invitația nu a putut fi creată.",
+    };
+  }
 }
