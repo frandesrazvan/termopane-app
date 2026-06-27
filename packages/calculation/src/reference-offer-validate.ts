@@ -6,21 +6,54 @@ import {
   recreateReferenceOfferPack,
   validateReferenceOfferPack,
   type ReferenceOfferFixturePack,
+  type ReferenceOfferComparisonReport,
 } from "./reference-offer-harness.js";
 
-const defaultFixturePath = "fixtures/reference-offers/synthetic-offers.json";
+const defaultFixturePaths = [
+  "fixtures/reference-offers/synthetic-offers.json",
+  "fixtures/reference-offers/owner-validated-historical-pack.json",
+];
 
 async function main() {
-  const fixturePath = resolve(process.cwd(), process.argv[2] ?? defaultFixturePath);
-  const pack = JSON.parse(await readFile(fixturePath, "utf8")) as ReferenceOfferFixturePack;
+  const fixturePaths = process.argv.slice(2);
+  const pathsToValidate =
+    fixturePaths.length > 0 ? fixturePaths : defaultFixturePaths;
+  const reports: ReferenceOfferComparisonReport[] = [];
+  const output: string[] = [];
+
+  for (const fixturePathInput of pathsToValidate) {
+    const fixturePath = resolve(process.cwd(), fixturePathInput);
+    const { lines, report } = await validateFixturePath(fixturePath);
+
+    if (output.length > 0) {
+      output.push("");
+    }
+
+    output.push(...lines);
+    reports.push(report);
+  }
+
+  console.log(output.join("\n"));
+
+  if (reports.some((report) => report.status === "fail")) {
+    process.exitCode = 1;
+  }
+}
+
+async function validateFixturePath(fixturePath: string) {
+  const pack = JSON.parse(
+    await readFile(fixturePath, "utf8"),
+  ) as ReferenceOfferFixturePack;
   const validation = validateReferenceOfferPack(pack);
   const recreation = recreateReferenceOfferPack(pack);
   const report = createReferenceOfferComparisonReport(pack);
 
   const lines = [
     "Reference offer validation report",
+    `Path: ${fixturePath}`,
     `Pack: ${report.packId}`,
     `Type: ${report.packType}`,
+    `Status: ${report.status}`,
     `Cases: ${report.caseCount}`,
     `Missing business inputs: ${report.missingBusinessInputCount}`,
     `Warning mismatches: ${report.warningMismatchCount}`,
@@ -69,21 +102,44 @@ async function main() {
     );
   }
 
-  const failedCases = recreation.cases.filter((referenceCase) => !referenceCase.passed);
+  lines.push("", "Case status:");
+
+  if (report.cases.length === 0) {
+    lines.push(
+      "- none: missing-data (no redacted owner cases have been committed yet)",
+    );
+  } else {
+    lines.push(
+      ...report.cases.map((referenceCase) => {
+        const missingInputs =
+          referenceCase.missingBusinessInputs.length > 0
+            ? `, missing inputs: ${referenceCase.missingBusinessInputs.join(", ")}`
+            : "";
+        const mismatchText =
+          referenceCase.mismatchCount > 0
+            ? `, mismatches: ${referenceCase.mismatchCount}`
+            : "";
+
+        return `- ${referenceCase.caseId}: ${referenceCase.status} (${referenceCase.reviewStatus}${missingInputs}${mismatchText})`;
+      }),
+    );
+  }
+
+  const failedCases = recreation.cases.filter(
+    (referenceCase) => !referenceCase.passed,
+  );
 
   if (failedCases.length > 0) {
     lines.push("", "Case mismatches:");
     for (const referenceCase of failedCases) {
       lines.push(`- ${referenceCase.caseId}`);
-      lines.push(...referenceCase.mismatches.map((mismatch) => `  - ${mismatch}`));
+      lines.push(
+        ...referenceCase.mismatches.map((mismatch) => `  - ${mismatch}`),
+      );
     }
   }
 
-  console.log(lines.join("\n"));
-
-  if (!report.readyForReviewSession) {
-    process.exitCode = 1;
-  }
+  return { lines, report };
 }
 
 main().catch((error: unknown) => {

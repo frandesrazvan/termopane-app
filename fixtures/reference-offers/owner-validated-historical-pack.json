@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "packId": "owner-validated-redacted-historical-quotes",
+  "packType": "redacted-historical-review",
+  "dataClassification": "redacted-historical",
+  "description": "Empty intake structure for the first owner-validated redacted historical quote pack. No real owner-approved historical cases are available in source control yet; populate this file only with redacted JSON snapshots after owner review.",
+  "requirementsChecklist": [
+    {
+      "key": "profilePriceList",
+      "label": "Redacted profile price-list snapshots approved by owner",
+      "status": "missing"
+    },
+    {
+      "key": "glassDeductionRules",
+      "label": "Owner-approved glass deduction rules",
+      "status": "missing"
+    },
+    {
+      "key": "glassPriceList",
+      "label": "Redacted glass price-list snapshots approved by owner",
+      "status": "missing"
+    },
+    {
+      "key": "hardwareRules",
+      "label": "Owner-approved hardware selection and quantity rules",
+      "status": "missing"
+    },
+    {
+      "key": "accessoryServicePrices",
+      "label": "Redacted accessory, service, transport, and installation prices",
+      "status": "missing"
+    },
+    {
+      "key": "commercialRules",
+      "label": "Owner-approved VAT, markup, discount, rounding, and override rules",
+      "status": "missing"
+    },
+    {
+      "key": "preferredPdfTemplate",
+      "label": "Owner-approved preferred PDF template for historical recreation",
+      "status": "pending-business-owner"
+    },
+    {
+      "key": "sampleOutputRequirements",
+      "label": "Owner-approved PDF/template output fields and acceptance notes",
+      "status": "missing"
+    }
+  ],
+  "cases": []
+}

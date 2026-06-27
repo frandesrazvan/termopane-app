@@ -18,7 +18,9 @@ const fixtureUrl = new URL(
 );
 
 async function loadSyntheticPack() {
-  return JSON.parse(await readFile(fixtureUrl, "utf8")) as ReferenceOfferFixturePack;
+  return JSON.parse(
+    await readFile(fixtureUrl, "utf8"),
+  ) as ReferenceOfferFixturePack;
 }
 
 describe("reference offer harness", () => {
@@ -28,9 +30,9 @@ describe("reference offer harness", () => {
 
     expect(validation.errors).toEqual([]);
     expect(pack.dataClassification).toBe("synthetic-redacted");
-    expect(pack.requirementsChecklist.map((requirement) => requirement.key)).toEqual(
-      requiredReviewInputKeys,
-    );
+    expect(
+      pack.requirementsChecklist.map((requirement) => requirement.key),
+    ).toEqual(requiredReviewInputKeys);
     expect(
       pack.requirementsChecklist.every(
         (requirement) => requirement.status === "pending-business-owner",
@@ -44,12 +46,15 @@ describe("reference offer harness", () => {
 
     expect(recreation.passed).toBe(true);
     expect(recreation.cases).toHaveLength(2);
-    expect(recreation.cases.map((result) => result.mismatches)).toEqual([[], []]);
+    expect(recreation.cases.map((result) => result.mismatches)).toEqual([
+      [],
+      [],
+    ]);
     expect(recreation.cases[0]?.result.totals.totalWithVatMinor).toBe(67_116);
     expect(recreation.cases[1]?.result.totals.totalWithVatMinor).toBe(64_000);
-    expect(recreation.cases[1]?.result.warnings.map((warning) => warning.code)).toEqual([
-      "MANUAL_OVERRIDE_APPLIED",
-    ]);
+    expect(
+      recreation.cases[1]?.result.warnings.map((warning) => warning.code),
+    ).toEqual(["MANUAL_OVERRIDE_APPLIED"]);
   });
 
   it("rejects private artifact references and unredacted contact strings", async () => {
@@ -85,6 +90,7 @@ describe("reference offer harness", () => {
     expect(report).toMatchObject({
       packId: "synthetic-redacted-pilot-reference-offers",
       packType: "synthetic-pilot",
+      status: "pass",
       caseCount: 2,
       missingBusinessInputCount: 0,
       warningMismatchCount: 0,
@@ -99,6 +105,7 @@ describe("reference offer harness", () => {
       {
         caseId: "synthetic-offer-001",
         reviewStatus: "synthetic-baseline",
+        status: "pass",
         passed: true,
         mismatchCount: 0,
         missingBusinessInputs: [],
@@ -111,6 +118,7 @@ describe("reference offer harness", () => {
       {
         caseId: "synthetic-offer-002",
         reviewStatus: "synthetic-baseline",
+        status: "pass",
         passed: true,
         mismatchCount: 0,
         missingBusinessInputs: [],
@@ -159,12 +167,14 @@ describe("reference offer harness", () => {
     ]);
     expect(report).toMatchObject({
       caseCount: 1,
+      status: "missing-data",
       missingBusinessInputCount: 2,
       readyForReviewSession: false,
     });
     expect(report.cases[0]).toMatchObject({
       caseId: "synthetic-offer-001",
       reviewStatus: "blocked-missing-data",
+      status: "missing-data",
       missingBusinessInputs: ["glassPriceList", "hardwareRules"],
     });
   });
@@ -204,6 +214,7 @@ describe("reference offer harness", () => {
       totalMismatchCount: 1,
       templateFieldMismatchCount: 1,
       failedCaseCount: 1,
+      status: "fail",
       readyForReviewSession: false,
     });
   });
@@ -331,7 +342,39 @@ describe("reference offer harness", () => {
 
     expect(validation.errors).toEqual([]);
     expect(report.caseCount).toBe(10);
+    expect(report.status).toBe("pass");
     expect(report.historicalCaseWindowSatisfied).toBe(true);
     expect(report.readyForReviewSession).toBe(true);
+  });
+
+  it("keeps an empty redacted historical review pack in missing-data status", async () => {
+    const pack = await loadSyntheticPack();
+    const emptyHistoricalPack: ReferenceOfferFixturePack = {
+      ...pack,
+      packId: "owner-validated-redacted-historical-quotes",
+      packType: "redacted-historical-review",
+      dataClassification: "redacted-historical",
+      requirementsChecklist: pack.requirementsChecklist.map((requirement) => ({
+        ...requirement,
+        status: "missing",
+      })),
+      cases: [],
+    };
+    const validation = validateReferenceOfferPack(emptyHistoricalPack);
+    const report = createReferenceOfferComparisonReport(emptyHistoricalPack);
+
+    expect(validation.errors).toEqual([]);
+    expect(validation.warnings).toEqual([
+      "Reference offer pack has no cases yet.",
+    ]);
+    expect(report).toMatchObject({
+      packId: "owner-validated-redacted-historical-quotes",
+      packType: "redacted-historical-review",
+      status: "missing-data",
+      caseCount: 0,
+      missingBusinessInputCount: 0,
+      validationWarningCount: 1,
+      readyForReviewSession: false,
+    });
   });
 });

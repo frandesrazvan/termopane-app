@@ -25,6 +25,9 @@ Inainte de orice commit in acest folder, confirmati explicit:
 ## Fisiere
 
 - `synthetic-offers.json` contine exemple sintetice pentru exercitarea harness-ului.
+- `owner-validated-historical-pack.json` este structura goala pentru primul pack istoric
+  redacted/owner-validat; ramane `missing-data` pana cand ownerii furnizeaza 10-20 cazuri
+  redactate.
 - `templates/price-snapshot.template.json` este template pentru snapshot-uri de pret profile,
   sticla, accesorii si servicii.
 - `templates/quote-case.template.json` este template pentru un caz istoric redacted.
@@ -59,24 +62,30 @@ Colectati urmatoarele inainte de recrearea a 10-20 oferte istorice validate:
 
 ## Workflow de conversie in fixture sigur
 
-1. Creati un pack nou pornind de la `synthetic-offers.json` si setati `packType` la
-   `redacted-historical-review` pana cand exista 10-20 cazuri complet validate.
-2. Copiati `templates/quote-case.template.json` pentru fiecare oferta istorica selectata.
-3. Completati doar datele aprobate si redactate: snapshot de preturi, input de calcul, totaluri
+1. Actualizati `owner-validated-historical-pack.json`; nu creati un pack paralel decat daca ownerii
+   cer explicit un set separat.
+2. Pastrati `packType = "redacted-historical-review"` pana cand exista 10-20 cazuri complet
+   validate.
+3. Copiati `templates/quote-case.template.json` pentru fiecare oferta istorica selectata.
+4. Completati doar datele aprobate si redactate: snapshot de preturi, input de calcul, totaluri
    asteptate, coduri de avertizare si campurile PDF comparabile.
-4. Folositi `templates/price-snapshot.template.json` pentru profile, sticla, accesorii si servicii.
+5. Folositi `templates/price-snapshot.template.json` pentru profile, sticla, accesorii si servicii.
    Nu copiati fisierele brute de la furnizor.
-5. Folositi `templates/expected-totals.template.json` pentru totaluri in unitati minore.
-6. Folositi `templates/expected-pdf-output-fields.template.json` pentru campurile comparabile acum:
+6. Folositi `templates/expected-totals.template.json` pentru totaluri in unitati minore.
+7. Folositi `templates/expected-pdf-output-fields.template.json` pentru campurile comparabile acum:
    `templateKey`, `quoteId`, `itemCount`, `totalWithVatMinor`, `warningCodes`.
-7. Marcati statusul cazului:
+8. Marcati statusul cazului:
    - `draft-redacted`: datele sunt redactate, dar ownerul nu le-a revizuit inca;
    - `business-reviewed`: ownerul a revizuit cazul, dar comparatia nu este finala;
    - `validated-historical`: totalurile, avertizarile si campurile PDF se potrivesc;
    - `blocked-missing-data`: lipsesc inputuri business si cazul nu trebuie folosit ca referinta.
-8. Cand pack-ul are 10-20 cazuri `validated-historical`, schimbati `packType` la
+9. Cand pack-ul are 10-20 cazuri `validated-historical`, schimbati `packType` la
    `validated-historical-recreation` si `dataClassification` la `redacted-validated-historical`.
-9. Rulati `pnpm reference:validate` si corectati orice lipsa sau mismatch raportat.
+10. Rulati `pnpm reference:validate` si corectati orice lipsa sau mismatch raportat.
+
+`Status: missing-data` este normal pentru pack-ul gol sau pentru cazuri `blocked-missing-data`.
+`Status: fail` inseamna erori de validare, totaluri nealiniate, avertizari nealiniate sau campuri
+PDF/template nealiniate.
 
 ## Reguli validate si calibrare
 
@@ -97,8 +106,9 @@ Tolerantele de rotunjire se declara in `expected.tolerances`. Pentru cazurile is
 `approvedBy` trebuie sa fie `business-owner`; tolerantele sintetice nu sunt acceptate ca validare
 istorica.
 
-Momentan repository-ul nu contine un pack istoric owner-validat de 10-20 cazuri. Exemplele commited
-raman sintetice si nu valideaza formule de productie.
+Momentan repository-ul contine doar structura goala
+`owner-validated-historical-pack.json`, nu un pack istoric owner-validat de 10-20 cazuri. Exemplele
+commited raman sintetice si nu valideaza formule de productie.
 
 ## Forma snapshot-ului
 
@@ -140,9 +150,10 @@ Rulare recomandata:
 pnpm reference:validate
 ```
 
-Comanda afiseaza numarul de cazuri, inputurile business lipsa, mismatch-urile de avertizari,
-mismatch-urile de totaluri si mismatch-urile de campuri template/PDF. Pentru debugging mai granular
-se poate rula in continuare:
+Comanda valideaza implicit `synthetic-offers.json` si `owner-validated-historical-pack.json`.
+Afiseaza statusul `pass`, `fail` sau `missing-data`, numarul de cazuri, inputurile business lipsa,
+mismatch-urile de avertizari, mismatch-urile de totaluri si mismatch-urile de campuri template/PDF.
+Pentru debugging mai granular se poate rula in continuare:
 
 ```powershell
 pnpm --filter @termopane/calculation test -- reference-offer-harness

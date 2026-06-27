@@ -80,11 +80,7 @@ export type ReferenceOfferTotalsExpectation = Partial<
 >;
 
 export type ReferencePdfOutputFieldValue =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly string[];
+  string | number | boolean | null | readonly string[];
 
 export type ReferencePdfOutputFieldsExpectation = Readonly<
   Record<string, ReferencePdfOutputFieldValue>
@@ -115,7 +111,10 @@ export type ReferenceOfferCase = Readonly<{
   preferredTemplateKey: "template-a" | "template-b";
   source: ReferenceOfferSource;
   redaction: ReferenceOfferRedaction;
-  businessInputStatus: Record<RequiredReviewInputKey, ReferenceRequirementStatus>;
+  businessInputStatus: Record<
+    RequiredReviewInputKey,
+    ReferenceRequirementStatus
+  >;
   calculationInput: QuoteCalculationInput;
   expected: ReferenceOfferExpectation;
 }>;
@@ -150,9 +149,12 @@ export type ReferenceOfferPackRecreationResult = Readonly<{
   cases: readonly ReferenceOfferRecreationResult[];
 }>;
 
+export type ReferenceOfferComparisonStatus = "pass" | "fail" | "missing-data";
+
 export type ReferenceOfferComparisonCaseSummary = Readonly<{
   caseId: string;
   reviewStatus: ReferenceOfferReviewStatus;
+  status: ReferenceOfferComparisonStatus;
   passed: boolean;
   mismatchCount: number;
   missingBusinessInputs: readonly RequiredReviewInputKey[];
@@ -166,6 +168,7 @@ export type ReferenceOfferComparisonCaseSummary = Readonly<{
 export type ReferenceOfferComparisonReport = Readonly<{
   packId: string;
   packType: ReferenceOfferPackType;
+  status: ReferenceOfferComparisonStatus;
   caseCount: number;
   missingBusinessInputCount: number;
   warningMismatchCount: number;
@@ -198,25 +201,38 @@ export function validateReferenceOfferPack(
     errors.push("Reference offer pack must have a non-empty packId.");
   }
 
-  if (pack.packType === "validated-historical-recreation" && !isValidatedHistoricalPackSize(pack.cases.length)) {
-    errors.push("Validated historical recreation packs must contain 10-20 cases.");
+  if (
+    pack.packType === "validated-historical-recreation" &&
+    !isValidatedHistoricalPackSize(pack.cases.length)
+  ) {
+    errors.push(
+      "Validated historical recreation packs must contain 10-20 cases.",
+    );
   }
 
   if (
     pack.packType === "validated-historical-recreation" &&
     pack.dataClassification !== "redacted-validated-historical"
   ) {
-    errors.push("Validated historical recreation packs must be redacted-validated-historical.");
+    errors.push(
+      "Validated historical recreation packs must be redacted-validated-historical.",
+    );
   }
 
   if (
     pack.packType === "redacted-historical-review" &&
-    !["redacted-historical", "redacted-validated-historical"].includes(pack.dataClassification)
+    !["redacted-historical", "redacted-validated-historical"].includes(
+      pack.dataClassification,
+    )
   ) {
-    errors.push("Redacted historical review packs must use a redacted data classification.");
+    errors.push(
+      "Redacted historical review packs must use a redacted data classification.",
+    );
   }
 
-  const checklistKeys = new Set(pack.requirementsChecklist.map((requirement) => requirement.key));
+  const checklistKeys = new Set(
+    pack.requirementsChecklist.map((requirement) => requirement.key),
+  );
 
   for (const key of requiredReviewInputKeys) {
     if (!checklistKeys.has(key)) {
@@ -264,29 +280,43 @@ export function validateReferenceOfferCase(
   }
 
   if (referenceCase.source.originalDocumentAvailable) {
-    errors.push(`${prefix} must not point to original business documents inside fixtures.`);
+    errors.push(
+      `${prefix} must not point to original business documents inside fixtures.`,
+    );
   }
 
   if (referenceCase.redaction.sourceDocuments !== "none-committed") {
-    warnings.push(`${prefix} references redacted source documents; keep originals outside Git.`);
-  }
-
-  if (isRedactedHistoricalStatus(referenceCase.reviewStatus) && referenceCase.source.kind !== "redacted-historical-json") {
-    errors.push(`${prefix} redacted historical cases must use redacted-historical-json source kind.`);
+    warnings.push(
+      `${prefix} references redacted source documents; keep originals outside Git.`,
+    );
   }
 
   if (
     isRedactedHistoricalStatus(referenceCase.reviewStatus) &&
-    (referenceCase.redaction.customer !== "redacted" || referenceCase.redaction.project !== "redacted")
+    referenceCase.source.kind !== "redacted-historical-json"
   ) {
-    errors.push(`${prefix} redacted historical cases must redact customer and project fields.`);
+    errors.push(
+      `${prefix} redacted historical cases must use redacted-historical-json source kind.`,
+    );
+  }
+
+  if (
+    isRedactedHistoricalStatus(referenceCase.reviewStatus) &&
+    (referenceCase.redaction.customer !== "redacted" ||
+      referenceCase.redaction.project !== "redacted")
+  ) {
+    errors.push(
+      `${prefix} redacted historical cases must redact customer and project fields.`,
+    );
   }
 
   if (
     referenceCase.reviewStatus === "validated-historical" &&
     referenceCase.dataClassification !== "redacted-validated-historical"
   ) {
-    errors.push(`${prefix} validated historical cases must be redacted-validated-historical.`);
+    errors.push(
+      `${prefix} validated historical cases must be redacted-validated-historical.`,
+    );
   }
 
   for (const key of requiredReviewInputKeys) {
@@ -297,13 +327,21 @@ export function validateReferenceOfferCase(
 
   const missingBusinessInputs = missingBusinessInputKeysForCase(referenceCase);
 
-  if (referenceCase.reviewStatus === "blocked-missing-data" && missingBusinessInputs.length === 0) {
-    warnings.push(`${prefix} is blocked-missing-data but no missing business inputs were listed.`);
+  if (
+    referenceCase.reviewStatus === "blocked-missing-data" &&
+    missingBusinessInputs.length === 0
+  ) {
+    warnings.push(
+      `${prefix} is blocked-missing-data but no missing business inputs were listed.`,
+    );
   }
 
   if (referenceCase.reviewStatus === "validated-historical") {
     const unvalidatedBusinessInputs = requiredReviewInputKeys.filter(
-      (key) => !isValidatedHistoricalBusinessInputStatus(referenceCase.businessInputStatus[key]),
+      (key) =>
+        !isValidatedHistoricalBusinessInputStatus(
+          referenceCase.businessInputStatus[key],
+        ),
     );
 
     if (unvalidatedBusinessInputs.length > 0) {
@@ -324,7 +362,9 @@ export function validateReferenceOfferCase(
     referenceCase.expected.tolerances &&
     referenceCase.expected.tolerances.approvedBy !== "business-owner"
   ) {
-    errors.push(`${prefix} historical rounding tolerances must be approved by business-owner.`);
+    errors.push(
+      `${prefix} historical rounding tolerances must be approved by business-owner.`,
+    );
   }
 
   for (const unsafeValue of unsafeFixtureStrings(referenceCase)) {
@@ -346,7 +386,12 @@ export function recreateReferenceOfferCase(
   const totalMismatches: string[] = [];
   const templateFieldMismatches: string[] = [];
 
-  compareNumber("itemCount", result.items.length, referenceCase.expected.itemCount, mismatches);
+  compareNumber(
+    "itemCount",
+    result.items.length,
+    referenceCase.expected.itemCount,
+    mismatches,
+  );
   compareOptionalNumber(
     "materialRequirementCount",
     result.materialRequirements.length,
@@ -366,7 +411,9 @@ export function recreateReferenceOfferCase(
     mismatches,
   );
 
-  for (const [key, expectedValue] of Object.entries(referenceCase.expected.totals)) {
+  for (const [key, expectedValue] of Object.entries(
+    referenceCase.expected.totals,
+  )) {
     const actualValue = result.totals[key as keyof typeof result.totals];
     const toleranceMinor =
       referenceCase.expected.tolerances?.totalsMinor?.[
@@ -441,7 +488,9 @@ export function createReferenceOfferComparisonReport(
 ): ReferenceOfferComparisonReport {
   const validation = validateReferenceOfferPack(pack);
   const recreation = recreateReferenceOfferPack(pack);
-  const passedCaseCount = recreation.cases.filter((result) => result.passed).length;
+  const passedCaseCount = recreation.cases.filter(
+    (result) => result.passed,
+  ).length;
   const failedCaseCount = recreation.cases.length - passedCaseCount;
   const missingBusinessInputsByCase = new Map(
     pack.cases.map((referenceCase) => [
@@ -449,10 +498,9 @@ export function createReferenceOfferComparisonReport(
       missingBusinessInputKeysForCase(referenceCase),
     ]),
   );
-  const missingBusinessInputCount = [...missingBusinessInputsByCase.values()].reduce(
-    (count, missingInputs) => count + missingInputs.length,
-    0,
-  );
+  const missingBusinessInputCount = [
+    ...missingBusinessInputsByCase.values(),
+  ].reduce((count, missingInputs) => count + missingInputs.length, 0);
   const warningMismatchCount = recreation.cases.reduce(
     (count, result) => count + result.warningMismatches.length,
     0,
@@ -468,10 +516,18 @@ export function createReferenceOfferComparisonReport(
   const historicalCaseWindowSatisfied =
     pack.packType !== "validated-historical-recreation" ||
     isValidatedHistoricalPackSize(pack.cases.length);
+  const status = comparisonStatus({
+    validationErrorCount: validation.errors.length,
+    failedCaseCount,
+    caseCount: pack.cases.length,
+    missingBusinessInputCount,
+    historicalCaseWindowSatisfied,
+  });
 
   return Object.freeze({
     packId: pack.packId,
     packType: pack.packType,
+    status,
     caseCount: pack.cases.length,
     missingBusinessInputCount,
     warningMismatchCount,
@@ -484,16 +540,21 @@ export function createReferenceOfferComparisonReport(
     historicalCaseWindowSatisfied,
     readyForReviewSession:
       validation.errors.length === 0 &&
+      pack.cases.length > 0 &&
       missingBusinessInputCount === 0 &&
       failedCaseCount === 0 &&
       historicalCaseWindowSatisfied,
     cases: Object.freeze(
       recreation.cases.map((result) => {
-        const referenceCase = pack.cases.find((item) => item.caseId === result.caseId);
+        const referenceCase = pack.cases.find(
+          (item) => item.caseId === result.caseId,
+        );
 
         return Object.freeze({
           caseId: result.caseId,
-          reviewStatus: referenceCase?.reviewStatus ?? "pending-business-validation",
+          reviewStatus:
+            referenceCase?.reviewStatus ?? "pending-business-validation",
+          status: caseComparisonStatus(result, referenceCase),
           passed: result.passed,
           mismatchCount: result.mismatches.length,
           missingBusinessInputs: Object.freeze(
@@ -514,6 +575,49 @@ export function createReferenceOfferComparisonReport(
 
 export function isValidatedHistoricalPackSize(caseCount: number) {
   return Number.isInteger(caseCount) && caseCount >= 10 && caseCount <= 20;
+}
+
+function comparisonStatus(
+  input: Readonly<{
+    validationErrorCount: number;
+    failedCaseCount: number;
+    caseCount: number;
+    missingBusinessInputCount: number;
+    historicalCaseWindowSatisfied: boolean;
+  }>,
+): ReferenceOfferComparisonStatus {
+  if (
+    input.validationErrorCount > 0 ||
+    input.failedCaseCount > 0 ||
+    !input.historicalCaseWindowSatisfied
+  ) {
+    return "fail";
+  }
+
+  if (input.caseCount === 0 || input.missingBusinessInputCount > 0) {
+    return "missing-data";
+  }
+
+  return "pass";
+}
+
+function caseComparisonStatus(
+  result: ReferenceOfferRecreationResult,
+  referenceCase: ReferenceOfferCase | undefined,
+): ReferenceOfferComparisonStatus {
+  if (!result.passed) {
+    return "fail";
+  }
+
+  if (
+    !referenceCase ||
+    referenceCase.reviewStatus === "blocked-missing-data" ||
+    missingBusinessInputKeysForCase(referenceCase).length > 0
+  ) {
+    return "missing-data";
+  }
+
+  return "pass";
 }
 
 export function missingBusinessInputKeysForCase(
@@ -594,7 +698,9 @@ function createComparablePdfOutputFields(
     quoteId: referenceCase.calculationInput.quoteId,
     itemCount: result.items.length,
     totalWithVatMinor: result.totals.totalWithVatMinor,
-    warningCodes: uniqueSortedWarningCodes(result.warnings.map((warning) => warning.code)),
+    warningCodes: uniqueSortedWarningCodes(
+      result.warnings.map((warning) => warning.code),
+    ),
   });
 }
 
@@ -635,7 +741,9 @@ function isRedactedHistoricalStatus(status: ReferenceOfferReviewStatus) {
   );
 }
 
-function isMissingBusinessInputStatus(status: ReferenceRequirementStatus | undefined) {
+function isMissingBusinessInputStatus(
+  status: ReferenceRequirementStatus | undefined,
+) {
   return (
     status === undefined ||
     status === "missing" ||
@@ -644,7 +752,9 @@ function isMissingBusinessInputStatus(status: ReferenceRequirementStatus | undef
   );
 }
 
-function isValidatedHistoricalBusinessInputStatus(status: ReferenceRequirementStatus | undefined) {
+function isValidatedHistoricalBusinessInputStatus(
+  status: ReferenceRequirementStatus | undefined,
+) {
   return status === "validated" || status === "not-applicable";
 }
 
@@ -656,7 +766,11 @@ function unsafeFixtureStrings(value: unknown): string[] {
   const unsafeValues: string[] = [];
 
   visitStrings(value, (text) => {
-    if (privateArtifactPattern.test(text) || emailPattern.test(text) || hasUnsafePhoneLikeText(text)) {
+    if (
+      privateArtifactPattern.test(text) ||
+      emailPattern.test(text) ||
+      hasUnsafePhoneLikeText(text)
+    ) {
       unsafeValues.push(text);
     }
   });
@@ -676,7 +790,10 @@ function hasUnsafePhoneLikeText(text: string) {
 
     const digits = trimmed.replace(/\D/g, "");
 
-    return digits.length >= 8 && (trimmed.includes("+") || /[\s().]/.test(trimmed) || digits.length >= 10);
+    return (
+      digits.length >= 8 &&
+      (trimmed.includes("+") || /[\s().]/.test(trimmed) || digits.length >= 10)
+    );
   });
 }
 
