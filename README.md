@@ -16,6 +16,9 @@ production formulas.
   a future provider task.
 - PDF generation, local document storage, immutable `Document` records, selected template keys, and
   audit logging are present for generated quote documents.
+- Tenant company logo upload is available from `/dashboard/settings` for OWNER/ADMIN users. Logos
+  are stored as private tenant assets through the document storage provider and referenced in
+  Template A/B quote snapshots through authenticated tenant routes.
 - Locked quote versions with generated PDFs can be marked as sent. The workflow records `QUOTE_SENT`,
   `sentAt`, the intended recipient/document stub metadata, and shows a Romanian customer-safe
   confirmation/download screen. Real email delivery is still stubbed unless a future provider is
@@ -239,6 +242,11 @@ PDF generation passes a requested storage key to the provider, then persists the
 provider on the immutable `Document` row. If metadata creation fails after storage succeeds, the app
 attempts to delete the returned storage key so failed generations do not leave orphaned files.
 
+Company logo uploads use the same storage provider. Uploaded logos are stored under generated
+tenant asset keys, accept PNG/JPEG/WebP only, block SVG, and store metadata in tenant-owned
+`TenantAsset` records. The settings UI exposes only an authenticated app route for logo preview, not
+the underlying storage key.
+
 No real bucket integration tests run in CI. Validate bucket credentials, endpoint behavior,
 path-style settings, lifecycle/retention policy, and object access controls in the target
 environment before using `DOCUMENT_STORAGE_PROVIDER="s3"` for live PDF delivery.
@@ -368,7 +376,7 @@ pnpm verify
 - Advanced pricing-rule selection inside the quote builder.
 - Production-ready door formulas for panels, locks, thresholds, reinforcement, and fabrication.
 - Real production formulas or supplier-specific pricing rules.
-- Logo upload and richer account/user-management workflows.
+- Richer account/user-management workflows beyond pilot invites.
 - Invoicing, ERP, CNC export, stock, or accounting integrations.
 
 ## Scope Guardrails

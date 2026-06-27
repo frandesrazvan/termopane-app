@@ -139,7 +139,7 @@ function companySnapshotFromVersion(quoteVersion: QuoteVersion): TemplateACompan
     phone: stringFrom(settings?.phone),
     email: stringFrom(settings?.email),
     website: stringFrom(settings?.website),
-    logoUrl: stringFrom(settings?.logoUrl),
+    logoUrl: companyLogoUrlFromSettings(settings),
   };
 }
 
@@ -367,6 +367,19 @@ function stringFrom(...values: unknown[]) {
   }
 
   return undefined;
+}
+
+function companyLogoUrlFromSettings(settings: JsonRecord | null) {
+  const assetId = stringFrom(settings?.logoAssetId);
+  const logoUrl = stringFrom(settings?.logoUrl);
+
+  if (!assetId || !logoUrl) {
+    return undefined;
+  }
+
+  const expectedLogoUrl = `/dashboard/settings/logo/${encodeURIComponent(assetId)}`;
+
+  return logoUrl === expectedLogoUrl ? logoUrl : undefined;
 }
 
 function numberFrom(...values: unknown[]) {

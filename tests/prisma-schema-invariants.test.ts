@@ -13,6 +13,7 @@ const seed = readFileSync(seedPath, "utf8");
 const tenantOwnedModels = [
   "TenantMember",
   "TenantInvite",
+  "TenantAsset",
   "CompanySettings",
   "QuoteNumberSettings",
   "UserPreference",

@@ -15,6 +15,7 @@ import {
   TenantInviteError,
   requireTenant,
 } from "@/lib/auth";
+import { CompanyLogoUploadError, uploadTenantCompanyLogo } from "@/lib/branding/company-logo";
 import {
   updateTenantCompanySettings,
   updateTenantQuoteNumberSettings,
@@ -145,6 +146,33 @@ export async function updateCompanySettingsAction(formData: FormData) {
 
   revalidatePath("/dashboard/settings");
   redirect("/dashboard/settings?saved=company");
+}
+
+export async function uploadCompanyLogoAction(formData: FormData) {
+  const context = await requireTenant();
+
+  if (!canManageCompanySettings(context.membership)) {
+    redirect("/forbidden");
+  }
+
+  const logo = formData.get("logo");
+  let uploaded = false;
+
+  try {
+    await uploadTenantCompanyLogo(context, logo);
+    uploaded = true;
+  } catch (error) {
+    const reason = error instanceof CompanyLogoUploadError ? error.code : "upload_failed";
+
+    redirect(`/dashboard/settings?error=logo-${reason}`);
+  }
+
+  if (uploaded) {
+    revalidatePath("/dashboard/settings");
+    redirect("/dashboard/settings?saved=logo");
+  }
+
+  redirect("/dashboard/settings?error=logo");
 }
 
 export async function updateQuoteNumberSettingsAction(formData: FormData) {
