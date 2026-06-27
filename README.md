@@ -341,8 +341,9 @@ pnpm exec playwright install chromium
 ## Deployment Readiness
 
 See `docs/12-production-deployment-hardening.md` for the full pilot checklist, backup/restore notes,
-and Render deployment path. Before deploying, configure these server-side environment values in the
-target platform secret store:
+Render deployment path, and `docs/pilot-dry-run-report.md` for the redacted real-environment dry-run
+evidence ledger. Before deploying, configure these server-side environment values in the target
+platform secret store:
 
 - `DATABASE_URL`
 - `AUTH_SECRET` with at least 32 random characters
@@ -378,6 +379,11 @@ After migrations and service startup, run:
 ```bash
 pnpm pilot:smoke
 ```
+
+For the first production-like pilot rehearsal, complete `docs/pilot-dry-run-report.md` with redacted
+evidence for migrations, storage, `/api/health`, invite acceptance, Template A/B PDFs, delivery, and
+authenticated document downloads. Keep raw logs, invite tokens, internal test emails, and provider
+screenshots outside Git.
 
 Configure the host health check path as:
 

@@ -21,6 +21,11 @@ Run the narrower storage smoke test, `pnpm storage:smoke`, when you only need to
 credentials or endpoint behavior. Run `pnpm pilot:smoke` when you need confidence that the deployed
 app can boot safely, reach the database, use storage, and render quote/PDF basics.
 
+For the first real pilot environment rehearsal, use `docs/pilot-dry-run-report.md` after these smoke
+commands. The report captures redacted evidence for migrations, tenant invite acceptance, Template
+A/B PDF generation, customer-safe email delivery, document metadata, and authenticated downloads
+without committing secrets or PII.
+
 Run `pnpm pilot:acceptance` against a disposable local/development database before each pilot
 release candidate when you need browser-level proof that the current MVP commercial flow still works
 end to end. It complements this smoke script rather than replacing it: `pilot:smoke` is deployable
