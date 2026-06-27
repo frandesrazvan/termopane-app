@@ -1,5 +1,10 @@
 import { DocumentType, QuoteStatus, QuoteVersionStatus } from "@prisma/client";
-import type { Document, Quote, QuoteVersion } from "@prisma/client";
+import type {
+  Document,
+  Quote,
+  QuoteDelivery,
+  QuoteVersion,
+} from "@prisma/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { QuoteSendConfirmationView } from "./send-confirmation-view";
@@ -8,6 +13,19 @@ describe("QuoteSendConfirmationView", () => {
   it("renders a Romanian customer-safe confirmation without internal cost fields", () => {
     const markup = renderToStaticMarkup(
       <QuoteSendConfirmationView
+        delivery={
+          {
+            id: "delivery-safe",
+            tenantId: "tenant-a",
+            quoteId: "quote-safe",
+            quoteVersionId: "version-safe",
+            documentId: "document-safe",
+            provider: "resend",
+            status: "sent",
+            recipientEmail: "client.secret@example.test",
+            recipientEmailRedacted: "c***@e***.test",
+          } as unknown as QuoteDelivery
+        }
         quote={
           {
             id: "quote-safe",
@@ -58,6 +76,9 @@ describe("QuoteSendConfirmationView", () => {
     expect(markup).toContain("Ofertă trimisă");
     expect(markup).toContain("Descarcă PDF");
     expect(markup).toContain("OF-SAFE-001-v2.pdf");
+    expect(markup).toContain("Livrare email");
+    expect(markup).toContain("c***@e***.test");
+    expect(markup).not.toContain("client.secret@example.test");
     expect(markup).not.toContain("internalCostMinor");
     expect(markup).not.toContain("DO_NOT_SHOW_MARGIN");
     expect(markup).not.toContain("DO_NOT_SHOW_TRACE");

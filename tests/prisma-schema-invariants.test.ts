@@ -36,6 +36,7 @@ const tenantOwnedModels = [
   "QuoteItem",
   "QuoteCalculationResult",
   "Document",
+  "QuoteDelivery",
   "AuditLog",
   "SavedFilter",
 ];

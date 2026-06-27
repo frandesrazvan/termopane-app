@@ -30,6 +30,7 @@ import {
   type Project,
   type Quote,
   type QuoteCalculationResult,
+  type QuoteDelivery,
   type QuoteItem,
   type QuoteNumberSettings,
   type QuoteVersion,
@@ -39,6 +40,7 @@ import {
 } from "@prisma/client";
 import type { TenantContext } from "../auth/tenant-context";
 import { prisma } from "../prisma";
+import { redactEmailAddress } from "../privacy/redaction";
 
 export type ExplicitTenantScope = {
   tenantId: string;
@@ -108,6 +110,7 @@ export type TenantDataClient = {
   quoteItem: TenantDeletableModelDelegate<QuoteItem>;
   quoteCalculationResult: TenantWritableModelDelegate<QuoteCalculationResult>;
   document: TenantWritableModelDelegate<Document>;
+  quoteDelivery: TenantWritableModelDelegate<QuoteDelivery>;
   auditLog: TenantWritableModelDelegate<AuditLog>;
   companySettings: TenantWritableModelDelegate<CompanySettings>;
   quoteNumberSettings: TenantWritableModelDelegate<QuoteNumberSettings>;
@@ -456,10 +459,13 @@ export type TenantQuoteLockInput = {
 
 export type TenantQuoteSendInput = {
   actorUserId?: string | null;
+  completedAt?: Date | null;
+  deliveryProvider?: string | null;
+  deliveryStatus?: TenantQuoteDeliveryStatus | null;
   documentId: string;
-  intendedRecipientEmail?: string | null;
-  intendedRecipientName?: string | null;
-  emailProviderConfigured?: boolean;
+  providerMessageId?: string | null;
+  recipientEmail?: string | null;
+  recipientName?: string | null;
 };
 
 export type TenantQuoteRevisionInput = {
@@ -478,7 +484,10 @@ export type TenantQuoteRevisionResult = TenantQuoteLifecycleResult & {
 
 export type TenantQuoteSendResult = TenantQuoteLifecycleResult & {
   document: Document;
+  delivery: QuoteDelivery | null;
 };
+
+export type TenantQuoteDeliveryStatus = "failed" | "logged" | "sent";
 
 export type TenantQuoteDocumentWriteInput = {
   actorUserId?: string | null;
@@ -2185,6 +2194,29 @@ export function createTenantDataAccess(
       });
     },
 
+    async listTenantQuoteDocumentDeliveries(
+      scope: TenantDataScope,
+      quoteId: string,
+      documentId: string,
+    ) {
+      const documentState = await access.getTenantQuoteDocument(
+        scope,
+        quoteId,
+        documentId,
+      );
+
+      if (!documentState) {
+        return [];
+      }
+
+      return client.quoteDelivery.findMany({
+        where: tenantWhere(scope, {
+          documentId,
+        }),
+        orderBy: [{ createdAt: "desc" }],
+      });
+    },
+
     async createTenantQuoteItem(
       scope: TenantDataScope,
       quoteId: string,
@@ -2760,6 +2792,35 @@ export function createTenantDataAccess(
             status: QuoteStatus.SENT,
           },
         });
+        const recipientEmail = normalizedOptionalText(data.recipientEmail);
+        const recipientName = normalizedOptionalText(data.recipientName);
+        const deliveryProvider = normalizedDeliveryProvider(
+          data.deliveryProvider,
+        );
+        const deliveryStatus = normalizedDeliveryStatus(data.deliveryStatus);
+        const completedAt = data.completedAt ?? sentAt;
+        const delivery = recipientEmail
+          ? await transactionClient.quoteDelivery.create({
+              data: {
+                tenantId: tenantIdFromScope(scope),
+                quoteId: quoteState.quote.id,
+                quoteVersionId: updatedVersion.id,
+                documentId: documentState.document.id,
+                channel: "email",
+                provider: deliveryProvider,
+                status: deliveryStatus,
+                recipientEmail,
+                recipientEmailRedacted: redactEmailAddress(recipientEmail),
+                recipientName,
+                providerMessageId: normalizedOptionalText(
+                  data.providerMessageId,
+                ),
+                errorCode: null,
+                attemptedAt: sentAt,
+                completedAt,
+              },
+            })
+          : null;
 
         await transactionClient.auditLog.create({
           data: {
@@ -2779,13 +2840,13 @@ export function createTenantDataAccess(
               documentId: documentState.document.id,
               documentFileName: documentState.document.fileName,
               documentChecksum: documentState.document.checksum,
-              intendedRecipientEmail: data.intendedRecipientEmail ?? null,
-              intendedRecipientName: data.intendedRecipientName ?? null,
-              deliveryChannel: data.intendedRecipientEmail
-                ? "email_stub"
-                : "manual_download",
-              emailProviderConfigured: data.emailProviderConfigured ?? false,
-              providerStatus: "stub_recorded",
+              deliveryChannel: recipientEmail ? "email" : "manual_download",
+              deliveryId: delivery?.id ?? null,
+              deliveryProvider,
+              deliveryStatus: delivery?.status ?? "manual_recorded",
+              providerMessageId: delivery?.providerMessageId ?? null,
+              recipientEmailRedacted: redactEmailAddress(recipientEmail),
+              recipientNamePresent: Boolean(recipientName),
               sentAt: sentAt.toISOString(),
             }),
           },
@@ -2795,6 +2856,7 @@ export function createTenantDataAccess(
           quote: updatedQuote,
           currentVersion: updatedVersion,
           document: documentState.document,
+          delivery,
         };
       });
     },
@@ -3253,6 +3315,18 @@ export function listTenantQuoteDocuments(
   quoteVersionId: string,
 ) {
   return tenantDataAccess.listTenantQuoteDocuments(scope, quoteVersionId);
+}
+
+export function listTenantQuoteDocumentDeliveries(
+  scope: TenantDataScope,
+  quoteId: string,
+  documentId: string,
+) {
+  return tenantDataAccess.listTenantQuoteDocumentDeliveries(
+    scope,
+    quoteId,
+    documentId,
+  );
 }
 
 export function createTenantQuoteItem(
@@ -3942,6 +4016,26 @@ function compactRecord(record: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(record).filter(([, value]) => value !== undefined),
   );
+}
+
+function normalizedOptionalText(value: string | null | undefined) {
+  const trimmed = value?.trim();
+
+  return trimmed ? trimmed : null;
+}
+
+function normalizedDeliveryProvider(value: string | null | undefined) {
+  const provider = normalizedOptionalText(value);
+
+  return provider ? provider.slice(0, 80) : "local";
+}
+
+function normalizedDeliveryStatus(
+  value: TenantQuoteDeliveryStatus | null | undefined,
+): TenantQuoteDeliveryStatus {
+  return value === "failed" || value === "sent" || value === "logged"
+    ? value
+    : "logged";
 }
 
 function archiveCatalogRecordData() {

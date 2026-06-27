@@ -91,6 +91,10 @@ All tenant-owned catalog and pricing records require `tenantId`.
   - `id`, `tenantId`, `quoteVersionId`, template key, file/storage reference, generatedBy,
     generatedAt, visible totals, language/locale, checksum or content hash;
   - must be bound to the quote version used to generate it.
+- QuoteDelivery:
+  - `id`, `tenantId`, `quoteId`, `quoteVersionId`, `documentId`, channel, provider, delivery
+    status, recipient email, redacted recipient email, provider message id, timestamps;
+  - stores customer-offer delivery status separately from immutable generated document metadata.
 - AuditLog:
   - `id`, `tenantId`, optional actor user, action, entity type/id, before snapshot, after snapshot,
     metadata, timestamp;
@@ -262,13 +266,17 @@ ignored development storage by default; production object storage remains a depl
 Customer delivery starts only after the current quote version is locked and a tenant-owned quote PDF
 `Document` exists for that same version. Sending changes the current `QuoteVersion` from `LOCKED` to
 `SENT`, sets `sentAt`, marks the parent `Quote` as `SENT`, and writes a tenant-scoped `QUOTE_SENT`
-audit entry. The audit metadata records the selected document id and optional intended recipient
-fields as an email stub; no real email is sent by the MVP workflow.
+audit entry. The selected PDF is delivered through the configured server-side email provider, then a
+tenant-owned `QuoteDelivery` row stores the provider, status, document id, quote version id,
+recipient email, redacted recipient email, provider message id, and timestamps. The `QUOTE_SENT`
+audit metadata stores only redacted recipient facts and delivery ids/statuses; it must not include
+the full recipient email.
 
 Sent quote versions remain immutable. Item edits, manual price adjustments, discounts, and
 calculation updates continue to be rejected after send, and the revision flow remains the only way to
 change customer-facing content. The generated PDF `Document` stays bound to its original
-`quoteVersionId`; later revisions create new draft versions instead of rebinding old documents.
+`quoteVersionId`; delivery status is stored separately so later revisions create new draft versions
+instead of rebinding or mutating old documents.
 
 ## COD-018 catalog admin UI foundation notes
 

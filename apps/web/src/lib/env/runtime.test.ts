@@ -58,6 +58,7 @@ describe("runtime environment validation", () => {
         AUTH_SECRET: "replace-with-a-long-random-development-secret",
         DATABASE_URL: "",
         DOCUMENT_STORAGE_PROVIDER: "local",
+        EMAIL_PROVIDER: "local",
       }),
     );
 
@@ -66,6 +67,7 @@ describe("runtime environment validation", () => {
       "auth_dev_login_enabled",
       "database_url_missing",
       "document_storage_local_in_production",
+      "email_local_in_production",
     ]);
     expect(JSON.stringify(issues)).not.toContain("replace-with-a-long-random-development-secret");
   });
@@ -84,9 +86,32 @@ describe("runtime environment validation", () => {
           DOCUMENT_STORAGE_S3_BUCKET: "termopane-documents",
           DOCUMENT_STORAGE_S3_ACCESS_KEY_ID: "access-key",
           DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY: "secret-key",
+          EMAIL_PROVIDER: "resend",
+          EMAIL_FROM: "oferte@example.test",
+          RESEND_API_KEY: "resend-key",
         }),
       ),
     ).toEqual([]);
+  });
+
+  it("reports missing Resend email configuration in production", () => {
+    expect(
+      runtimeEnvironmentIssues(
+        env({
+          NODE_ENV: "production",
+          AUTH_DEV_LOGIN_ENABLED: "false",
+          AUTH_SECRET: "real-random-pilot-auth-value-0123456789",
+          DATABASE_URL: "postgresql://pilot.example/termopane",
+          DOCUMENT_STORAGE_PROVIDER: "s3",
+          DOCUMENT_STORAGE_S3_ENDPOINT: "https://storage.example.test",
+          DOCUMENT_STORAGE_S3_REGION: "eu-central-1",
+          DOCUMENT_STORAGE_S3_BUCKET: "termopane-documents",
+          DOCUMENT_STORAGE_S3_ACCESS_KEY_ID: "access-key",
+          DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY: "secret-key",
+          EMAIL_PROVIDER: "resend",
+        }),
+      ).map((issue) => issue.code),
+    ).toEqual(["email_resend_missing"]);
   });
 });
 

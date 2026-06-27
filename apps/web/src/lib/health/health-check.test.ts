@@ -53,6 +53,7 @@ describe("health check", () => {
           "auth_dev_login_enabled",
           "database_url_missing",
           "document_storage_local_in_production",
+          "email_provider_missing",
         ],
       },
       {

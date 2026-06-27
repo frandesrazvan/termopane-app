@@ -897,7 +897,11 @@ function QuoteDocumentsCard({
           {documentError === "locked"
             ? "Blochează versiunea înainte de a genera un PDF pentru client."
             : documentError === "recipient"
-              ? "Completează o adresă email validă sau lasă câmpul gol pentru confirmare fără email."
+              ? "Completează o adresă email validă pentru destinatar."
+              : documentError === "provider"
+                ? "Providerul de email nu a putut livra oferta. Verifică setările de livrare și încearcă din nou."
+                : documentError === "storage"
+                  ? "PDF-ul selectat nu a putut fi citit din stocare pentru atașare."
               : documentError === "send"
                 ? "Oferta nu a putut fi trimisă. Verifică dacă versiunea este blocată și PDF-ul aparține acestei oferte."
                 : "PDF-ul nu a putut fi generat. Verifică versiunea ofertei și stocarea locală."}
@@ -943,7 +947,7 @@ function QuoteDocumentsCard({
                 >
                   <input name="documentId" type="hidden" value={document.id} />
                   <label className="grid gap-1 text-xs font-semibold text-zinc-700">
-                    Email destinatar (opțional)
+                    Email destinatar
                     <span className="relative">
                       <Mail
                         className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
@@ -952,8 +956,9 @@ function QuoteDocumentsCard({
                       />
                       <input
                         className="h-10 w-full rounded-md border border-zinc-200 bg-white pl-9 pr-3 text-sm font-medium text-zinc-900 shadow-sm"
-                        name="intendedRecipientEmail"
+                        name="recipientEmail"
                         placeholder="client@example.test"
+                        required
                         type="email"
                       />
                     </span>
@@ -962,7 +967,7 @@ function QuoteDocumentsCard({
                     Nume destinatar (opțional)
                     <input
                       className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-900 shadow-sm"
-                      name="intendedRecipientName"
+                      name="recipientName"
                       placeholder="Contact client"
                     />
                   </label>
@@ -971,8 +976,8 @@ function QuoteDocumentsCard({
                     Trimite către client
                   </button>
                   <p className="text-xs text-zinc-500 sm:col-span-3">
-                    Stub email: se înregistrează destinatarul intenționat și
-                    documentul; nu se trimite email real.
+                    Livrarea folosește providerul de email configurat. În
+                    local se înregistrează doar un eveniment sintetic redacted.
                   </p>
                 </form>
               ) : null}

@@ -1,5 +1,10 @@
 import { CheckCircle2, Download, FileText, Plus } from "lucide-react";
-import type { Document, Quote, QuoteVersion } from "@prisma/client";
+import type {
+  Document,
+  Quote,
+  QuoteDelivery,
+  QuoteVersion,
+} from "@prisma/client";
 import Link from "next/link";
 import {
   formatDateTimeRo,
@@ -8,12 +13,14 @@ import {
 } from "../../../../../lib/i18n";
 
 type QuoteSendConfirmationViewProps = {
+  delivery?: QuoteDelivery | null;
   document: Document;
   quote: Quote;
   quoteVersion: QuoteVersion;
 };
 
 export function QuoteSendConfirmationView({
+  delivery,
   document,
   quote,
   quoteVersion,
@@ -109,8 +116,9 @@ export function QuoteSendConfirmationView({
               aria-hidden="true"
               size={16}
             />
-            Stub email activ: intenția de trimitere este auditată, dar niciun
-            email real nu este trimis fără integrare configurată.
+            {delivery
+              ? `Livrare email: ${deliveryStatusLabel(delivery.status)} prin ${delivery.provider}. Destinatar: ${delivery.recipientEmailRedacted ?? "redacted"}.`
+              : "Livrarea este auditată pentru documentul selectat."}
           </p>
         </section>
       </div>
@@ -175,4 +183,17 @@ function minorValue(value: unknown) {
   }
 
   return null;
+}
+
+function deliveryStatusLabel(status: string) {
+  switch (status) {
+    case "sent":
+      return "trimisă";
+    case "logged":
+      return "înregistrată local";
+    case "failed":
+      return "eșuată";
+    default:
+      return status || "necunoscută";
+  }
 }

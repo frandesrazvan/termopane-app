@@ -12,17 +12,16 @@ production formulas.
   draft quote items, calculation wiring, quote lifecycle, and Template A/B HTML previews are
   present.
 - Production-safe pilot login now uses tenant invite links with hashed single-use tokens. Tenant
-  OWNER users can create invite links from settings; real email delivery remains stubbed/manual until
-  a future provider task.
+  OWNER users can create invite links from settings; invite email delivery remains manual until a
+  future provider task.
 - PDF generation, local document storage, immutable `Document` records, selected template keys, and
   audit logging are present for generated quote documents.
 - Tenant company logo upload is available from `/dashboard/settings` for OWNER/ADMIN users. Logos
   are stored as private tenant assets through the document storage provider and referenced in
   Template A/B quote snapshots through authenticated tenant routes.
-- Locked quote versions with generated PDFs can be marked as sent. The workflow records `QUOTE_SENT`,
-  `sentAt`, the intended recipient/document stub metadata, and shows a Romanian customer-safe
-  confirmation/download screen. Real email delivery is still stubbed unless a future provider is
-  explicitly added.
+- Locked quote versions with generated PDFs can be delivered by email through the configured
+  provider. The workflow records `QUOTE_SENT`, `sentAt`, redacted recipient audit metadata, a
+  tenant-owned delivery status row, and shows a Romanian customer-safe confirmation/download screen.
 - Document storage now goes through a provider interface. The local provider remains the default
   for dev/test, and an SDK-backed S3-compatible provider is available for deployable object storage.
 - Production deployment hardening now includes runtime env validation, production dev-login blocking,
@@ -92,6 +91,7 @@ production formulas.
 - Pure packages for calculation, drawing, and PDF rendering
 - Document storage provider abstraction with local development storage under ignored
   `.local-storage/documents`
+- Email delivery provider abstraction with local synthetic logging and Resend production delivery
 - GitHub Actions CI for install, Prisma generate, lint, typecheck, test, and build
 
 ## Local Setup
@@ -269,6 +269,30 @@ pnpm storage:smoke
 smoke command below when you also need runtime, health, database, tenant/user bootstrap, and
 quote/PDF basics.
 
+## Customer Offer Email Delivery
+
+Generated customer PDFs are delivered through the server-side provider selected by
+`EMAIL_PROVIDER`.
+
+The default provider is `local`, which does not send a real email. It writes only a synthetic,
+PII-redacted delivery event through the safe logger and lets tests/development exercise the send
+workflow without contacting an external service.
+
+Production/pilot customer delivery currently supports Resend:
+
+```powershell
+$env:EMAIL_PROVIDER="resend"
+$env:EMAIL_FROM="oferte@example.test"
+$env:EMAIL_REPLY_TO="office@example.test"
+$env:RESEND_API_KEY="replace-in-secret-store"
+```
+
+When a tenant company email is snapshotted on the quote version, the app uses it as the offer
+sender/reply-to value for the customer email where the provider accepts it. The selected generated
+PDF is attached; the email body is Romanian and customer-facing only. Server logs and `QUOTE_SENT`
+audit metadata store only redacted recipient values. Do not commit real recipient emails, provider
+API keys, or private customer PDFs.
+
 ## Pilot Smoke Test
 
 Run the full pilot smoke test after configuring the target environment:
@@ -306,6 +330,8 @@ target platform secret store:
 - S3-compatible: `DOCUMENT_STORAGE_S3_ENDPOINT`, `DOCUMENT_STORAGE_S3_REGION`,
   `DOCUMENT_STORAGE_S3_BUCKET`, `DOCUMENT_STORAGE_S3_ACCESS_KEY_ID`,
   `DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY`, and `DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE`
+- `EMAIL_PROVIDER="resend"` for pilot customer offer delivery
+- Resend email delivery: `EMAIL_FROM`, optional `EMAIL_REPLY_TO`, and `RESEND_API_KEY`
 
 Use a Node.js or Docker deployment target for the Next.js app; static export is not suitable because
 auth, tenant-scoped database access, PDF generation, and document downloads require server runtime
@@ -381,7 +407,7 @@ pnpm verify
 ## Not Done Yet
 
 - Real bucket integration tests.
-- Real email-provider integration for auth invite delivery and customer delivery.
+- Real email-provider integration for auth invite delivery.
 - Advanced pricing-rule selection inside the quote builder.
 - Production-ready door formulas for panels, locks, thresholds, reinforcement, and fabrication.
 - Real production formulas or supplier-specific pricing rules.

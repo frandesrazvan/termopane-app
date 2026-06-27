@@ -155,6 +155,7 @@ model Tenant {
   profileSystems      ProfileSystem[]
   projects            Project[]
   quoteItems          QuoteItem[]
+  quoteDeliveries     QuoteDelivery[]
   quoteNumberSettings QuoteNumberSettings?
   quoteResults        QuoteCalculationResult[]
   quoteVersions       QuoteVersion[]
@@ -677,6 +678,7 @@ model Quote {
   currentVersion   QuoteVersion?  @relation("CurrentQuoteVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   customer         Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
   project          Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  quoteDeliveries  QuoteDelivery[]
   tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   versions         QuoteVersion[] @relation("QuoteVersions")
 
@@ -715,6 +717,7 @@ model QuoteVersion {
   currentForQuote         Quote?                  @relation("CurrentQuoteVersion")
   documents               Document[]
   items                   QuoteItem[]
+  quoteDeliveries         QuoteDelivery[]
   quote                   Quote                   @relation("QuoteVersions", fields: [quoteId], references: [id], onDelete: Cascade)
   tenant                  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -781,12 +784,41 @@ model Document {
   generatedById         String?
   createdAt             DateTime      @default(now())
   generatedBy           User?         @relation("DocumentGeneratedBy", fields: [generatedById], references: [id], onDelete: SetNull)
+  quoteDeliveries       QuoteDelivery[]
   quoteVersion          QuoteVersion? @relation(fields: [quoteVersionId], references: [id], onDelete: SetNull)
   tenant                Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, quoteVersionId])
   @@index([tenantId, type])
   @@index([tenantId, createdAt])
+}
+
+model QuoteDelivery {
+  id                     String       @id @default(cuid())
+  tenantId               String
+  quoteId                String
+  quoteVersionId         String
+  documentId             String
+  channel                String       @default("email")
+  provider               String
+  status                 String
+  recipientEmail         String?
+  recipientEmailRedacted String?
+  recipientName          String?
+  providerMessageId      String?
+  errorCode              String?
+  attemptedAt            DateTime     @default(now())
+  completedAt            DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  document               Document     @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  quote                  Quote        @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quoteVersion           QuoteVersion @relation(fields: [quoteVersionId], references: [id], onDelete: Cascade)
+  tenant                 Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, quoteVersionId])
+  @@index([tenantId, documentId])
+  @@index([tenantId, status, createdAt])
 }
 
 model AuditLog {

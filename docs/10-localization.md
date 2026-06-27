@@ -246,13 +246,15 @@ CSV column names remain machine-readable field keys such as `profileSystemId`, `
 Offer sending and confirmation UI uses Romanian labels including:
 
 - `Trimite către client`;
-- `Email destinatar (opțional)`;
+- `Email destinatar`;
 - `Nume destinatar (opțional)`;
 - `Ofertă trimisă`;
 - `Trimisă la`;
 - `Descarcă PDF`;
 - `Creează revizie din ofertă`;
-- `Stub email`.
+- `Livrare email`;
+- `Providerul de email nu a putut livra oferta`;
+- `PDF-ul selectat nu a putut fi citit din stocare pentru atașare`.
 
 ## COD-035 Auth Invite Labels
 
