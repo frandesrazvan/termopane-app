@@ -315,6 +315,28 @@ codes only and does not print secrets, emails, tokens, cookies, or customer reco
 `docs/14-pilot-smoke-tests.md` for failure meanings and the difference between `storage:smoke` and
 `pilot:smoke`.
 
+## Pilot Acceptance Test
+
+Run the browser-based pilot acceptance suite before each pilot release candidate:
+
+```powershell
+pnpm pilot:acceptance
+```
+
+The command generates the Prisma client, applies committed migrations, reseeds the synthetic local
+demo data, starts the Next app with local development login enabled, and runs the Playwright suite in
+a 390px mobile viewport. It covers login, tenant switching, company settings, catalog admin,
+customer/project creation, quote creation, all MVP line types, calculation, manual override,
+version locking, Template A/B PDF generation, send confirmation, saved filters, `/api/health`, and a
+local document-storage round trip.
+
+Use only disposable local/development databases for this command. Install Playwright's browser once
+on a fresh machine if needed:
+
+```powershell
+pnpm exec playwright install chromium
+```
+
 ## Deployment Readiness
 
 See `docs/12-production-deployment-hardening.md` for the full pilot checklist, backup/restore notes,
@@ -386,6 +408,7 @@ For pilot deployment verification, also run:
 
 ```powershell
 pnpm pilot:smoke
+pnpm pilot:acceptance
 ```
 
 Or run the aggregate local check after dependencies are installed:

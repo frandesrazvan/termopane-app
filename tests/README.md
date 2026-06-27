@@ -13,6 +13,8 @@ Keep tests close to the behavior they protect and use synthetic data only.
 - App smoke tests can live next to the Next.js route or component they import.
 - Package tests live beside package source under `packages/*/src`.
 - Shared cross-package fixtures can live under `tests/fixtures` after the data shape is stable.
+- The pilot browser acceptance suite lives under `tests/e2e` and is run with
+  `pnpm pilot:acceptance`.
 
 ## Guardrails
 
@@ -20,3 +22,5 @@ Keep tests close to the behavior they protect and use synthetic data only.
 - Do not encode unvalidated production formulas as expected values.
 - Prefer deterministic tests that do not require network access or a running database.
 - Calculation tests should assert warnings and trace behavior when calculation work is introduced.
+- E2E acceptance tests may use the local PostgreSQL database, but only after reseeding synthetic
+  fixtures and cleaning up synthetic acceptance records by prefix.

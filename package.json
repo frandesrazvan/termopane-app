@@ -8,6 +8,7 @@
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test && tsx tests/prisma-schema-invariants.test.ts && tsx tests/smoke-pilot-deployment.test.ts",
+    "pilot:acceptance": "pnpm prisma:generate && pnpm db:migrate:deploy && pnpm db:seed && playwright test --config=tests/e2e/playwright.config.ts",
     "reference:validate": "tsx packages/calculation/src/reference-offer-validate.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "verify": "pnpm prisma generate && pnpm check",
@@ -27,6 +28,7 @@
     "@prisma/client": "^6.19.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.51.1",
     "@types/node": "^20",
     "prettier": "latest",
     "prisma": "^6.19.1",

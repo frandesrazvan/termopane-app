@@ -23,6 +23,12 @@ phone in the field with one-handed use, unstable attention, and quick review bef
 - Do not display restricted admin areas to users without permission, but still enforce permissions on
   the server.
 
+## COD-041 pilot acceptance notes
+
+The pilot acceptance suite exercises the authenticated flow at a 390px mobile viewport. The dashboard
+tenant switcher must keep both the tenant selector and the `Schimbă` action reachable without
+overlap with logout or bottom navigation controls.
+
 ## COD-035 invite login UX notes
 
 The login page separates pilot invite login from local development login. Pilot users enter the
