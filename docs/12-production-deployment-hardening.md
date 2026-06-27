@@ -28,6 +28,9 @@ for generated PDFs.
 - Configure the platform health check to call `/api/health`.
 - Run the storage smoke test against the target environment before sending real pilot offers.
 - Run the full pilot smoke test before and after deploy.
+- For the first real pilot rehearsal, complete `docs/pilot-dry-run-report.md` with redacted evidence
+  for migrations, storage, `/api/health`, invite acceptance, Template A/B PDFs, email delivery,
+  document metadata, and authenticated downloads.
 
 ## Runtime safety checks
 
@@ -141,6 +144,14 @@ records.
 Use `pnpm storage:smoke` for bucket-only verification. Use `pnpm pilot:smoke` before/after deploy
 or after migrations, credential rotation, or infrastructure changes. See
 `docs/14-pilot-smoke-tests.md` for required env values and failure meanings.
+
+## Real pilot dry-run report
+
+`docs/pilot-dry-run-report.md` is the public-safe evidence ledger for the first production-like pilot
+dry run. It must not contain secrets, raw invite links, raw logs, full recipient emails, customer
+PII, database URLs, storage keys, provider screenshots, or PDF payloads. Store private evidence
+outside Git and copy back only status, timestamps, counts, redacted ids, redacted recipients, and
+provider/check names.
 
 ## Backup and restore notes
 
