@@ -14,6 +14,8 @@ for generated PDFs.
   value is accidentally set to `true`.
 - Set `AUTH_COOKIE_NAME=termopane_session` or another tenant-safe cookie name.
 - Set `AUTH_SESSION_DAYS` to the intended pilot session length.
+- Use tenant invite links for pilot authentication and keep invite delivery manual until an email
+  provider is configured in a later task.
 - Set `DOCUMENT_STORAGE_PROVIDER=s3` for pilot deployments.
 - Configure `DOCUMENT_STORAGE_S3_ENDPOINT`, `DOCUMENT_STORAGE_S3_REGION`,
   `DOCUMENT_STORAGE_S3_BUCKET`, `DOCUMENT_STORAGE_S3_ACCESS_KEY_ID`,
@@ -35,6 +37,8 @@ Production health checks fail when:
 - S3-compatible document storage is selected without all required S3 env values.
 
 Development login is opt-in for local work and is blocked whenever `NODE_ENV=production`.
+Pilot login does not depend on development login; invited users accept single-use tenant invite links
+and receive the same HTTP-only, SameSite=Lax session cookie.
 
 ## Database migration command
 

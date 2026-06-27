@@ -15,6 +15,10 @@ isolation, quote-version immutability, and snapshot behavior.
 - Membership:
   - `id`, `tenantId`, `userId`, `role`, permission flags, status, timestamps;
   - unique per tenant/user pair unless the auth model requires otherwise.
+- TenantInvite:
+  - `id`, `tenantId`, invited email, role, token hash, expiry, accepted timestamp, revoked
+    timestamp, creator, timestamps;
+  - raw invite tokens are never stored and acceptance is single-use.
 - CompanySettings:
   - `id`, `tenantId`, company legal/display name, address, contact details, logo reference,
     default currency, VAT/tax defaults, default PDF template, PDF terms, warranty, delivery,
@@ -136,6 +140,18 @@ Tenant-owned data access must call server-side tenant-context helpers before que
 Dealer/restricted users do not see internal costs by default. Owner/admin roles can manage catalog
 and generate PDFs; user management is owner-only until an explicit per-member user-management
 permission is added.
+
+## COD-035 production auth and invite notes
+
+The pilot production auth path is a minimal invite-token plus email-confirmation flow. `TenantInvite`
+is tenant-owned and stores only a hash of the one-time token. Invites expire, can be revoked, and are
+marked accepted after first use. Acceptance requires the token, tenant id, and matching invited
+email; it creates or activates the `TenantMember` for that tenant and sets the existing signed
+session cookie.
+
+Dev login remains a local-only synthetic seed-user path gated by `AUTH_DEV_LOGIN_ENABLED=true` and is
+blocked in production. Real email delivery is not implemented in this task; owner-created invite
+links are delivered manually until a provider is added.
 
 ## COD-006 tenant-scoped data access notes
 

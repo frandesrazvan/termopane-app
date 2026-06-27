@@ -11,6 +11,9 @@ production formulas.
 - Authentication, tenant context, role permissions, customer/project records, saved quote shells,
   draft quote items, calculation wiring, quote lifecycle, and Template A/B HTML previews are
   present.
+- Production-safe pilot login now uses tenant invite links with hashed single-use tokens. Tenant
+  OWNER users can create invite links from settings; real email delivery remains stubbed/manual until
+  a future provider task.
 - PDF generation, local document storage, immutable `Document` records, selected template keys, and
   audit logging are present for generated quote documents.
 - Locked quote versions with generated PDFs can be marked as sent. The workflow records `QUOTE_SENT`,
@@ -144,7 +147,8 @@ production formulas.
 
 The web app runs at `http://localhost:3000` by default. Development login requires
 `AUTH_DEV_LOGIN_ENABLED="true"` in your local `.env`; `.env.example` keeps it disabled by default so
-it is not accidentally copied into production.
+it is not accidentally copied into production. Production and pilot users should sign in through
+tenant invite links, not through development login.
 
 ## Seed Users
 
@@ -156,6 +160,23 @@ Synthetic users seeded for local testing:
 - `dealer@example.test`
 
 Use only synthetic data in fixtures, screenshots, and docs.
+
+## Authentication And Invites
+
+Pilot authentication uses a minimal invite-token and passwordless link foundation:
+
+- OWNER users create invites from `/dashboard/settings`;
+- each invite stores the invited email, tenant, role, token hash, expiry, accepted timestamp, and
+  revoked timestamp;
+- the raw token is shown only once as a manual delivery link because real email sending is still
+  stubbed;
+- invite acceptance asks the user to confirm the invited email and then sets the existing HTTP-only
+  session cookie;
+- expired, revoked, already accepted, cross-tenant, or disabled-membership invites are rejected.
+
+Keep `AUTH_DEV_LOGIN_ENABLED="false"` for pilot and production. Local development login remains
+available only when explicitly enabled outside production and only for synthetic `@example.test`
+seed users.
 
 ## Database Migrations
 
@@ -267,9 +288,10 @@ Configure the host health check path as:
 /api/health
 ```
 
-Do not enable development login in production, do not store S3 credentials in source control, and do
-not expose bucket credentials to browser-side code. CI runs `pnpm env:check-defaults` to ensure
-unsafe production defaults are not enabled in `.env.example`.
+Do not enable development login in production, do not use dev-login as the pilot auth method, do not
+store S3 credentials in source control, and do not expose bucket credentials to browser-side code. CI
+runs `pnpm env:check-defaults` to ensure unsafe production defaults are not enabled in
+`.env.example`.
 
 ## Validation
 
@@ -304,7 +326,7 @@ pnpm verify
 ## Not Done Yet
 
 - Real bucket integration tests.
-- Real email-provider integration for customer delivery.
+- Real email-provider integration for auth invite delivery and customer delivery.
 - Advanced pricing-rule selection inside the quote builder.
 - Production-ready door formulas for panels, locks, thresholds, reinforcement, and fabrication.
 - Real production formulas or supplier-specific pricing rules.

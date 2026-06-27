@@ -23,6 +23,16 @@ phone in the field with one-handed use, unstable attention, and quick review bef
 - Do not display restricted admin areas to users without permission, but still enforce permissions on
   the server.
 
+## COD-035 invite login UX notes
+
+The login page separates pilot invite login from local development login. Pilot users enter the
+invited email plus the invite code/link tenant values, and the page returns a generic Romanian error
+for invalid, expired, revoked, used, or cross-tenant tokens so it does not reveal account existence.
+
+The settings screen exposes `Utilizatori și invitații` only as an owner workflow. Invite links are
+shown after creation for manual delivery because real email sending is still stubbed. Labels must not
+imply that an email was sent automatically.
+
 ## Dashboard
 
 The dashboard should prioritize daily sales work:

@@ -244,6 +244,22 @@ Offer sending and confirmation UI uses Romanian labels including:
 - `Creează revizie din ofertă`;
 - `Stub email`.
 
+## COD-035 Auth Invite Labels
+
+Production auth and onboarding UI uses Romanian labels including:
+
+- `Autentificare`;
+- `Acces pilot prin invitație`;
+- `Email invitat`;
+- `Cod invitație`;
+- `Tenant din invitație`;
+- `Acceptă invitația`;
+- `Autentificare locală dezvoltare`;
+- `Utilizatori și invitații`;
+- `Invitații recente`;
+- `Link invitație`;
+- `Livrare email: stub manual`.
+
 ## Testing Expectations
 
 When a task changes user-facing offer output, update package/app tests so Romanian labels remain
