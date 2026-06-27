@@ -155,6 +155,18 @@ status, and whether a historical pack satisfies the 10-20 case window. A pack ca
 only when the JSON is redacted, contains no private artifacts, and all recreated totals/warnings match
 the expected values.
 
+## COD-038 redacted historical validation notes
+
+`pnpm reference:validate` validates the committed synthetic reference pack and any redacted pack path
+passed to the command. The report includes case count, missing business inputs, warning mismatches,
+total mismatches, template/PDF field mismatches, validation errors, validation warnings, and review
+readiness.
+
+Reference cases can be marked `draft-redacted`, `business-reviewed`, `validated-historical`, or
+`blocked-missing-data`. Historical cases are ready only after every required business input is
+`validated` or `not-applicable`, all expected totals and warning codes match the pure calculation
+result, and no private artifacts are referenced.
+
 ## COD-028 door MVP calculation notes
 
 Door quote items are supported as rough MVP calculation inputs with `type: "door"`. The calculator

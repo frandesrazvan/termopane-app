@@ -1,0 +1,25 @@
+{
+  "templateKind": "expected-pdf-output-fields",
+  "businessValidationStatus": "requires-business-validation",
+  "supportedComparableFields": [
+    "templateKey",
+    "quoteId",
+    "itemCount",
+    "totalWithVatMinor",
+    "warningCodes"
+  ],
+  "pdfOutputFields": {
+    "templateKey": "template-a",
+    "quoteId": "redacted-historical-00",
+    "itemCount": 1,
+    "totalWithVatMinor": 0,
+    "warningCodes": []
+  },
+  "redactionChecklist": {
+    "customerNameRemoved": true,
+    "customerContactRemoved": true,
+    "siteAddressRemoved": true,
+    "sourcePdfNotCommitted": true,
+    "internalCostsExcludedUnlessOwnerApprovedForHarness": true
+  }
+}

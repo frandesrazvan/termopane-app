@@ -9,9 +9,28 @@ identificatori fiscali, spreadsheet-uri confidentiale de furnizor sau capturi di
 Documentele originale raman in afara repository-ului; in Git ajung doar snapshot-uri JSON aprobate
 si redactate.
 
+## Checklist de excludere artefacte private
+
+Inainte de orice commit in acest folder, confirmati explicit:
+
+- [ ] Nu exista PDF-uri, imagini, documente Office sau capturi din oferte reale.
+- [ ] Nu exista nume reale de clienti, telefoane, emailuri, adrese, CUI/CNP sau numere de contract.
+- [ ] Nu exista spreadsheet-uri confidentiale de furnizor sau liste de pret brute.
+- [ ] Nu exista costuri interne/supplier-cost decat daca ownerul a aprobat explicit includerea lor
+      in harness-ul redacted.
+- [ ] `source.privateArtifactsCommitted` este `false` pentru fiecare caz.
+- [ ] `source.originalDocumentAvailable` este `false` pentru fiecare caz commited in Git.
+- [ ] Originalele raman in storage privat, iar in repository exista doar JSON redacted/sintetic.
+
 ## Fisiere
 
 - `synthetic-offers.json` contine exemple sintetice pentru exercitarea harness-ului.
+- `templates/price-snapshot.template.json` este template pentru snapshot-uri de pret profile,
+  sticla, accesorii si servicii.
+- `templates/quote-case.template.json` este template pentru un caz istoric redacted.
+- `templates/expected-totals.template.json` este template pentru totalurile asteptate.
+- `templates/expected-pdf-output-fields.template.json` este template pentru campurile vizibile
+  asteptate in outputul PDF/template.
 - `README.md` este ghidul scurt pentru intake-ul fixture-urilor.
 - `docs/11-business-owner-review-pack.md` este checklist-ul complet pentru sedinta cu ownerii.
 
@@ -38,6 +57,27 @@ Colectati urmatoarele inainte de recrearea a 10-20 oferte istorice validate:
 5. Campurile necunoscute raman `requires business validation`; nu se inventeaza formule.
 6. Se ruleaza harness-ul inainte ca un caz sa fie considerat baza de comparatie.
 
+## Workflow de conversie in fixture sigur
+
+1. Creati un pack nou pornind de la `synthetic-offers.json` si setati `packType` la
+   `redacted-historical-review` pana cand exista 10-20 cazuri complet validate.
+2. Copiati `templates/quote-case.template.json` pentru fiecare oferta istorica selectata.
+3. Completati doar datele aprobate si redactate: snapshot de preturi, input de calcul, totaluri
+   asteptate, coduri de avertizare si campurile PDF comparabile.
+4. Folositi `templates/price-snapshot.template.json` pentru profile, sticla, accesorii si servicii.
+   Nu copiati fisierele brute de la furnizor.
+5. Folositi `templates/expected-totals.template.json` pentru totaluri in unitati minore.
+6. Folositi `templates/expected-pdf-output-fields.template.json` pentru campurile comparabile acum:
+   `templateKey`, `quoteId`, `itemCount`, `totalWithVatMinor`, `warningCodes`.
+7. Marcati statusul cazului:
+   - `draft-redacted`: datele sunt redactate, dar ownerul nu le-a revizuit inca;
+   - `business-reviewed`: ownerul a revizuit cazul, dar comparatia nu este finala;
+   - `validated-historical`: totalurile, avertizarile si campurile PDF se potrivesc;
+   - `blocked-missing-data`: lipsesc inputuri business si cazul nu trebuie folosit ca referinta.
+8. Cand pack-ul are 10-20 cazuri `validated-historical`, schimbati `packType` la
+   `validated-historical-recreation` si `dataClassification` la `redacted-validated-historical`.
+9. Rulati `pnpm reference:validate` si corectati orice lipsa sau mismatch raportat.
+
 ## Forma snapshot-ului
 
 Pachetele istorice folosesc `packType = "validated-historical-recreation"` si
@@ -49,6 +89,7 @@ Pachetele istorice folosesc `packType = "validated-historical-recreation"` si
 - `businessInputStatus` pentru toate cheile din `requiredReviewInputKeys`;
 - `calculationInput` ca snapshot complet pentru calculator, fara citiri din baza de date live;
 - `expected.totals` in unitati minore si `expected.warningCodes` pentru comparatie.
+- `expected.pdfOutputFields` pentru campurile template/PDF comparabile.
 
 Cheile obligatorii pentru review sunt:
 
@@ -72,6 +113,14 @@ Harness-ul din `packages/calculation/src/reference-offer-harness.ts` valideaza c
 - totalurile, numarul de pozitii si codurile de avertizare se potrivesc.
 
 Rulare recomandata:
+
+```powershell
+pnpm reference:validate
+```
+
+Comanda afiseaza numarul de cazuri, inputurile business lipsa, mismatch-urile de avertizari,
+mismatch-urile de totaluri si mismatch-urile de campuri template/PDF. Pentru debugging mai granular
+se poate rula in continuare:
 
 ```powershell
 pnpm --filter @termopane/calculation test -- reference-offer-harness

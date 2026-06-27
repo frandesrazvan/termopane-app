@@ -75,6 +75,8 @@ production formulas.
 - Pilot reference-offer fixtures are prepared under `fixtures/reference-offers` with synthetic
   redacted examples, a Romanian business-owner collection checklist, sample-output requirements, and
   a pure calculation comparison harness for recreating 10-20 validated historical quotes later.
+  `pnpm reference:validate` reports case count, missing business inputs, warning mismatches, total
+  mismatches, and template/PDF field mismatches without committing private PDFs or customer data.
 
 ## Stack
 
@@ -341,6 +343,7 @@ Run the same checks as CI:
 pnpm install --frozen-lockfile
 pnpm prisma generate
 pnpm env:check-defaults
+pnpm reference:validate
 pnpm lint
 pnpm typecheck
 pnpm test

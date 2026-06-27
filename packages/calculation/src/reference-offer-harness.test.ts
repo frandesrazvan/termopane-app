@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   createReferenceOfferComparisonReport,
   isValidatedHistoricalPackSize,
+  missingBusinessInputKeysForCase,
+  recreateReferenceOfferCase,
   recreateReferenceOfferPack,
   requiredReviewInputKeys,
   validateReferenceOfferCase,
@@ -84,6 +86,10 @@ describe("reference offer harness", () => {
       packId: "synthetic-redacted-pilot-reference-offers",
       packType: "synthetic-pilot",
       caseCount: 2,
+      missingBusinessInputCount: 0,
+      warningMismatchCount: 0,
+      totalMismatchCount: 0,
+      templateFieldMismatchCount: 0,
       validationErrorCount: 0,
       failedCaseCount: 0,
       historicalCaseWindowSatisfied: true,
@@ -92,19 +98,111 @@ describe("reference offer harness", () => {
     expect(report.cases).toEqual([
       {
         caseId: "synthetic-offer-001",
+        reviewStatus: "synthetic-baseline",
         passed: true,
         mismatchCount: 0,
+        missingBusinessInputs: [],
+        warningMismatchCount: 0,
+        totalMismatchCount: 0,
+        templateFieldMismatchCount: 0,
         totalWithVatMinor: 67_116,
         warningCodes: [],
       },
       {
         caseId: "synthetic-offer-002",
+        reviewStatus: "synthetic-baseline",
         passed: true,
         mismatchCount: 0,
+        missingBusinessInputs: [],
+        warningMismatchCount: 0,
+        totalMismatchCount: 0,
+        templateFieldMismatchCount: 0,
         totalWithVatMinor: 64_000,
         warningCodes: ["MANUAL_OVERRIDE_APPLIED"],
       },
     ]);
+  });
+
+  it("supports redacted review statuses and reports missing business inputs", async () => {
+    const pack = await loadSyntheticPack();
+    const blockedCase = {
+      ...pack.cases[0]!,
+      reviewStatus: "blocked-missing-data",
+      dataClassification: "redacted-historical",
+      source: {
+        kind: "redacted-historical-json",
+        originalDocumentAvailable: false,
+        privateArtifactsCommitted: false,
+      },
+      redaction: {
+        customer: "redacted",
+        project: "redacted",
+        sourceDocuments: "none-committed",
+      },
+      businessInputStatus: {
+        ...pack.cases[0]!.businessInputStatus,
+        glassPriceList: "missing",
+        hardwareRules: "requires-business-validation",
+      },
+    } satisfies ReferenceOfferFixturePack["cases"][number];
+    const report = createReferenceOfferComparisonReport({
+      ...pack,
+      packType: "redacted-historical-review",
+      dataClassification: "redacted-historical",
+      cases: [blockedCase],
+    });
+
+    expect(validateReferenceOfferCase(blockedCase).errors).toEqual([]);
+    expect(missingBusinessInputKeysForCase(blockedCase)).toEqual([
+      "glassPriceList",
+      "hardwareRules",
+    ]);
+    expect(report).toMatchObject({
+      caseCount: 1,
+      missingBusinessInputCount: 2,
+      readyForReviewSession: false,
+    });
+    expect(report.cases[0]).toMatchObject({
+      caseId: "synthetic-offer-001",
+      reviewStatus: "blocked-missing-data",
+      missingBusinessInputs: ["glassPriceList", "hardwareRules"],
+    });
+  });
+
+  it("classifies warning, total, and template field mismatches", async () => {
+    const pack = await loadSyntheticPack();
+    const failingCase = {
+      ...pack.cases[0]!,
+      expected: {
+        ...pack.cases[0]!.expected,
+        warningCodes: ["MISSING_GLASS_PRICE"],
+        totals: {
+          ...pack.cases[0]!.expected.totals,
+          totalWithVatMinor: 1,
+        },
+        pdfOutputFields: {
+          ...pack.cases[0]!.expected.pdfOutputFields,
+          templateKey: "template-b",
+        },
+      },
+    } satisfies ReferenceOfferFixturePack["cases"][number];
+    const recreation = recreateReferenceOfferCase(failingCase);
+    const report = createReferenceOfferComparisonReport({
+      ...pack,
+      cases: [failingCase],
+    });
+
+    expect(recreation.passed).toBe(false);
+    expect(recreation.warningMismatches).toHaveLength(1);
+    expect(recreation.totalMismatches).toHaveLength(1);
+    expect(recreation.templateFieldMismatches).toHaveLength(1);
+    expect(report).toMatchObject({
+      warningMismatchCount: 1,
+      totalMismatchCount: 1,
+      templateFieldMismatchCount: 1,
+      failedCaseCount: 1,
+      readyForReviewSession: false,
+    });
   });
 
   it("accepts a 10-case redacted historical comparison pack shape", async () => {
@@ -145,6 +243,15 @@ describe("reference offer harness", () => {
           calculationInput: {
             ...sourceCase.calculationInput,
             quoteId: caseId,
+          },
+          expected: {
+            ...sourceCase.expected,
+            pdfOutputFields: sourceCase.expected.pdfOutputFields
+              ? {
+                  ...sourceCase.expected.pdfOutputFields,
+                  quoteId: caseId,
+                }
+              : undefined,
           },
         };
       }),

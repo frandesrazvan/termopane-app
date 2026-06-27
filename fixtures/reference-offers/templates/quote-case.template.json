@@ -1,0 +1,72 @@
+{
+  "caseId": "redacted-historical-00",
+  "title": "Redacted historical quote 00",
+  "reviewStatus": "blocked-missing-data",
+  "dataClassification": "redacted-historical",
+  "preferredTemplateKey": "template-a",
+  "source": {
+    "kind": "redacted-historical-json",
+    "originalDocumentAvailable": false,
+    "privateArtifactsCommitted": false,
+    "notes": "Redacted JSON only. Original artifacts stay outside Git."
+  },
+  "redaction": {
+    "customer": "redacted",
+    "project": "redacted",
+    "sourceDocuments": "none-committed"
+  },
+  "businessInputStatus": {
+    "profilePriceList": "missing",
+    "glassDeductionRules": "missing",
+    "glassPriceList": "missing",
+    "hardwareRules": "missing",
+    "accessoryServicePrices": "missing",
+    "commercialRules": "missing",
+    "preferredPdfTemplate": "missing",
+    "sampleOutputRequirements": "missing"
+  },
+  "calculationInput": {
+    "quoteId": "redacted-historical-00",
+    "commercialRules": {
+      "markupBasisPoints": 0,
+      "discountBasisPoints": 0,
+      "vatBasisPoints": 0
+    },
+    "items": [
+      {
+        "elementId": "redacted-historical-00-line-1",
+        "type": "custom-line",
+        "description": "Redacted line item",
+        "quantity": 1,
+        "unit": "fixed",
+        "unitPriceMinor": 0
+      }
+    ]
+  },
+  "expected": {
+    "itemCount": 1,
+    "materialRequirementCount": 1,
+    "glassCutCount": 0,
+    "profileGroupCount": 0,
+    "warningCodes": [],
+    "totals": {
+      "materialCostMinor": 0,
+      "markupMinor": 0,
+      "itemDiscountMinor": 0,
+      "quoteDiscountMinor": 0,
+      "discountMinor": 0,
+      "subtotalAfterDiscountMinor": 0,
+      "vatMinor": 0,
+      "totalBeforeManualOverrideMinor": 0,
+      "manualAdjustmentMinor": 0,
+      "totalWithVatMinor": 0
+    },
+    "pdfOutputFields": {
+      "templateKey": "template-a",
+      "quoteId": "redacted-historical-00",
+      "itemCount": 1,
+      "totalWithVatMinor": 0,
+      "warningCodes": []
+    }
+  }
+}
