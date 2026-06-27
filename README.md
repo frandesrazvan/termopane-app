@@ -124,7 +124,7 @@ production formulas.
    A cloud PostgreSQL database is also fine for development. Put its connection string in
    `DATABASE_URL` in `.env`.
 
-5. Apply Prisma and seed synthetic demo data:
+5. Apply committed Prisma migrations and seed synthetic demo data:
 
    ```powershell
    pnpm prisma generate
@@ -132,9 +132,9 @@ production formulas.
    pnpm db:seed
    ```
 
-   The repository currently has a Prisma schema and synthetic seed script, but no committed
-   `prisma/migrations` directory. `pnpm prisma migrate dev` creates local development migration
-   files and applies the schema to your local database.
+   `pnpm prisma migrate dev` applies the committed migrations to your local database and creates a
+   new local migration when `prisma/schema.prisma` changes. `pnpm db:seed` is for synthetic
+   local/development data only; do not run it against pilot or production databases.
 
 6. Start the web app:
 
@@ -156,6 +156,38 @@ Synthetic users seeded for local testing:
 - `dealer@example.test`
 
 Use only synthetic data in fixtures, screenshots, and docs.
+
+## Database Migrations
+
+Committed Prisma migrations live under `prisma/migrations`. The current schema baseline is committed
+there so deployment can use Prisma's reviewed migration flow.
+
+For local schema work:
+
+```powershell
+pnpm prisma migrate dev --name short_descriptive_name
+pnpm prisma generate
+```
+
+Review the generated `migration.sql` before committing it with the schema change. Local seed data is
+optional and should stay synthetic:
+
+```powershell
+pnpm db:seed
+```
+
+For pilot deployment, do not use `prisma migrate dev` or `prisma db push`. Configure the target
+`DATABASE_URL`, generate the Prisma client, build the app, then apply committed migrations:
+
+```bash
+pnpm prisma generate
+pnpm build
+pnpm db:migrate:deploy
+pnpm --filter web start
+```
+
+See `docs/13-database-migrations.md` for SQL review guidance, the exact CI limitation around
+database-backed deploy checks, and seed-data rules.
 
 ## Documents And Storage
 
@@ -226,8 +258,8 @@ pnpm db:migrate:deploy
 pnpm --filter web start
 ```
 
-Because committed Prisma migrations are not present yet, define and review the first migration before
-a real environment deploy. Do not use undocumented `db push` behavior for pilot deployment.
+Review committed Prisma migration SQL before a real environment deploy. Do not use undocumented
+`prisma db push` behavior for pilot deployment.
 
 Configure the host health check path as:
 
