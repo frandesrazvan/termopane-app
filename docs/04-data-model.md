@@ -19,6 +19,11 @@ isolation, quote-version immutability, and snapshot behavior.
   - `id`, `tenantId`, invited email, role, token hash, expiry, accepted timestamp, revoked
     timestamp, creator, timestamps;
   - raw invite tokens are never stored and acceptance is single-use.
+- TenantAsset:
+  - `id`, `tenantId`, asset kind, generated storage key, MIME type, checksum, byte size, uploader,
+    uploaded timestamp;
+  - stores metadata for private tenant assets such as company logos without exposing object-storage
+    keys in UI routes.
 - CompanySettings:
   - `id`, `tenantId`, company legal/display name, address, contact details, logo reference,
     default currency, VAT/tax defaults, default PDF template, PDF terms, warranty, delivery,
@@ -333,6 +338,18 @@ when no currency is supplied, generates quote numbers from `QuoteNumberSettings`
 next number only after the quote shell is created. Unique quote-number collisions retry the next
 tenant sequence number before returning a controlled collision error. Company and quote-number
 changes create `AuditLog` rows with `SETTINGS_UPDATED` or `QUOTE_NUMBERING_UPDATED`.
+
+## COD-037 tenant branding asset notes
+
+Company logos are represented as tenant-owned `TenantAsset` metadata rows plus private bytes in the
+configured document storage provider. `CompanySettings.logoAssetId` and `CompanySettings.logoUrl`
+point to the current logo through an authenticated app route. The raw storage key stays server-side,
+and logo reads require the current tenant context before object storage is accessed.
+
+Logo uploads are settings mutations: OWNER/ADMIN users can create a new company-logo asset and
+update company settings, while ESTIMATOR and DEALER users cannot mutate logo metadata. Existing
+quote-version snapshots keep their stored `logoAssetId`/`logoUrl` reference and fall back to text
+branding if the logo is unavailable.
 
 ## COD-028 door item notes
 

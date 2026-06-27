@@ -31,6 +31,7 @@ import {
   type ServiceItem,
   type Supplier,
   type TaxRate,
+  type TenantAsset,
   type UserPreference,
 } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -163,6 +164,7 @@ function testState(): TestState {
     serviceItem: delegate([] as ServiceItem[]),
     supplier: delegate([] as Supplier[]),
     taxRate: delegate([] as TaxRate[]),
+    tenantAsset: delegate([] as TenantAsset[]),
     userPreference: delegate([] as UserPreference[]),
   };
 
@@ -266,6 +268,48 @@ describe("quote PDF generation", () => {
     );
 
     expect(snapshot.templateKey).toBe("template-b");
+  });
+
+  it("includes a same-tenant company logo route in Template A and B snapshots", () => {
+    const version = quoteVersion({
+      companySettingsSnapshot: {
+        displayName: "Synthetic Company",
+        logoAssetId: "logo-asset-a",
+        logoUrl: "/dashboard/settings/logo/logo-asset-a",
+      },
+    });
+
+    const templateA = buildQuotePdfOfferSnapshot(quote({}), version, [], "template-a");
+    const templateB = buildQuotePdfOfferSnapshot(quote({}), version, [], "template-b");
+
+    expect(templateA.company.logoUrl).toBe("/dashboard/settings/logo/logo-asset-a");
+    expect(templateB.company.logoUrl).toBe("/dashboard/settings/logo/logo-asset-a");
+  });
+
+  it("uses the missing-logo fallback when the logo reference is absent or mismatched", () => {
+    const withoutLogo = buildQuotePdfOfferSnapshot(
+      quote({}),
+      quoteVersion({
+        companySettingsSnapshot: {
+          displayName: "Synthetic Company",
+        },
+      }),
+      [],
+    );
+    const mismatchedLogo = buildQuotePdfOfferSnapshot(
+      quote({}),
+      quoteVersion({
+        companySettingsSnapshot: {
+          displayName: "Synthetic Company",
+          logoAssetId: "logo-asset-a",
+          logoUrl: "/dashboard/settings/logo/logo-asset-b",
+        },
+      }),
+      [],
+    );
+
+    expect(withoutLogo.company.logoUrl).toBeUndefined();
+    expect(mismatchedLogo.company.logoUrl).toBeUndefined();
   });
 
   it("includes door customer-facing fields in preview snapshots without internal costs", () => {

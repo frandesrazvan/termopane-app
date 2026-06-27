@@ -26,6 +26,7 @@ import {
   type ServiceItem,
   type Supplier,
   type TaxRate,
+  type TenantAsset,
   type UserPreference,
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
@@ -148,6 +149,7 @@ function testState({
     serviceItem: delegate([] as ServiceItem[]),
     supplier: delegate([] as Supplier[]),
     taxRate: delegate([] as TaxRate[]),
+    tenantAsset: delegate([] as TenantAsset[]),
     userPreference: delegate([] as UserPreference[]),
   };
 

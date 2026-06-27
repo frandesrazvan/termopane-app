@@ -196,6 +196,16 @@ The settings UI uses Romanian labels including:
 - `Preferințe utilizator`;
 - `Scurtături panou`.
 
+## COD-037 Company Branding Labels
+
+The company logo upload UI uses Romanian labels including:
+
+- `Logo companie`;
+- `FÄƒrÄƒ logo`;
+- `FiÈ™ier logo companie`;
+- `ÃŽncarcÄƒ logo`;
+- `Doar OWNER È™i ADMIN pot modifica logo-ul companiei`.
+
 ## COD-028 Door Item Labels
 
 Door quote item UI and customer-facing output use Romanian labels including:

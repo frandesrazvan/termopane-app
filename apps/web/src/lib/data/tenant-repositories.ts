@@ -34,6 +34,7 @@ import {
   type QuoteNumberSettings,
   type QuoteVersion,
   type SavedFilter,
+  type TenantAsset,
   type UserPreference,
 } from "@prisma/client";
 import type { TenantContext } from "../auth/tenant-context";
@@ -114,6 +115,7 @@ export type TenantDataClient = {
   serviceItem: TenantWritableModelDelegate<ServiceItem>;
   supplier: TenantWritableModelDelegate<Supplier>;
   taxRate: TenantWritableModelDelegate<TaxRate>;
+  tenantAsset: TenantWritableModelDelegate<TenantAsset>;
   userPreference: TenantWritableModelDelegate<UserPreference>;
   $transaction?: <TResult>(
     operation: (transactionClient: TenantDataClient) => Promise<TResult>,
@@ -203,6 +205,19 @@ export type TenantCompanySettingsWriteInput = {
   advancePaymentText?: string | null;
   pdfFooterText?: string | null;
   actorUserId?: string | null;
+};
+
+export type TenantCompanyLogoAssetWriteInput = {
+  assetId: string;
+  storageKey: string;
+  mimeType: string;
+  checksum: string;
+  byteSize: number;
+  logoUrl: string;
+  uploadedById?: string | null;
+  uploadedAt?: Date;
+  fallbackDisplayName: string;
+  fallbackLegalName: string;
 };
 
 export type TenantQuoteNumberSettingsWriteInput = {
@@ -1620,6 +1635,15 @@ export function createTenantDataAccess(
       });
     },
 
+    getTenantCompanyLogoAsset(scope: TenantDataScope, assetId: string) {
+      return client.tenantAsset.findFirst({
+        where: tenantWhere(scope, {
+          id: assetId,
+          kind: "company-logo",
+        }),
+      });
+    },
+
     async updateTenantCompanySettings(
       scope: TenantDataScope,
       settingsId: string | null,
@@ -1673,6 +1697,75 @@ export function createTenantDataAccess(
         });
 
         return { record, auditLog };
+      });
+    },
+
+    async updateTenantCompanyLogoAsset(
+      scope: TenantDataScope,
+      data: TenantCompanyLogoAssetWriteInput,
+    ): Promise<TenantAuditedSettingsResult<CompanySettings> & { asset: TenantAsset }> {
+      return runTenantDataTransaction(client, async (transactionClient) => {
+        const transactionAccess = createTenantDataAccess(
+          transactionClient,
+          options,
+        );
+        const tenantId = tenantIdFromScope(scope);
+        const existing = await transactionAccess.getTenantCompanySettings(scope);
+        const asset = await transactionClient.tenantAsset.create({
+          data: {
+            id: data.assetId,
+            tenantId,
+            kind: "company-logo",
+            storageKey: data.storageKey,
+            mimeType: data.mimeType,
+            checksum: data.checksum,
+            byteSize: data.byteSize,
+            uploadedById: data.uploadedById ?? null,
+            uploadedAt: data.uploadedAt ?? now(),
+          },
+        });
+        const logoData = {
+          logoAssetId: asset.id,
+          logoUrl: data.logoUrl,
+        };
+        const record = existing
+          ? await transactionClient.companySettings.update({
+              where: { id: existing.id },
+              data: logoData,
+            })
+          : await transactionClient.companySettings.create({
+              data: {
+                tenantId,
+                legalName: data.fallbackLegalName,
+                displayName: data.fallbackDisplayName,
+                defaultCurrency: "RON",
+                defaultPdfTemplate: "template-a",
+                ...logoData,
+              },
+            });
+
+        const auditLog = await transactionClient.auditLog.create({
+          data: {
+            tenantId,
+            actorUserId: data.uploadedById ?? null,
+            action: AuditAction.SETTINGS_UPDATED,
+            entityType: "CompanySettings",
+            entityId: record.id,
+            beforeSnapshot: existing
+              ? companySettingsAuditSnapshot(existing)
+              : null,
+            afterSnapshot: companySettingsAuditSnapshot(record),
+            metadata: {
+              settingsType: "company-logo",
+              logoAssetId: asset.id,
+              mimeType: asset.mimeType,
+              byteSize: asset.byteSize,
+              checksum: asset.checksum,
+            },
+          },
+        });
+
+        return { record, auditLog, asset };
       });
     },
 
@@ -3042,12 +3135,23 @@ export function getTenantCompanySettingsById(
   return tenantDataAccess.getTenantCompanySettingsById(scope, settingsId);
 }
 
+export function getTenantCompanyLogoAsset(scope: TenantDataScope, assetId: string) {
+  return tenantDataAccess.getTenantCompanyLogoAsset(scope, assetId);
+}
+
 export function updateTenantCompanySettings(
   scope: TenantDataScope,
   settingsId: string | null,
   data: TenantCompanySettingsWriteInput,
 ) {
   return tenantDataAccess.updateTenantCompanySettings(scope, settingsId, data);
+}
+
+export function updateTenantCompanyLogoAsset(
+  scope: TenantDataScope,
+  data: TenantCompanyLogoAssetWriteInput,
+) {
+  return tenantDataAccess.updateTenantCompanyLogoAsset(scope, data);
 }
 
 export function getTenantQuoteNumberSettings(scope: TenantDataScope) {
@@ -3792,6 +3896,7 @@ function companySettingsSnapshot(companySettings: CompanySettings | null) {
     phone: companySettings.phone,
     email: companySettings.email,
     website: companySettings.website,
+    logoAssetId: companySettings.logoAssetId,
     logoUrl: companySettings.logoUrl,
     defaultCurrency: companySettings.defaultCurrency,
     defaultPdfTemplate: companySettings.defaultPdfTemplate,
@@ -3917,6 +4022,8 @@ function companySettingsAuditSnapshot(companySettings: CompanySettings) {
     phone: companySettings.phone,
     email: companySettings.email,
     website: companySettings.website,
+    logoAssetId: companySettings.logoAssetId,
+    logoUrl: companySettings.logoUrl,
     defaultCurrency: companySettings.defaultCurrency,
     defaultPdfTemplate: companySettings.defaultPdfTemplate,
     vatRateBasisPoints: companySettings.vatRateBasisPoints,

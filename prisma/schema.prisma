@@ -162,6 +162,7 @@ model Tenant {
   savedFilters        SavedFilter[]
   serviceItems        ServiceItem[]
   suppliers           Supplier[]
+  tenantAssets        TenantAsset[]
   taxRates            TaxRate[]
   userPreferences     UserPreference[]
 
@@ -187,6 +188,7 @@ model User {
   memberships          TenantMember[]
   preferences          UserPreference[]
   savedFilters         SavedFilter[]
+  uploadedTenantAssets TenantAsset[]    @relation("TenantAssetUploadedBy")
 
   @@index([email])
 }
@@ -250,6 +252,7 @@ model CompanySettings {
   email               String?
   website             String?
   logoUrl             String?
+  logoAssetId         String?
   defaultCurrency     String   @default("RON")
   defaultPdfTemplate  String   @default("template-a")
   vatRateBasisPoints  Int?
@@ -266,6 +269,25 @@ model CompanySettings {
   tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+}
+
+model TenantAsset {
+  id           String   @id @default(cuid())
+  tenantId     String
+  kind         String
+  storageKey   String
+  mimeType     String
+  checksum     String
+  byteSize     Int
+  uploadedById String?
+  uploadedAt   DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy   User?    @relation("TenantAssetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, storageKey])
+  @@index([tenantId, kind, uploadedAt])
+  @@index([tenantId, checksum])
+  @@index([uploadedById])
 }
 
 model QuoteNumberSettings {
