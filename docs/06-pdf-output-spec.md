@@ -206,3 +206,21 @@ internal notes, internal material costs, and calculation traces remain excluded 
 
 Door drawings are schematic only. They show a rectangular door with optional glass/panel split and
 dimension labels; they do not represent production fabrication geometry.
+
+## COD-037 company logo and branding notes
+
+Company logos are uploaded from tenant settings by OWNER/ADMIN users and stored as private tenant
+assets through the configured document storage provider. Uploads accept PNG, JPEG, and WebP only;
+SVG is blocked until a sanitizer exists, and generated storage paths never use the user-supplied
+file name.
+
+`CompanySettings.logoUrl` points to an authenticated app route such as
+`/dashboard/settings/logo/<assetId>`, while the underlying storage key, MIME type, checksum, byte
+size, uploader, and upload time are stored in `TenantAsset`. Quote-version company snapshots include
+the logo URL only when it matches the snapshotted logo asset id. Missing or mismatched logo data
+falls back to text company branding.
+
+Template A and Template B HTML output render the logo when the authenticated route can serve it for
+the same tenant. The current lightweight PDF binary renderer preserves company name/contact text as
+the fallback brand surface; future image embedding must keep tenant-scoped asset access and avoid
+printing storage keys or uploaded file names.

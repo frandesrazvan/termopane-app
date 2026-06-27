@@ -80,3 +80,13 @@ Catalog CSV import and export are restricted to OWNER and ADMIN memberships. Thi
 as well as imports because price-list item CSV files can include internal cost columns. ESTIMATOR and
 DEALER users can continue to read permitted catalog screens but cannot download or publish catalog
 CSV files.
+
+## COD-035 invite permissions
+
+Tenant user onboarding uses invite links with single-use hashed tokens. The current permission model
+keeps user management owner-only, so OWNER memberships can create invites and ADMIN memberships
+cannot invite until the model explicitly grants that capability. ESTIMATOR and DEALER memberships
+cannot create invites.
+
+Invite acceptance activates only the invited tenant membership. A disabled membership cannot be
+reactivated by accepting a new invite; an owner must resolve that account state intentionally.

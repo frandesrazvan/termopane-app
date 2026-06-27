@@ -11,8 +11,14 @@ production formulas.
 - Authentication, tenant context, role permissions, customer/project records, saved quote shells,
   draft quote items, calculation wiring, quote lifecycle, and Template A/B HTML previews are
   present.
+- Production-safe pilot login now uses tenant invite links with hashed single-use tokens. Tenant
+  OWNER users can create invite links from settings; real email delivery remains stubbed/manual until
+  a future provider task.
 - PDF generation, local document storage, immutable `Document` records, selected template keys, and
   audit logging are present for generated quote documents.
+- Tenant company logo upload is available from `/dashboard/settings` for OWNER/ADMIN users. Logos
+  are stored as private tenant assets through the document storage provider and referenced in
+  Template A/B quote snapshots through authenticated tenant routes.
 - Locked quote versions with generated PDFs can be marked as sent. The workflow records `QUOTE_SENT`,
   `sentAt`, the intended recipient/document stub metadata, and shows a Romanian customer-safe
   confirmation/download screen. Real email delivery is still stubbed unless a future provider is
@@ -20,8 +26,8 @@ production formulas.
 - Document storage now goes through a provider interface. The local provider remains the default
   for dev/test, and an SDK-backed S3-compatible provider is available for deployable object storage.
 - Production deployment hardening now includes runtime env validation, production dev-login blocking,
-  `/api/health`, PII-redacting server logging helpers, a storage smoke test command, and a Render
-  pilot deployment checklist.
+  `/api/health`, PII-redacting server logging helpers, storage and full pilot smoke test commands,
+  and a Render pilot deployment checklist.
 - Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
   glass packages, hardware kits, colors, accessories, services, tax rates, price lists, price-list
   items, and pricing rules.
@@ -126,7 +132,7 @@ production formulas.
    A cloud PostgreSQL database is also fine for development. Put its connection string in
    `DATABASE_URL` in `.env`.
 
-5. Apply Prisma and seed synthetic demo data:
+5. Apply committed Prisma migrations and seed synthetic demo data:
 
    ```powershell
    pnpm prisma generate
@@ -134,9 +140,9 @@ production formulas.
    pnpm db:seed
    ```
 
-   The repository currently has a Prisma schema and synthetic seed script, but no committed
-   `prisma/migrations` directory. `pnpm prisma migrate dev` creates local development migration
-   files and applies the schema to your local database.
+   `pnpm prisma migrate dev` applies the committed migrations to your local database and creates a
+   new local migration when `prisma/schema.prisma` changes. `pnpm db:seed` is for synthetic
+   local/development data only; do not run it against pilot or production databases.
 
 6. Start the web app:
 
@@ -146,7 +152,8 @@ production formulas.
 
 The web app runs at `http://localhost:3000` by default. Development login requires
 `AUTH_DEV_LOGIN_ENABLED="true"` in your local `.env`; `.env.example` keeps it disabled by default so
-it is not accidentally copied into production.
+it is not accidentally copied into production. Production and pilot users should sign in through
+tenant invite links, not through development login.
 
 ## Seed Users
 
@@ -158,6 +165,55 @@ Synthetic users seeded for local testing:
 - `dealer@example.test`
 
 Use only synthetic data in fixtures, screenshots, and docs.
+
+## Authentication And Invites
+
+Pilot authentication uses a minimal invite-token and passwordless link foundation:
+
+- OWNER users create invites from `/dashboard/settings`;
+- each invite stores the invited email, tenant, role, token hash, expiry, accepted timestamp, and
+  revoked timestamp;
+- the raw token is shown only once as a manual delivery link because real email sending is still
+  stubbed;
+- invite acceptance asks the user to confirm the invited email and then sets the existing HTTP-only
+  session cookie;
+- expired, revoked, already accepted, cross-tenant, or disabled-membership invites are rejected.
+
+Keep `AUTH_DEV_LOGIN_ENABLED="false"` for pilot and production. Local development login remains
+available only when explicitly enabled outside production and only for synthetic `@example.test`
+seed users.
+
+## Database Migrations
+
+Committed Prisma migrations live under `prisma/migrations`. The current schema baseline is committed
+there so deployment can use Prisma's reviewed migration flow.
+
+For local schema work:
+
+```powershell
+pnpm prisma migrate dev --name short_descriptive_name
+pnpm prisma generate
+```
+
+Review the generated `migration.sql` before committing it with the schema change. Local seed data is
+optional and should stay synthetic:
+
+```powershell
+pnpm db:seed
+```
+
+For pilot deployment, do not use `prisma migrate dev` or `prisma db push`. Configure the target
+`DATABASE_URL`, generate the Prisma client, build the app, then apply committed migrations:
+
+```bash
+pnpm prisma generate
+pnpm build
+pnpm db:migrate:deploy
+pnpm --filter web start
+```
+
+See `docs/13-database-migrations.md` for SQL review guidance, the exact CI limitation around
+database-backed deploy checks, and seed-data rules.
 
 ## Documents And Storage
 
@@ -188,6 +244,11 @@ PDF generation passes a requested storage key to the provider, then persists the
 provider on the immutable `Document` row. If metadata creation fails after storage succeeds, the app
 attempts to delete the returned storage key so failed generations do not leave orphaned files.
 
+Company logo uploads use the same storage provider. Uploaded logos are stored under generated
+tenant asset keys, accept PNG/JPEG/WebP only, block SVG, and store metadata in tenant-owned
+`TenantAsset` records. The settings UI exposes only an authenticated app route for logo preview, not
+the underlying storage key.
+
 No real bucket integration tests run in CI. Validate bucket credentials, endpoint behavior,
 path-style settings, lifecycle/retention policy, and object access controls in the target
 environment before using `DOCUMENT_STORAGE_PROVIDER="s3"` for live PDF delivery.
@@ -197,6 +258,32 @@ Run the storage smoke test after setting target storage env values:
 ```powershell
 pnpm storage:smoke
 ```
+
+`pnpm storage:smoke` validates only the configured document storage provider. Use the full pilot
+smoke command below when you also need runtime, health, database, tenant/user bootstrap, and
+quote/PDF basics.
+
+## Pilot Smoke Test
+
+Run the full pilot smoke test after configuring the target environment:
+
+```powershell
+pnpm pilot:smoke
+```
+
+Set `BASE_URL` when checking a deployed web service so the script also calls `/api/health`:
+
+```powershell
+$env:BASE_URL="https://your-pilot-host.example"
+pnpm pilot:smoke
+```
+
+The command uses existing runtime validators, performs a synthetic storage write/read/delete,
+checks the Prisma connection, verifies at least one tenant/user/active membership exists, renders a
+synthetic PDF in memory, and inspects seeded synthetic quote metadata when present. It prints issue
+codes only and does not print secrets, emails, tokens, cookies, or customer records. See
+`docs/14-pilot-smoke-tests.md` for failure meanings and the difference between `storage:smoke` and
+`pilot:smoke`.
 
 ## Deployment Readiness
 
@@ -228,8 +315,14 @@ pnpm db:migrate:deploy
 pnpm --filter web start
 ```
 
-Because committed Prisma migrations are not present yet, define and review the first migration before
-a real environment deploy. Do not use undocumented `db push` behavior for pilot deployment.
+Review committed Prisma migration SQL before a real environment deploy. Do not use undocumented
+`prisma db push` behavior for pilot deployment.
+
+After migrations and service startup, run:
+
+```bash
+pnpm pilot:smoke
+```
 
 Configure the host health check path as:
 
@@ -237,9 +330,10 @@ Configure the host health check path as:
 /api/health
 ```
 
-Do not enable development login in production, do not store S3 credentials in source control, and do
-not expose bucket credentials to browser-side code. CI runs `pnpm env:check-defaults` to ensure
-unsafe production defaults are not enabled in `.env.example`.
+Do not enable development login in production, do not use dev-login as the pilot auth method, do not
+store S3 credentials in source control, and do not expose bucket credentials to browser-side code. CI
+runs `pnpm env:check-defaults` to ensure unsafe production defaults are not enabled in
+`.env.example`.
 
 ## Validation
 
@@ -256,6 +350,12 @@ pnpm test
 pnpm build
 ```
 
+For pilot deployment verification, also run:
+
+```powershell
+pnpm pilot:smoke
+```
+
 Or run the aggregate local check after dependencies are installed:
 
 ```powershell
@@ -269,17 +369,17 @@ pnpm verify
 - `packages/drawing`: deterministic SVG schematic renderer.
 - `packages/pdf`: Template A and Template B HTML/PDF rendering package.
 - `prisma`: schema, migrations, and synthetic seed entrypoint.
-- `scripts`: operational checks such as env-default and storage smoke tests.
+- `scripts`: operational checks such as env-default, storage smoke, and pilot smoke tests.
 - `docs`: product, data, calculation, PDF, UX, and tasking docs.
 
 ## Not Done Yet
 
 - Real bucket integration tests.
-- Real email-provider integration for customer delivery.
+- Real email-provider integration for auth invite delivery and customer delivery.
 - Advanced pricing-rule selection inside the quote builder.
 - Production-ready door formulas for panels, locks, thresholds, reinforcement, and fabrication.
 - Real production formulas or supplier-specific pricing rules.
-- Logo upload and richer account/user-management workflows.
+- Richer account/user-management workflows beyond pilot invites.
 - Invoicing, ERP, CNC export, stock, or accounting integrations.
 
 ## Scope Guardrails

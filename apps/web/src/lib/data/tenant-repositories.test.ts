@@ -33,6 +33,7 @@ import {
   type QuoteNumberSettings,
   type QuoteVersion,
   type SavedFilter,
+  type TenantAsset,
   type UserPreference,
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
@@ -784,6 +785,30 @@ function testClient(
       ] as SavedFilter[],
       { unique: [["tenantId", "userId", "name"]] },
     ),
+    tenantAsset: delegate([
+      {
+        id: "logo-a",
+        tenantId: "tenant-a",
+        kind: "company-logo",
+        storageKey: "tenant-assets/tenant-a/company-logo/logo-a.png",
+        mimeType: "image/png",
+        checksum: "checksum-a",
+        byteSize: 128,
+        uploadedById: "user-a",
+        uploadedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "logo-b",
+        tenantId: "tenant-b",
+        kind: "company-logo",
+        storageKey: "tenant-assets/tenant-b/company-logo/logo-b.png",
+        mimeType: "image/png",
+        checksum: "checksum-b",
+        byteSize: 128,
+        uploadedById: "user-b",
+        uploadedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ] as TenantAsset[]),
     userPreference: delegate(
       [
         {
@@ -1614,6 +1639,79 @@ describe("tenant repositories", () => {
         defaultPdfTemplate: "template-b",
       },
     });
+  });
+
+  it("stores company logo metadata inside the current tenant", async () => {
+    const auditLogs: AuditLog[] = [];
+    const data = createTenantDataAccess(testClient({ auditLogs }));
+    const uploadedAt = new Date("2026-06-27T12:00:00.000Z");
+    const result = await data.updateTenantCompanyLogoAsset(
+      { tenantId: "tenant-a" },
+      {
+        assetId: "logo-new",
+        byteSize: 512,
+        checksum: "checksum-new",
+        fallbackDisplayName: "Tenant A",
+        fallbackLegalName: "Tenant A SRL",
+        logoUrl: "/dashboard/settings/logo/logo-new",
+        mimeType: "image/png",
+        storageKey: "tenant-assets/tenant-a/company-logo/logo-new.png",
+        uploadedAt,
+        uploadedById: "owner-a",
+      },
+    );
+
+    expect(result.asset).toMatchObject({
+      id: "logo-new",
+      tenantId: "tenant-a",
+      kind: "company-logo",
+      storageKey: "tenant-assets/tenant-a/company-logo/logo-new.png",
+      mimeType: "image/png",
+      checksum: "checksum-new",
+      byteSize: 512,
+      uploadedById: "owner-a",
+      uploadedAt,
+    });
+    expect(result.record).toMatchObject({
+      id: "settings-a",
+      tenantId: "tenant-a",
+      logoAssetId: "logo-new",
+      logoUrl: "/dashboard/settings/logo/logo-new",
+    });
+    await expect(
+      data.getTenantCompanyLogoAsset({ tenantId: "tenant-a" }, "logo-new"),
+    ).resolves.toMatchObject({
+      id: "logo-new",
+      tenantId: "tenant-a",
+      storageKey: "tenant-assets/tenant-a/company-logo/logo-new.png",
+    });
+    await expect(
+      data.getTenantCompanyLogoAsset({ tenantId: "tenant-b" }, "logo-new"),
+    ).resolves.toBeNull();
+    expect(auditLogs).toEqual([
+      expect.objectContaining({
+        tenantId: "tenant-a",
+        actorUserId: "owner-a",
+        action: AuditAction.SETTINGS_UPDATED,
+        entityType: "CompanySettings",
+        entityId: "settings-a",
+        metadata: {
+          settingsType: "company-logo",
+          logoAssetId: "logo-new",
+          mimeType: "image/png",
+          byteSize: 512,
+          checksum: "checksum-new",
+        },
+      }),
+    ]);
+  });
+
+  it("rejects cross-tenant company logo asset reads", async () => {
+    const data = createTenantDataAccess(testClient());
+
+    await expect(
+      data.getTenantCompanyLogoAsset({ tenantId: "tenant-a" }, "logo-b"),
+    ).resolves.toBeNull();
   });
 
   it("rejects cross-tenant settings updates", async () => {

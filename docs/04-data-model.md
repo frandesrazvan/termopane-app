@@ -15,6 +15,15 @@ isolation, quote-version immutability, and snapshot behavior.
 - Membership:
   - `id`, `tenantId`, `userId`, `role`, permission flags, status, timestamps;
   - unique per tenant/user pair unless the auth model requires otherwise.
+- TenantInvite:
+  - `id`, `tenantId`, invited email, role, token hash, expiry, accepted timestamp, revoked
+    timestamp, creator, timestamps;
+  - raw invite tokens are never stored and acceptance is single-use.
+- TenantAsset:
+  - `id`, `tenantId`, asset kind, generated storage key, MIME type, checksum, byte size, uploader,
+    uploaded timestamp;
+  - stores metadata for private tenant assets such as company logos without exposing object-storage
+    keys in UI routes.
 - CompanySettings:
   - `id`, `tenantId`, company legal/display name, address, contact details, logo reference,
     default currency, VAT/tax defaults, default PDF template, PDF terms, warranty, delivery,
@@ -136,6 +145,18 @@ Tenant-owned data access must call server-side tenant-context helpers before que
 Dealer/restricted users do not see internal costs by default. Owner/admin roles can manage catalog
 and generate PDFs; user management is owner-only until an explicit per-member user-management
 permission is added.
+
+## COD-035 production auth and invite notes
+
+The pilot production auth path is a minimal invite-token plus email-confirmation flow. `TenantInvite`
+is tenant-owned and stores only a hash of the one-time token. Invites expire, can be revoked, and are
+marked accepted after first use. Acceptance requires the token, tenant id, and matching invited
+email; it creates or activates the `TenantMember` for that tenant and sets the existing signed
+session cookie.
+
+Dev login remains a local-only synthetic seed-user path gated by `AUTH_DEV_LOGIN_ENABLED=true` and is
+blocked in production. Real email delivery is not implemented in this task; owner-created invite
+links are delivered manually until a provider is added.
 
 ## COD-006 tenant-scoped data access notes
 
@@ -317,6 +338,18 @@ when no currency is supplied, generates quote numbers from `QuoteNumberSettings`
 next number only after the quote shell is created. Unique quote-number collisions retry the next
 tenant sequence number before returning a controlled collision error. Company and quote-number
 changes create `AuditLog` rows with `SETTINGS_UPDATED` or `QUOTE_NUMBERING_UPDATED`.
+
+## COD-037 tenant branding asset notes
+
+Company logos are represented as tenant-owned `TenantAsset` metadata rows plus private bytes in the
+configured document storage provider. `CompanySettings.logoAssetId` and `CompanySettings.logoUrl`
+point to the current logo through an authenticated app route. The raw storage key stays server-side,
+and logo reads require the current tenant context before object storage is accessed.
+
+Logo uploads are settings mutations: OWNER/ADMIN users can create a new company-logo asset and
+update company settings, while ESTIMATOR and DEALER users cannot mutate logo metadata. Existing
+quote-version snapshots keep their stored `logoAssetId`/`logoUrl` reference and fall back to text
+branding if the logo is unavailable.
 
 ## COD-028 door item notes
 

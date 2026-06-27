@@ -7,7 +7,7 @@
     "build": "pnpm -r --if-present build",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test && tsx tests/prisma-schema-invariants.test.ts",
+    "test": "pnpm -r --if-present test && tsx tests/prisma-schema-invariants.test.ts && tsx tests/smoke-pilot-deployment.test.ts",
     "reference:validate": "tsx packages/calculation/src/reference-offer-validate.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "verify": "pnpm prisma generate && pnpm check",
@@ -17,7 +17,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "env:check-defaults": "tsx scripts/check-production-env-defaults.ts",
-    "storage:smoke": "tsx scripts/smoke-document-storage.ts"
+    "storage:smoke": "tsx scripts/smoke-document-storage.ts",
+    "pilot:smoke": "tsx scripts/smoke-pilot-deployment.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -33,6 +33,7 @@ describe("safe logger", () => {
     logger.warn("auth.dev_login.rejected", {
       reason: "unsupported_domain",
       attemptedEmail: "client@example.test",
+      inviteToken: "raw-invite-token",
     });
 
     expect(entries).toEqual([
@@ -42,6 +43,7 @@ describe("safe logger", () => {
         metadata: {
           reason: "unsupported_domain",
           attemptedEmail: "[redacted]",
+          inviteToken: "[redacted]",
         },
       },
     ]);

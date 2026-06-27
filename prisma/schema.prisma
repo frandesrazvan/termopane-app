@@ -146,6 +146,7 @@ model Tenant {
   documents           Document[]
   glassPackages       GlassPackage[]
   hardwareKits        HardwareKit[]
+  invites             TenantInvite[]
   members             TenantMember[]
   priceListItems      PriceListItem[]
   priceLists          PriceList[]
@@ -161,6 +162,7 @@ model Tenant {
   savedFilters        SavedFilter[]
   serviceItems        ServiceItem[]
   suppliers           Supplier[]
+  tenantAssets        TenantAsset[]
   taxRates            TaxRate[]
   userPreferences     UserPreference[]
 
@@ -181,9 +183,12 @@ model User {
   createdQuotes        Quote[]          @relation("QuoteCreatedBy")
   createdQuoteVersions QuoteVersion[]   @relation("QuoteVersionCreatedBy")
   generatedDocuments   Document[]       @relation("DocumentGeneratedBy")
+  acceptedInvites      TenantInvite[]   @relation("TenantInviteAcceptedBy")
+  createdInvites       TenantInvite[]   @relation("TenantInviteCreatedBy")
   memberships          TenantMember[]
   preferences          UserPreference[]
   savedFilters         SavedFilter[]
+  uploadedTenantAssets TenantAsset[]    @relation("TenantAssetUploadedBy")
 
   @@index([email])
 }
@@ -209,6 +214,29 @@ model TenantMember {
   @@index([userId])
 }
 
+model TenantInvite {
+  id           String     @id @default(cuid())
+  tenantId     String
+  email        String
+  role         TenantRole
+  tokenHash    String     @unique
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  acceptedById String?
+  revokedAt    DateTime?
+  createdById  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  acceptedBy   User?      @relation("TenantInviteAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  createdBy    User?      @relation("TenantInviteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, email])
+  @@index([tenantId, role])
+  @@index([tenantId, expiresAt])
+  @@index([tenantId, acceptedAt, revokedAt])
+}
+
 model CompanySettings {
   id                  String   @id @default(cuid())
   tenantId            String   @unique
@@ -224,6 +252,7 @@ model CompanySettings {
   email               String?
   website             String?
   logoUrl             String?
+  logoAssetId         String?
   defaultCurrency     String   @default("RON")
   defaultPdfTemplate  String   @default("template-a")
   vatRateBasisPoints  Int?
@@ -240,6 +269,25 @@ model CompanySettings {
   tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+}
+
+model TenantAsset {
+  id           String   @id @default(cuid())
+  tenantId     String
+  kind         String
+  storageKey   String
+  mimeType     String
+  checksum     String
+  byteSize     Int
+  uploadedById String?
+  uploadedAt   DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy   User?    @relation("TenantAssetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, storageKey])
+  @@index([tenantId, kind, uploadedAt])
+  @@index([tenantId, checksum])
+  @@index([uploadedById])
 }
 
 model QuoteNumberSettings {

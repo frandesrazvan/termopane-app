@@ -1,19 +1,25 @@
-import { Building2, Hash, Save, Settings, UserCog } from "lucide-react";
-import { QuoteNumberDatePattern } from "@prisma/client";
+import { Building2, Hash, ImageIcon, Save, Settings, Upload, UserCog, UserPlus } from "lucide-react";
+import { QuoteNumberDatePattern, type CompanySettings, type TenantAsset } from "@prisma/client";
 import Link from "next/link";
 import {
   canManageCompanySettings,
   canManageQuoteNumbering,
+  canManageUsers,
+  listTenantInvites,
   requireTenant,
 } from "@/lib/auth";
 import {
   getTenantCompanySettings,
+  getTenantCompanyLogoAsset,
   getTenantQuoteNumberSettings,
   getTenantUserPreference,
   previewTenantQuoteNumber,
 } from "@/lib/data";
+import { formatDateTimeRo, tenantRoleLabel } from "@/lib/i18n";
+import { InviteUserForm } from "./invite-user-form";
 import {
   updateCompanySettingsAction,
+  uploadCompanyLogoAction,
   updateQuoteNumberSettingsAction,
   updateUserPreferencesAction,
 } from "./actions";
@@ -47,6 +53,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   ]);
   const canEditCompany = canManageCompanySettings(context.membership);
   const canEditNumbering = canManageQuoteNumbering(context.membership);
+  const canInviteUsers = canManageUsers(context.membership);
+  const tenantInvites = canInviteUsers ? await listTenantInvites(context) : [];
+  const companyLogoAsset = companySettings?.logoAssetId
+    ? await getTenantCompanyLogoAsset(context, companySettings.logoAssetId)
+    : null;
   const numberingDefaults = quoteNumberSettings ?? {
     prefix: "OF",
     nextNumber: 1,
@@ -94,6 +105,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               icon={Building2}
               title="Companie și PDF"
               status={canEditCompany ? "Editabil" : "Doar citire"}
+            />
+            <CompanyLogoPanel
+              asset={companyLogoAsset}
+              canEdit={canEditCompany}
+              settings={companySettings}
             />
             <form action={updateCompanySettingsAction} className="mt-5 grid gap-4">
               <input name="settingsId" type="hidden" value={companySettings?.id ?? ""} />
@@ -288,6 +304,52 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           </section>
 
           <section className="rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
+            <SectionHeading
+              icon={UserPlus}
+              title="Utilizatori și invitații"
+              status={canInviteUsers ? "Owner" : "Doar proprietar"}
+            />
+            {canInviteUsers ? (
+              <div className="mt-5 grid gap-5">
+                <InviteUserForm />
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-900">Invitații recente</h3>
+                  <div className="mt-3 grid gap-2">
+                    {tenantInvites.length > 0 ? (
+                      tenantInvites.map((invite) => (
+                        <div
+                          key={invite.id}
+                          className="grid gap-2 rounded-md border border-zinc-200 bg-stone-50 p-3 text-sm text-zinc-700 sm:grid-cols-[1fr_auto]"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-zinc-950">{invite.email}</p>
+                            <p className="mt-1 text-xs text-zinc-500">
+                              Rol: {tenantRoleLabel(invite.role)} · expiră{" "}
+                              {formatDateTimeRo(invite.expiresAt)}
+                            </p>
+                          </div>
+                          <span className="inline-flex w-fit items-center rounded-md bg-white px-2 py-1 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200">
+                            {inviteStatusLabel(invite)}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-md bg-stone-100 px-3 py-2 text-sm text-zinc-600">
+                        Nu există invitații create pentru acest tenant.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-4 rounded-md bg-stone-100 px-3 py-2 text-sm text-zinc-600">
+                Doar proprietarii tenantului pot invita utilizatori în modelul curent de
+                permisiuni.
+              </p>
+            )}
+          </section>
+
+          <section className="rounded-md border border-zinc-200 bg-white p-5 shadow-sm">
             <SectionHeading icon={UserCog} title="Preferințe utilizator" status="Personal" />
             <form action={updateUserPreferencesAction} className="mt-5 grid gap-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -351,6 +413,76 @@ function SectionHeading({
       <span className="inline-flex w-fit rounded-md bg-stone-100 px-2 py-1 text-sm font-medium text-zinc-600">
         {status}
       </span>
+    </div>
+  );
+}
+
+function CompanyLogoPanel({
+  asset,
+  canEdit,
+  settings,
+}: {
+  asset: TenantAsset | null;
+  canEdit: boolean;
+  settings: CompanySettings | null;
+}) {
+  const logoUrl = companyLogoPreviewUrl(settings);
+
+  return (
+    <div className="mt-5 grid gap-4 rounded-md border border-zinc-200 bg-stone-50 p-4 md:grid-cols-[7rem_1fr]">
+      <div className="flex size-28 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-white">
+        {logoUrl ? (
+          <div
+            aria-label="Logo companie"
+            className="size-full bg-contain bg-center bg-no-repeat"
+            role="img"
+            style={{ backgroundImage: `url("${logoUrl}")` }}
+          />
+        ) : (
+          <div className="grid place-items-center gap-2 text-center text-zinc-500">
+            <ImageIcon aria-hidden="true" size={28} />
+            <span className="text-xs font-semibold">FÄƒrÄƒ logo</span>
+          </div>
+        )}
+      </div>
+      <div className="grid gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-950">Logo companie</h3>
+          <p className="mt-1 text-sm leading-6 text-zinc-600">
+            PNG, JPG sau WebP, maximum 2 MB. SVG este blocat pÃ¢nÄƒ existÄƒ
+            sanitizare dedicatÄƒ.
+          </p>
+          {asset ? (
+            <p className="mt-1 text-xs text-zinc-500">
+              ÃŽncÄƒrcat la {formatDateTimeRo(asset.uploadedAt)} Â· {asset.mimeType}
+            </p>
+          ) : null}
+        </div>
+        {canEdit ? (
+          <form
+            action={uploadCompanyLogoAction}
+            className="grid gap-3 sm:grid-cols-[1fr_auto]"
+            encType="multipart/form-data"
+          >
+            <input
+              accept="image/png,image/jpeg,image/webp"
+              aria-label="FiÈ™ier logo companie"
+              className="h-11 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-zinc-800"
+              name="logo"
+              required
+              type="file"
+            />
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800">
+              <Upload aria-hidden="true" size={17} />
+              ÃŽncarcÄƒ logo
+            </button>
+          </form>
+        ) : (
+          <p className="rounded-md bg-white px-3 py-2 text-sm text-zinc-600 ring-1 ring-zinc-200">
+            Doar OWNER È™i ADMIN pot modifica logo-ul companiei.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -457,6 +589,22 @@ function SubmitButton({ label }: { label: string }) {
   );
 }
 
+function inviteStatusLabel(invite: Awaited<ReturnType<typeof listTenantInvites>>[number]) {
+  if (invite.revokedAt) {
+    return "revocată";
+  }
+
+  if (invite.acceptedAt) {
+    return "acceptată";
+  }
+
+  if (invite.expiresAt <= new Date()) {
+    return "expirată";
+  }
+
+  return "în așteptare";
+}
+
 function basisPointsToPercentInput(value: number | null | undefined) {
   return value === null || value === undefined
     ? ""
@@ -469,4 +617,14 @@ function dashboardShortcuts(value: unknown) {
   }
 
   return value.flatMap((entry) => (typeof entry === "string" ? [entry] : []));
+}
+
+function companyLogoPreviewUrl(settings: CompanySettings | null) {
+  const logoUrl = settings?.logoUrl?.trim();
+
+  if (!settings?.logoAssetId || !logoUrl?.startsWith("/dashboard/settings/logo/")) {
+    return null;
+  }
+
+  return logoUrl;
 }

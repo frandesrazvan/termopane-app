@@ -196,6 +196,16 @@ The settings UI uses Romanian labels including:
 - `Preferințe utilizator`;
 - `Scurtături panou`.
 
+## COD-037 Company Branding Labels
+
+The company logo upload UI uses Romanian labels including:
+
+- `Logo companie`;
+- `FÄƒrÄƒ logo`;
+- `FiÈ™ier logo companie`;
+- `ÃŽncarcÄƒ logo`;
+- `Doar OWNER È™i ADMIN pot modifica logo-ul companiei`.
+
 ## COD-028 Door Item Labels
 
 Door quote item UI and customer-facing output use Romanian labels including:
@@ -243,6 +253,22 @@ Offer sending and confirmation UI uses Romanian labels including:
 - `Descarcă PDF`;
 - `Creează revizie din ofertă`;
 - `Stub email`.
+
+## COD-035 Auth Invite Labels
+
+Production auth and onboarding UI uses Romanian labels including:
+
+- `Autentificare`;
+- `Acces pilot prin invitație`;
+- `Email invitat`;
+- `Cod invitație`;
+- `Tenant din invitație`;
+- `Acceptă invitația`;
+- `Autentificare locală dezvoltare`;
+- `Utilizatori și invitații`;
+- `Invitații recente`;
+- `Link invitație`;
+- `Livrare email: stub manual`.
 
 ## Testing Expectations
 
