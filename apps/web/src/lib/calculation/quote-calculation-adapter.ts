@@ -11,6 +11,7 @@ import {
   calculateQuote,
   type CatalogLineItemInput,
   type CalculationItemInput,
+  type CalculationRuleValidationStatus,
   type CalculationTraceEntry,
   type CalculationUnit,
   type CommercialRulesSnapshot,
@@ -19,6 +20,7 @@ import {
   type ExplicitMaterialRequirementInput,
   type FixedWindowElementInput,
   type ManualOverrideInput,
+  type ProfileMeterRuleSnapshot,
   type QuoteCalculationInput,
   type QuoteCalculationResult,
   type QuoteDiscountInput,
@@ -253,6 +255,22 @@ function fixedWindowInput(
   const glassDeductionRule = firstRecord(glass?.deductionRule);
   const glassPrice = firstRecord(glass?.priceListItem, glass?.price);
   const frameProfilePrice = firstRecord(frameProfile?.priceListItem, frameProfile?.price);
+  const profileMeterRule = profileMeterRuleFromSnapshot(
+    firstRecord(
+      frameProfile?.meterRule,
+      frameProfile?.profileMeterRule,
+      frameProfile?.linearMeterRule,
+      frameProfile?.calculationRule,
+    ),
+  );
+  const explicitMaterialRequirements = [
+    ...(explicitMaterialRequirementsFromSnapshot(
+      configuration.explicitMaterialRequirements ?? catalog?.explicitMaterialRequirements,
+    ) ?? []),
+    ...(explicitMaterialRequirementsFromSnapshot(
+      configuration.materialCalculationRules ?? catalog?.materialCalculationRules,
+    ) ?? []),
+  ];
 
   return {
     elementId: item.id,
@@ -265,6 +283,28 @@ function fixedWindowInput(
     glass: {
       id: stringFrom(glass?.id, glass?.catalogItemId) ?? `missing-glass-${item.id}`,
       label: stringFrom(glass?.label, glass?.name) ?? "Missing glass snapshot",
+      deductionRule: glassDeductionRule
+        ? {
+            ruleId: stringFrom(glassDeductionRule.id, glassDeductionRule.ruleId),
+            sourceRule: stringFrom(
+              glassDeductionRule.sourceRule,
+              glassDeductionRule.ruleKey,
+              glassDeductionRule.id,
+            ),
+            validationStatus: ruleValidationStatusFromSnapshot(
+              glassDeductionRule.validationStatus,
+              glassDeductionRule.businessValidationStatus,
+            ),
+            deductionWidthMm: numberFrom(
+              glassDeductionRule.deductionWidthMm,
+              glassDeductionRule.glassDeductionWidthMm,
+            ),
+            deductionHeightMm: numberFrom(
+              glassDeductionRule.deductionHeightMm,
+              glassDeductionRule.glassDeductionHeightMm,
+            ),
+          }
+        : undefined,
       deductionWidthMm: numberFrom(
         glass?.deductionWidthMm,
         glass?.glassDeductionWidthMm,
@@ -290,6 +330,7 @@ function fixedWindowInput(
     frameProfile: {
       id: stringFrom(frameProfile?.id, frameProfile?.catalogItemId) ?? `missing-profile-${item.id}`,
       label: stringFrom(frameProfile?.label, frameProfile?.name) ?? "Missing frame profile snapshot",
+      meterRule: profileMeterRule,
       unitPriceMinorPerMeter: numberFrom(
         frameProfile?.unitPriceMinorPerMeter,
         frameProfile?.unitPriceMinor,
@@ -298,9 +339,10 @@ function fixedWindowInput(
     },
     commercialRules: commercialRulesFromSnapshot(configuration.commercialRules) ?? quoteRules,
     manualOverride: manualOverrideFromSnapshot(configuration.manualOverride),
-    explicitMaterialRequirements: explicitMaterialRequirementsFromSnapshot(
-      configuration.explicitMaterialRequirements ?? catalog?.explicitMaterialRequirements,
-    ),
+    explicitMaterialRequirements:
+      explicitMaterialRequirements.length > 0
+        ? Object.freeze(explicitMaterialRequirements)
+        : undefined,
   };
 }
 
@@ -465,6 +507,50 @@ function commercialRulesFromSnapshot(value: unknown): CommercialRulesSnapshot | 
     discountBasisPoints: numberFrom(record.discountBasisPoints) ?? 0,
     vatBasisPoints: numberFrom(record.vatBasisPoints, record.vatRateBasisPoints) ?? 0,
   };
+}
+
+function profileMeterRuleFromSnapshot(
+  value: unknown,
+): ProfileMeterRuleSnapshot | undefined {
+  const record = toNullableJsonRecord(value);
+  const kind = stringFrom(record?.kind, record?.formulaKey);
+
+  if (!record || kind !== "rectangular-perimeter") {
+    return undefined;
+  }
+
+  return {
+    kind,
+    ruleId: stringFrom(record.id, record.ruleId),
+    sourceRule: stringFrom(record.sourceRule, record.ruleKey, record.id),
+    validationStatus: ruleValidationStatusFromSnapshot(
+      record.validationStatus,
+      record.businessValidationStatus,
+    ),
+    widthMultiplier: numberFrom(record.widthMultiplier),
+    heightMultiplier: numberFrom(record.heightMultiplier),
+    wasteBasisPoints: numberFrom(record.wasteBasisPoints),
+  };
+}
+
+function ruleValidationStatusFromSnapshot(
+  ...values: unknown[]
+): CalculationRuleValidationStatus | undefined {
+  const status = stringFrom(...values);
+
+  if (
+    status === "synthetic" ||
+    status === "validated" ||
+    status === "requires-business-validation"
+  ) {
+    return status;
+  }
+
+  if (status === "requires business validation" || status === "pending-business-owner") {
+    return "requires-business-validation";
+  }
+
+  return undefined;
 }
 
 function quoteDiscountFromSnapshot(snapshot: JsonRecord | null): QuoteDiscountInput | undefined {

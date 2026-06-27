@@ -46,6 +46,15 @@ async function main() {
     lines.push(...validation.warnings.map((warning) => `- ${warning}`));
   }
 
+  if (pack.requirementsChecklist.length > 0) {
+    lines.push("", "Business input status:");
+    lines.push(
+      ...pack.requirementsChecklist.map(
+        (requirement) => `- ${requirement.key}: ${requirement.status}`,
+      ),
+    );
+  }
+
   const casesWithMissingInputs = report.cases.filter(
     (referenceCase) => referenceCase.missingBusinessInputs.length > 0,
   );

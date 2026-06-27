@@ -167,6 +167,35 @@ Reference cases can be marked `draft-redacted`, `business-reviewed`, `validated-
 `validated` or `not-applicable`, all expected totals and warning codes match the pure calculation
 result, and no private artifacts are referenced.
 
+## COD-039 calculation-rule calibration notes
+
+The calculator now accepts explicit rule snapshots for calibrated fixed-window behavior:
+
+- `glass.deductionRule` carries owner-provided width/height deductions, rule id/source, and
+  validation status;
+- `frameProfile.meterRule` carries an explicit `rectangular-perimeter` profile-meter rule with
+  multipliers and optional waste basis points;
+- hardware, accessory, service, reinforcement, panel, and labor quantities still enter only through
+  explicit material requirements or catalog line snapshots.
+
+Legacy quote snapshots with flat `deductionWidthMm`, `deductionHeightMm`, and no `meterRule` continue
+to calculate with the previous rectangular frame perimeter so old quotes remain stable. Unsupported
+profile-meter rule kinds are blocked with `UNSUPPORTED_PROFILE_METER_RULE`; unvalidated rule
+snapshots emit `UNVALIDATED_GLASS_DEDUCTION_RULE` or `UNVALIDATED_PROFILE_METER_RULE`.
+
+The trusted areas are currently owner-provided glass deduction snapshots and explicit
+rectangular-perimeter profile-meter snapshots. Door panel/lock/threshold/reinforcement formulas,
+automatic hardware quantities, transport distance, installation labor, supplier formulas, and
+production cutting remain unvalidated.
+
+Reference fixtures may declare owner-approved rounding tolerances per expected total/PDF field. A
+historical fixture using tolerance must set `approvedBy = "business-owner"`; otherwise the harness
+rejects the case.
+
+No 10-20 case owner-validated historical pack is committed yet. Until owners provide redacted
+historical cases, the committed regression coverage remains synthetic and must not be treated as
+production formula validation.
+
 ## COD-028 door MVP calculation notes
 
 Door quote items are supported as rough MVP calculation inputs with `type: "door"`. The calculator

@@ -21,7 +21,15 @@
         "profileType": "frame",
         "unit": "linear-meter",
         "unitPriceMinorPerMeter": 0,
-        "deductionRuleKey": "requires business validation",
+        "meterRule": {
+          "ruleId": "redacted-profile-meter-rule-00",
+          "sourceRule": "requires business validation",
+          "validationStatus": "requires-business-validation",
+          "kind": "rectangular-perimeter",
+          "widthMultiplier": 2,
+          "heightMultiplier": 2,
+          "wasteBasisPoints": 0
+        },
         "businessValidationStatus": "requires-business-validation"
       }
     ],
@@ -31,8 +39,13 @@
         "label": "Redacted glass package",
         "unit": "square-meter",
         "unitPriceMinorPerM2": 0,
-        "deductionWidthMm": 0,
-        "deductionHeightMm": 0,
+        "deductionRule": {
+          "ruleId": "redacted-glass-deduction-rule-00",
+          "sourceRule": "requires business validation",
+          "validationStatus": "requires-business-validation",
+          "deductionWidthMm": 0,
+          "deductionHeightMm": 0
+        },
         "minBillableAreaM2": 0,
         "businessValidationStatus": "requires-business-validation"
       }
@@ -54,6 +67,18 @@
         "unit": "fixed",
         "unitPriceMinor": 0,
         "customerVisible": true,
+        "businessValidationStatus": "requires-business-validation"
+      }
+    ],
+    "materialCalculationRules": [
+      {
+        "materialType": "hardware",
+        "catalogItemId": "redacted-hardware-00",
+        "label": "Redacted explicit hardware rule",
+        "unit": "each",
+        "quantity": 0,
+        "unitPriceMinor": 0,
+        "sourceRule": "requires business validation",
         "businessValidationStatus": "requires-business-validation"
       }
     ]

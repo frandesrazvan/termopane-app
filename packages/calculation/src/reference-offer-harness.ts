@@ -90,6 +90,12 @@ export type ReferencePdfOutputFieldsExpectation = Readonly<
   Record<string, ReferencePdfOutputFieldValue>
 >;
 
+export type ReferenceOfferToleranceExpectation = Readonly<{
+  approvedBy: "business-owner" | "synthetic";
+  totalsMinor?: Partial<Record<keyof ReferenceOfferTotalsExpectation, number>>;
+  pdfOutputFieldsMinor?: Readonly<Record<string, number>>;
+}>;
+
 export type ReferenceOfferExpectation = Readonly<{
   itemCount: number;
   materialRequirementCount?: number;
@@ -98,6 +104,7 @@ export type ReferenceOfferExpectation = Readonly<{
   warningCodes?: readonly CalculationWarningCode[];
   totals: ReferenceOfferTotalsExpectation;
   pdfOutputFields?: ReferencePdfOutputFieldsExpectation;
+  tolerances?: ReferenceOfferToleranceExpectation;
 }>;
 
 export type ReferenceOfferCase = Readonly<{
@@ -312,6 +319,14 @@ export function validateReferenceOfferCase(
     errors.push(`${prefix} must include expected totals.`);
   }
 
+  if (
+    referenceCase.reviewStatus === "validated-historical" &&
+    referenceCase.expected.tolerances &&
+    referenceCase.expected.tolerances.approvedBy !== "business-owner"
+  ) {
+    errors.push(`${prefix} historical rounding tolerances must be approved by business-owner.`);
+  }
+
   for (const unsafeValue of unsafeFixtureStrings(referenceCase)) {
     errors.push(`${prefix} contains unsafe fixture text: ${unsafeValue}.`);
   }
@@ -353,8 +368,19 @@ export function recreateReferenceOfferCase(
 
   for (const [key, expectedValue] of Object.entries(referenceCase.expected.totals)) {
     const actualValue = result.totals[key as keyof typeof result.totals];
+    const toleranceMinor =
+      referenceCase.expected.tolerances?.totalsMinor?.[
+        key as keyof ReferenceOfferTotalsExpectation
+      ] ?? 0;
 
-    compareNumber(`totals.${key}`, actualValue, expectedValue, mismatches, totalMismatches);
+    compareNumber(
+      `totals.${key}`,
+      actualValue,
+      expectedValue,
+      mismatches,
+      totalMismatches,
+      toleranceMinor,
+    );
   }
 
   const actualWarningCodes = uniqueSortedWarningCodes(
@@ -365,9 +391,15 @@ export function recreateReferenceOfferCase(
   );
 
   if (actualWarningCodes.join(",") !== expectedWarningCodes.join(",")) {
-    const mismatch = `warningCodes expected ${
-      expectedWarningCodes.join(",") || "none"
-    } but received ${actualWarningCodes.join(",") || "none"}`;
+    const missingWarnings = expectedWarningCodes.filter(
+      (code) => !actualWarningCodes.includes(code),
+    );
+    const unexpectedWarnings = actualWarningCodes.filter(
+      (code) => !expectedWarningCodes.includes(code),
+    );
+    const mismatch = `warningCodes missing expected [${
+      missingWarnings.join(",") || "none"
+    }], unexpected [${unexpectedWarnings.join(",") || "none"}]`;
 
     mismatches.push(mismatch);
     warningMismatches.push(mismatch);
@@ -377,6 +409,7 @@ export function recreateReferenceOfferCase(
     result,
     referenceCase,
     referenceCase.expected.pdfOutputFields,
+    referenceCase.expected.tolerances,
     mismatches,
     templateFieldMismatches,
   );
@@ -499,9 +532,11 @@ function compareNumber(
   expectedValue: number,
   mismatches: string[],
   categoryMismatches?: string[],
+  tolerance = 0,
 ) {
-  if (actualValue !== expectedValue) {
-    const mismatch = `${label} expected ${expectedValue} but received ${actualValue}`;
+  if (Math.abs(actualValue - expectedValue) > tolerance) {
+    const toleranceText = tolerance > 0 ? ` within +/- ${tolerance}` : "";
+    const mismatch = `${label} expected ${expectedValue}${toleranceText} but received ${actualValue}`;
 
     mismatches.push(mismatch);
     categoryMismatches?.push(mismatch);
@@ -525,6 +560,7 @@ function comparePdfOutputFields(
   result: QuoteCalculationResult,
   referenceCase: ReferenceOfferCase,
   expectedFields: ReferencePdfOutputFieldsExpectation | undefined,
+  tolerances: ReferenceOfferToleranceExpectation | undefined,
   mismatches: string[],
   templateFieldMismatches: string[],
 ) {
@@ -536,11 +572,12 @@ function comparePdfOutputFields(
 
   for (const [key, expectedValue] of Object.entries(expectedFields)) {
     const actualValue = actualFields[key];
+    const toleranceMinor = tolerances?.pdfOutputFieldsMinor?.[key] ?? 0;
 
-    if (!samePdfFieldValue(actualValue, expectedValue)) {
+    if (!samePdfFieldValue(actualValue, expectedValue, toleranceMinor)) {
       const mismatch = `pdfOutputFields.${key} expected ${formatPdfFieldValue(
         expectedValue,
-      )} but received ${formatPdfFieldValue(actualValue)}`;
+      )}${toleranceMinor > 0 ? ` within +/- ${toleranceMinor}` : ""} but received ${formatPdfFieldValue(actualValue)}`;
 
       mismatches.push(mismatch);
       templateFieldMismatches.push(mismatch);
@@ -564,9 +601,18 @@ function createComparablePdfOutputFields(
 function samePdfFieldValue(
   actualValue: ReferencePdfOutputFieldValue | undefined,
   expectedValue: ReferencePdfOutputFieldValue,
+  tolerance = 0,
 ) {
   if (actualValue === undefined) {
     return false;
+  }
+
+  if (
+    typeof actualValue === "number" &&
+    typeof expectedValue === "number" &&
+    tolerance > 0
+  ) {
+    return Math.abs(actualValue - expectedValue) <= tolerance;
   }
 
   if (Array.isArray(actualValue) || Array.isArray(expectedValue)) {

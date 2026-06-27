@@ -10,8 +10,9 @@ custom manual line items.
 Included:
 
 - glass dimensions from configured deduction values;
+- owner-provided glass deduction rule snapshots;
 - glass area and billable area;
-- rectangular frame profile linear meters;
+- rectangular frame profile linear meters from legacy snapshots or explicit profile-meter rules;
 - simple material cost from snapshot prices;
 - markup, discount, and VAT using integer minor units;
 - item-level and quote-level manual final-total overrides with warnings and trace entries;
@@ -34,6 +35,8 @@ appear only as explicit snapshot requirements passed into the input. The package
 those quantities.
 
 Unknown production rules must remain configurable or be marked as requiring business validation.
+Rule snapshots marked `requires-business-validation` are calculated only with warnings. Unsupported
+profile-meter rule kinds are blocked instead of inferred.
 
 ## Reference Offer Harness
 

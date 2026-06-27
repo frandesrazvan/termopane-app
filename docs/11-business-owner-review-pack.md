@@ -61,6 +61,20 @@ Pentru un pack in lucru folositi `packType = "redacted-historical-review"` si
 `packType = "validated-historical-recreation"` si
 `dataClassification = "redacted-validated-historical"`.
 
+## Calibrare reguli COD-039
+
+Pentru calibrare se copiaza doar reguli validate explicit de owner:
+
+- deductii sticla in `glass.deductionRule`;
+- reguli metru liniar profil in `frameProfile.meterRule`;
+- hardware, accesorii si servicii in `materialCalculationRules` sau `explicitMaterialRequirements`
+  numai cand exista cantitate, unitate si pret snapshot.
+
+Nu se deduc formule dintr-un singur PDF si nu se reverse-engineer-uiesc formule de furnizor.
+Diferentele fata de outputul istoric trebuie sa ramana vizibile in raportul `pnpm reference:validate`.
+Tolerantele de rotunjire sunt permise doar in `expected.tolerances` cu `approvedBy =
+"business-owner"`.
+
 ## Exemplu JSON validat
 
 ```json

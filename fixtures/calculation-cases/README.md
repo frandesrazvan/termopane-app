@@ -21,6 +21,8 @@ Use this case for unit tests around `calculateElement`.
 - Frame profile cost: `5200` minor units
 - Glass cuts output contains one `main` pane using the configured deduction rule.
 - Profile linear meters output uses one grouped frame profile requirement.
+- Validated profile-meter snapshots may provide the rectangular-perimeter multipliers and optional
+  waste basis points. Unsupported rule kinds must warn instead of falling back to a guessed formula.
 
 ## Custom manual line
 
@@ -52,6 +54,8 @@ Tests intentionally cover:
 - missing glass/profile/custom prices;
 - unsupported item types;
 - explicit hardware/accessory snapshots, without automatic formulas;
+- rule snapshots that still require business validation;
+- owner-approved rounding tolerances in the reference-offer harness;
 - manual override and quote discount trace entries.
 
 All values are synthetic and exist only to keep tests deterministic.
