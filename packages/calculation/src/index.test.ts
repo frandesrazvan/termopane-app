@@ -155,6 +155,117 @@ describe("calculateElement", () => {
     );
   });
 
+  it("uses validated glass deduction and profile meter rule snapshots", () => {
+    const result = calculateElement({
+      ...baseInput,
+      glass: {
+        ...baseInput.glass,
+        deductionWidthMm: undefined,
+        deductionHeightMm: undefined,
+        deductionRule: {
+          ruleId: "glass-rule-owner-validated",
+          sourceRule: "owner-approved-glass-deduction-2026",
+          validationStatus: "validated",
+          deductionWidthMm: 82,
+          deductionHeightMm: 102,
+        },
+      },
+      frameProfile: {
+        ...baseInput.frameProfile,
+        meterRule: {
+          ruleId: "profile-rule-owner-validated",
+          sourceRule: "owner-approved-frame-perimeter-2026",
+          validationStatus: "validated",
+          kind: "rectangular-perimeter",
+          widthMultiplier: 2,
+          heightMultiplier: 2,
+          wasteBasisPoints: 500,
+        },
+      },
+    });
+
+    expect(result.glass).toMatchObject({
+      widthMm: 1_118,
+      heightMm: 1_298,
+      sourceRule: "owner-approved-glass-deduction-2026",
+    });
+    expect(result.glassCuts[0]?.sourceRule).toBe("owner-approved-glass-deduction-2026");
+    expect(result.profiles[0]).toMatchObject({
+      linearMetersPerElement: 5.46,
+      totalLinearMeters: 5.46,
+      sourceRule: "owner-approved-frame-perimeter-2026",
+    });
+    expect(result.warnings).toEqual([]);
+    expect(result.trace).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          step: "frameProfileLinearMeters",
+          inputs: expect.objectContaining({
+            meterRule: expect.objectContaining({
+              validationStatus: "validated",
+              sourceRule: "owner-approved-frame-perimeter-2026",
+            }),
+          }),
+        }),
+      ]),
+    );
+  });
+
+  it("warns when configured rule snapshots still require business validation", () => {
+    const result = calculateElement({
+      ...baseInput,
+      glass: {
+        ...baseInput.glass,
+        deductionRule: {
+          sourceRule: "pending-owner-glass-rule",
+          validationStatus: "requires-business-validation",
+          deductionWidthMm: 80,
+          deductionHeightMm: 100,
+        },
+      },
+      frameProfile: {
+        ...baseInput.frameProfile,
+        meterRule: {
+          sourceRule: "pending-owner-profile-rule",
+          validationStatus: "requires-business-validation",
+          kind: "rectangular-perimeter",
+        },
+      },
+    });
+
+    expect(result.warnings.map((warning) => warning.code)).toEqual(
+      expect.arrayContaining([
+        "UNVALIDATED_GLASS_DEDUCTION_RULE",
+        "UNVALIDATED_PROFILE_METER_RULE",
+      ]),
+    );
+    expect(result.totals.totalWithVatMinor).toBeGreaterThan(0);
+  });
+
+  it("blocks unsupported explicit profile meter rules instead of inferring a formula", () => {
+    const result = calculateElement({
+      ...baseInput,
+      frameProfile: {
+        ...baseInput.frameProfile,
+        meterRule: {
+          kind: "supplier-secret-rule",
+          sourceRule: "unsupported-owner-rule",
+          validationStatus: "validated",
+        } as never,
+      },
+    });
+
+    expect(result.profiles[0]).toMatchObject({
+      linearMetersPerElement: 0,
+      totalLinearMeters: 0,
+      costMinor: 0,
+      sourceRule: "unsupported-owner-rule",
+    });
+    expect(result.warnings.map((warning) => warning.code)).toContain(
+      "UNSUPPORTED_PROFILE_METER_RULE",
+    );
+  });
+
   it("calculates material cost, markup, discount, and VAT using integer minor units", () => {
     const result = calculateElement({
       ...baseInput,

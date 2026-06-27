@@ -9,6 +9,9 @@ export type CalculationWarningCode =
   | "GLASS_DIMENSION_NON_POSITIVE"
   | "MISSING_GLASS_PRICE"
   | "MISSING_PROFILE_PRICE"
+  | "UNVALIDATED_GLASS_DEDUCTION_RULE"
+  | "UNVALIDATED_PROFILE_METER_RULE"
+  | "UNSUPPORTED_PROFILE_METER_RULE"
   | "MISSING_CUSTOM_LINE_PRICE"
   | "MISSING_DOOR_FORMULA"
   | "MISSING_EXPLICIT_MATERIAL_PRICE"
@@ -51,6 +54,29 @@ export type MaterialRequirementType =
   | "accessory"
   | "service";
 
+export type CalculationRuleValidationStatus =
+  | "synthetic"
+  | "validated"
+  | "requires-business-validation";
+
+export type GlassDeductionRuleSnapshot = Readonly<{
+  ruleId?: string;
+  sourceRule?: string;
+  validationStatus?: CalculationRuleValidationStatus;
+  deductionWidthMm?: number;
+  deductionHeightMm?: number;
+}>;
+
+export type ProfileMeterRuleSnapshot = Readonly<{
+  ruleId?: string;
+  sourceRule?: string;
+  validationStatus?: CalculationRuleValidationStatus;
+  kind: "rectangular-perimeter";
+  widthMultiplier?: number;
+  heightMultiplier?: number;
+  wasteBasisPoints?: BasisPoints;
+}>;
+
 export type ManualOverrideInput = Readonly<{
   target: "totalWithVat" | "quoteTotalWithVat";
   amountMinor: MoneyMinor;
@@ -83,6 +109,7 @@ export type CalculationContextSnapshot = Readonly<{
 export type GlassSnapshot = Readonly<{
   id: string;
   label: string;
+  deductionRule?: GlassDeductionRuleSnapshot;
   deductionWidthMm?: number;
   deductionHeightMm?: number;
   minBillableAreaM2: number;
@@ -92,6 +119,7 @@ export type GlassSnapshot = Readonly<{
 export type FrameProfileSnapshot = Readonly<{
   id: string;
   label: string;
+  meterRule?: ProfileMeterRuleSnapshot;
   unitPriceMinorPerMeter?: MoneyMinor;
 }>;
 
@@ -191,6 +219,7 @@ export type GlassCalculation = Readonly<{
   totalBillableAreaM2: number | null;
   deductionWidthMm: number | null;
   deductionHeightMm: number | null;
+  sourceRule: string;
 }>;
 
 export type GlassCut = Readonly<{
@@ -875,8 +904,18 @@ function calculateGlass(
   warnings: CalculationWarning[],
   trace: CalculationTraceEntry[],
 ): GlassCalculation {
-  const deductionWidthMm = input.glass.deductionWidthMm;
-  const deductionHeightMm = input.glass.deductionHeightMm;
+  const deductionRule = resolveGlassDeductionRule(input.glass);
+  const { deductionWidthMm, deductionHeightMm, sourceRule } = deductionRule;
+
+  if (deductionRule.validationStatus === "requires-business-validation") {
+    warnings.push(
+      warning(
+        "UNVALIDATED_GLASS_DEDUCTION_RULE",
+        "Glass deduction rule is present but still requires business validation.",
+        `${path}.glass.deductionRule`,
+      ),
+    );
+  }
 
   if (deductionWidthMm === undefined) {
     warnings.push(
@@ -906,7 +945,11 @@ function calculateGlass(
         `${path}.dimensions`,
       ),
     );
-    const incompleteGlass = incompleteGlassCalculation(deductionWidthMm, deductionHeightMm);
+    const incompleteGlass = incompleteGlassCalculation(
+      deductionWidthMm,
+      deductionHeightMm,
+      sourceRule,
+    );
 
     trace.push({
       step: "glassDimensions",
@@ -916,6 +959,7 @@ function calculateGlass(
         heightMm: input.dimensions.heightMm,
         deductionWidthMm,
         deductionHeightMm,
+        sourceRule,
       },
       output: { complete: false },
       note: "Glass dimensions were blocked because width or height is invalid.",
@@ -925,7 +969,11 @@ function calculateGlass(
   }
 
   if (deductionWidthMm === undefined || deductionHeightMm === undefined) {
-    const incompleteGlass = incompleteGlassCalculation(deductionWidthMm, deductionHeightMm);
+    const incompleteGlass = incompleteGlassCalculation(
+      deductionWidthMm,
+      deductionHeightMm,
+      sourceRule,
+    );
 
     trace.push({
       step: "glassDimensions",
@@ -935,6 +983,7 @@ function calculateGlass(
         heightMm: input.dimensions.heightMm,
         deductionWidthMm,
         deductionHeightMm,
+        sourceRule,
       },
       output: { complete: false },
       note: "Glass dimensions were not calculated because deduction values are incomplete.",
@@ -971,12 +1020,13 @@ function calculateGlass(
       heightMm: input.dimensions.heightMm,
       deductionWidthMm,
       deductionHeightMm,
+      sourceRule,
       minBillableAreaM2: input.glass.minBillableAreaM2,
       quantity: input.quantity,
     },
     output: { widthMm, heightMm, areaM2, billableAreaM2, totalBillableAreaM2 },
     note: hasValidQuantity
-      ? "Configured glass deduction placeholder; not a supplier formula."
+      ? "Configured glass deduction rule snapshot; not inferred from historical output."
       : "Total billable glass area was zeroed because quantity is invalid.",
   });
 
@@ -988,6 +1038,7 @@ function calculateGlass(
     totalBillableAreaM2,
     deductionWidthMm,
     deductionHeightMm,
+    sourceRule,
   });
 }
 
@@ -1039,6 +1090,28 @@ function calculateFrameProfile(
   warnings: CalculationWarning[],
   trace: CalculationTraceEntry[],
 ): ProfileRequirement {
+  const meterRule = resolveProfileMeterRule(input.frameProfile);
+
+  if (meterRule.validationStatus === "requires-business-validation") {
+    warnings.push(
+      warning(
+        "UNVALIDATED_PROFILE_METER_RULE",
+        "Profile meter rule is present but still requires business validation.",
+        `${path}.frameProfile.meterRule`,
+      ),
+    );
+  }
+
+  if (!meterRule.supported) {
+    warnings.push(
+      warning(
+        "UNSUPPORTED_PROFILE_METER_RULE",
+        "Profile meter rule is not supported by the MVP calculator.",
+        `${path}.frameProfile.meterRule`,
+      ),
+    );
+  }
+
   if (input.frameProfile.unitPriceMinorPerMeter === undefined) {
     warnings.push(
       warning(
@@ -1049,7 +1122,7 @@ function calculateFrameProfile(
     );
   }
 
-  if (!hasValidDimensions || !hasValidQuantity) {
+  if (!hasValidDimensions || !hasValidQuantity || !meterRule.supported) {
     if (!hasValidDimensions) {
       warnings.push(
         warning(
@@ -1069,19 +1142,25 @@ function calculateFrameProfile(
         quantity: input.quantity,
         profileId: input.frameProfile.id,
         unitPriceMinorPerMeter: input.frameProfile.unitPriceMinorPerMeter,
+        meterRule: meterRule.traceInput,
       },
       output: { linearMetersPerElement: 0, totalLinearMeters: 0, costMinor: 0 },
-      note: hasValidDimensions
-        ? "Total profile meters were zeroed because quantity is invalid."
-        : "Profile meter calculation was blocked because width or height is invalid.",
+      note: !meterRule.supported
+        ? "Profile meter calculation was blocked because the provided rule is unsupported."
+        : hasValidDimensions
+          ? "Total profile meters were zeroed because quantity is invalid."
+          : "Profile meter calculation was blocked because width or height is invalid.",
     });
 
-    return profileRequirement(input, 0, 0, 0);
+    return profileRequirement(input, 0, 0, 0, meterRule.sourceRule);
   }
 
   const widthM = input.dimensions.widthMm / 1_000;
   const heightM = input.dimensions.heightMm / 1_000;
-  const linearMetersPerElement = roundMeasurement(2 * widthM + 2 * heightM);
+  const baseLinearMeters =
+    meterRule.widthMultiplier * widthM + meterRule.heightMultiplier * heightM;
+  const wasteLinearMeters = (baseLinearMeters * meterRule.wasteBasisPoints) / BASIS_POINTS_DENOMINATOR;
+  const linearMetersPerElement = roundMeasurement(baseLinearMeters + wasteLinearMeters);
   const totalLinearMeters = roundMeasurement(linearMetersPerElement * input.quantity);
   const costMinor =
     input.frameProfile.unitPriceMinorPerMeter === undefined
@@ -1097,12 +1176,21 @@ function calculateFrameProfile(
       quantity: input.quantity,
       profileId: input.frameProfile.id,
       unitPriceMinorPerMeter: input.frameProfile.unitPriceMinorPerMeter,
+      meterRule: meterRule.traceInput,
     },
     output: { linearMetersPerElement, totalLinearMeters, costMinor },
-    note: "Rectangular fixed-window frame perimeter only; not production cut optimization.",
+    note: meterRule.isLegacy
+      ? "Legacy rectangular fixed-window frame perimeter preserved for old snapshots."
+      : "Configured profile meter rule snapshot; not production cut optimization.",
   });
 
-  return profileRequirement(input, linearMetersPerElement, totalLinearMeters, costMinor);
+  return profileRequirement(
+    input,
+    linearMetersPerElement,
+    totalLinearMeters,
+    costMinor,
+    meterRule.sourceRule,
+  );
 }
 
 function calculateExplicitMaterialRequirements(
@@ -1368,9 +1456,74 @@ function applyManualOverride(
   });
 }
 
+function resolveGlassDeductionRule(glass: GlassSnapshot) {
+  const rule = glass.deductionRule;
+
+  if (rule) {
+    return {
+      deductionWidthMm: rule.deductionWidthMm ?? glass.deductionWidthMm,
+      deductionHeightMm: rule.deductionHeightMm ?? glass.deductionHeightMm,
+      sourceRule: rule.sourceRule ?? rule.ruleId ?? "configured-glass-deduction",
+      validationStatus: rule.validationStatus,
+    };
+  }
+
+  return {
+    deductionWidthMm: glass.deductionWidthMm,
+    deductionHeightMm: glass.deductionHeightMm,
+    sourceRule: "configured-glass-deduction",
+    validationStatus: undefined,
+  };
+}
+
+function resolveProfileMeterRule(frameProfile: FrameProfileSnapshot) {
+  const rule = frameProfile.meterRule;
+
+  if (!rule) {
+    return {
+      supported: true,
+      isLegacy: true,
+      widthMultiplier: 2,
+      heightMultiplier: 2,
+      wasteBasisPoints: 0,
+      sourceRule: "rectangular-frame-perimeter",
+      validationStatus: undefined,
+      traceInput: {
+        kind: "legacy-rectangular-perimeter",
+        sourceRule: "rectangular-frame-perimeter",
+      },
+    };
+  }
+
+  const supported = rule.kind === "rectangular-perimeter";
+  const widthMultiplier = rule.widthMultiplier ?? 2;
+  const heightMultiplier = rule.heightMultiplier ?? 2;
+  const wasteBasisPoints = rule.wasteBasisPoints ?? 0;
+  const sourceRule = rule.sourceRule ?? rule.ruleId ?? "configured-profile-meter-rule";
+
+  return {
+    supported,
+    isLegacy: false,
+    widthMultiplier,
+    heightMultiplier,
+    wasteBasisPoints,
+    sourceRule,
+    validationStatus: rule.validationStatus,
+    traceInput: {
+      kind: rule.kind,
+      widthMultiplier,
+      heightMultiplier,
+      wasteBasisPoints,
+      sourceRule,
+      validationStatus: rule.validationStatus,
+    },
+  };
+}
+
 function incompleteGlassCalculation(
   deductionWidthMm: number | undefined,
   deductionHeightMm: number | undefined,
+  sourceRule: string,
 ): GlassCalculation {
   return Object.freeze({
     widthMm: null,
@@ -1380,6 +1533,7 @@ function incompleteGlassCalculation(
     totalBillableAreaM2: null,
     deductionWidthMm: deductionWidthMm ?? null,
     deductionHeightMm: deductionHeightMm ?? null,
+    sourceRule,
   });
 }
 
@@ -1409,7 +1563,7 @@ function glassCutFromCalculation(
       billableAreaM2: glass.billableAreaM2,
       quantity: input.quantity > 0 ? input.quantity : 0,
       totalBillableAreaM2: glass.totalBillableAreaM2,
-      sourceRule: "configured-glass-deduction",
+      sourceRule: glass.sourceRule,
     }),
   ]);
 }
@@ -1433,7 +1587,7 @@ function glassMaterialRequirementFromCalculation(
       quantity: glass.totalBillableAreaM2,
       unitPriceMinor: input.glass.unitPriceMinorPerM2 ?? null,
       costMinor,
-      sourceRule: "configured-glass-deduction",
+      sourceRule: glass.sourceRule,
     }),
   ]);
 }
@@ -1478,6 +1632,7 @@ function profileRequirement(
   linearMetersPerElement: number,
   totalLinearMeters: number,
   costMinor: MoneyMinor,
+  sourceRule = "rectangular-frame-perimeter",
 ): ProfileRequirement {
   return Object.freeze({
     itemId: input.elementId,
@@ -1488,7 +1643,7 @@ function profileRequirement(
     totalLinearMeters,
     unitPriceMinorPerMeter: input.frameProfile.unitPriceMinorPerMeter ?? null,
     costMinor,
-    sourceRule: "rectangular-frame-perimeter",
+    sourceRule,
   });
 }
 

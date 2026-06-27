@@ -77,6 +77,12 @@ production formulas.
   a pure calculation comparison harness for recreating 10-20 validated historical quotes later.
   `pnpm reference:validate` reports case count, missing business inputs, warning mismatches, total
   mismatches, and template/PDF field mismatches without committing private PDFs or customer data.
+- Calculation calibration now accepts owner-provided glass deduction rule snapshots, explicit
+  rectangular profile-meter rule snapshots, and explicit hardware/accessory/service material rules.
+  Automatic hardware quantities, door production formulas, supplier formulas, transport distance,
+  installation labor, and production cutting remain unvalidated until owner-approved data is
+  supplied. The committed pack is still synthetic; a 10-20 case owner-validated historical pack has
+  not yet been added.
 
 ## Stack
 

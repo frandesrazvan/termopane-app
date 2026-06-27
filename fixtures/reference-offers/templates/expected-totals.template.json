@@ -18,5 +18,11 @@
   "notes": [
     "Copy only owner-approved redacted values.",
     "Leave unknown business rules marked as requires business validation."
-  ]
+  ],
+  "tolerances": {
+    "approvedBy": "business-owner",
+    "totalsMinor": {
+      "totalWithVatMinor": 0
+    }
+  }
 }

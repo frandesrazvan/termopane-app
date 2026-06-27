@@ -194,6 +194,9 @@ describe("reference offer harness", () => {
 
     expect(recreation.passed).toBe(false);
     expect(recreation.warningMismatches).toHaveLength(1);
+    expect(recreation.warningMismatches[0]).toBe(
+      "warningCodes missing expected [MISSING_GLASS_PRICE], unexpected [none]",
+    );
     expect(recreation.totalMismatches).toHaveLength(1);
     expect(recreation.templateFieldMismatches).toHaveLength(1);
     expect(report).toMatchObject({
@@ -203,6 +206,73 @@ describe("reference offer harness", () => {
       failedCaseCount: 1,
       readyForReviewSession: false,
     });
+  });
+
+  it("applies explicit owner-approved rounding tolerances to total and template fields", async () => {
+    const pack = await loadSyntheticPack();
+    const toleratedCase = {
+      ...pack.cases[0]!,
+      expected: {
+        ...pack.cases[0]!.expected,
+        totals: {
+          ...pack.cases[0]!.expected.totals,
+          totalWithVatMinor: 67_117,
+        },
+        pdfOutputFields: {
+          ...pack.cases[0]!.expected.pdfOutputFields,
+          totalWithVatMinor: 67_117,
+        },
+        tolerances: {
+          approvedBy: "synthetic",
+          totalsMinor: {
+            totalWithVatMinor: 1,
+          },
+          pdfOutputFieldsMinor: {
+            totalWithVatMinor: 1,
+          },
+        },
+      },
+    } satisfies ReferenceOfferFixturePack["cases"][number];
+    const recreation = recreateReferenceOfferCase(toleratedCase);
+
+    expect(recreation.passed).toBe(true);
+    expect(recreation.totalMismatches).toEqual([]);
+    expect(recreation.templateFieldMismatches).toEqual([]);
+  });
+
+  it("requires business-owner approval for historical rounding tolerances", async () => {
+    const pack = await loadSyntheticPack();
+    const historicalCase = {
+      ...pack.cases[0]!,
+      reviewStatus: "validated-historical",
+      dataClassification: "redacted-validated-historical",
+      source: {
+        kind: "redacted-historical-json",
+        originalDocumentAvailable: false,
+        privateArtifactsCommitted: false,
+      },
+      redaction: {
+        customer: "redacted",
+        project: "redacted",
+        sourceDocuments: "none-committed",
+      },
+      businessInputStatus: Object.fromEntries(
+        requiredReviewInputKeys.map((key) => [key, "validated"]),
+      ) as ReferenceOfferFixturePack["cases"][number]["businessInputStatus"],
+      expected: {
+        ...pack.cases[0]!.expected,
+        tolerances: {
+          approvedBy: "synthetic",
+          totalsMinor: {
+            totalWithVatMinor: 1,
+          },
+        },
+      },
+    } satisfies ReferenceOfferFixturePack["cases"][number];
+
+    expect(validateReferenceOfferCase(historicalCase).errors).toContain(
+      "Case synthetic-offer-001 historical rounding tolerances must be approved by business-owner.",
+    );
   });
 
   it("accepts a 10-case redacted historical comparison pack shape", async () => {

@@ -78,6 +78,28 @@ Colectati urmatoarele inainte de recrearea a 10-20 oferte istorice validate:
    `validated-historical-recreation` si `dataClassification` la `redacted-validated-historical`.
 9. Rulati `pnpm reference:validate` si corectati orice lipsa sau mismatch raportat.
 
+## Reguli validate si calibrare
+
+Snapshot-urile pot include reguli explicite validate de owner:
+
+- `glass.deductionRule` cu `deductionWidthMm`, `deductionHeightMm`, `sourceRule` si
+  `validationStatus`;
+- `frameProfile.meterRule` cu `kind = "rectangular-perimeter"`, multiplicatori si optional
+  `wasteBasisPoints`;
+- `materialCalculationRules` sau `explicitMaterialRequirements` pentru hardware, accesorii si
+  servicii numai cand ownerul furnizeaza cantitatea, unitatea si pretul snapshot.
+
+Regulile cu `validationStatus = "requires-business-validation"` ruleaza cu avertizari si nu trebuie
+tratate ca formule de productie. Reguli hardware, accesorii sau servicii care nu contin cantitati
+explicite raman in afara calculului; nu se deduc automat dintr-un PDF istoric.
+
+Tolerantele de rotunjire se declara in `expected.tolerances`. Pentru cazurile istorice validate,
+`approvedBy` trebuie sa fie `business-owner`; tolerantele sintetice nu sunt acceptate ca validare
+istorica.
+
+Momentan repository-ul nu contine un pack istoric owner-validat de 10-20 cazuri. Exemplele commited
+raman sintetice si nu valideaza formule de productie.
+
 ## Forma snapshot-ului
 
 Pachetele istorice folosesc `packType = "validated-historical-recreation"` si

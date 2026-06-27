@@ -67,6 +67,15 @@
       "itemCount": 1,
       "totalWithVatMinor": 0,
       "warningCodes": []
+    },
+    "tolerances": {
+      "approvedBy": "business-owner",
+      "totalsMinor": {
+        "totalWithVatMinor": 0
+      },
+      "pdfOutputFieldsMinor": {
+        "totalWithVatMinor": 0
+      }
     }
   }
 }

@@ -455,6 +455,117 @@ describe("quote calculation adapter", () => {
     });
   });
 
+  it("converts validated catalog rule snapshots into calculation inputs", async () => {
+    const state = testState({
+      items: [
+        fixedWindowItem({
+          catalogSnapshot: {
+            source: "tenant-catalog",
+            glassPackage: {
+              id: "glass-owner-validated",
+              name: "Synthetic owner validated glass",
+              unit: "SQUARE_METER",
+              minBillableAreaSquareMm: 1_500_000,
+              deductionRule: {
+                id: "glass-deduction-owner-validated",
+                ruleKey: "owner-approved-glass-deduction-2026",
+                validationStatus: "validated",
+                deductionWidthMm: 82,
+                deductionHeightMm: 102,
+              },
+              priceListItem: {
+                id: "price-glass",
+                priceListId: "price-list-a",
+                unit: "SQUARE_METER",
+                saleMinor: 10_000,
+              },
+            },
+            frameProfile: {
+              id: "frame-owner-validated",
+              name: "Synthetic owner validated frame",
+              unit: "LINEAR_METER",
+              meterRule: {
+                id: "profile-meter-owner-validated",
+                ruleKey: "owner-approved-frame-perimeter-2026",
+                validationStatus: "validated",
+                kind: "rectangular-perimeter",
+                widthMultiplier: 2,
+                heightMultiplier: 2,
+                wasteBasisPoints: 500,
+              },
+              priceListItem: {
+                id: "price-frame",
+                priceListId: "price-list-a",
+                unit: "LINEAR_METER",
+                saleMinor: 1_000,
+              },
+            },
+            materialCalculationRules: [
+              {
+                materialType: "hardware",
+                catalogItemId: "hardware-owner-explicit",
+                label: "Synthetic explicit hardware from owner rule",
+                unit: "each",
+                quantity: 1,
+                unitPriceMinor: 2_500,
+                sourceRule: "owner-provided-hardware-quantity",
+              },
+            ],
+          },
+        }),
+      ],
+    });
+    const result = await recalculateTenantCurrentQuoteVersion(
+      { tenantId: "tenant-a" },
+      "quote-a",
+      { client: state.client },
+    );
+
+    expectCalculationOk(result);
+
+    const inputSnapshot = asRecord(state.calculationResults[0]?.inputSnapshot);
+    const outputSnapshot = asRecord(state.calculationResults[0]?.outputSnapshot);
+    const inputItems = inputSnapshot?.items as Array<Record<string, unknown>>;
+    const outputItems = outputSnapshot?.items as Array<Record<string, unknown>>;
+    const materialRequirements = outputSnapshot?.materialRequirements as Array<Record<string, unknown>>;
+
+    expect(inputItems[0]).toMatchObject({
+      glass: {
+        deductionRule: {
+          sourceRule: "owner-approved-glass-deduction-2026",
+          validationStatus: "validated",
+        },
+      },
+      frameProfile: {
+        meterRule: {
+          sourceRule: "owner-approved-frame-perimeter-2026",
+          validationStatus: "validated",
+        },
+      },
+    });
+    expect(outputItems[0]?.glass).toMatchObject({
+      widthMm: 1_118,
+      heightMm: 1_298,
+      sourceRule: "owner-approved-glass-deduction-2026",
+    });
+    expect(materialRequirements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          materialType: "profile",
+          quantity: 5.46,
+          sourceRule: "owner-approved-frame-perimeter-2026",
+        }),
+        expect.objectContaining({
+          materialType: "hardware",
+          catalogItemId: "hardware-owner-explicit",
+          quantity: 1,
+          costMinor: 2_500,
+          sourceRule: "owner-provided-hardware-quantity",
+        }),
+      ]),
+    );
+  });
+
   it("does not use catalog prices when selected price units are incompatible", async () => {
     const state = testState({
       items: [

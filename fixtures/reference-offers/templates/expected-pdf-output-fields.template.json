@@ -15,6 +15,12 @@
     "totalWithVatMinor": 0,
     "warningCodes": []
   },
+  "tolerances": {
+    "approvedBy": "business-owner",
+    "pdfOutputFieldsMinor": {
+      "totalWithVatMinor": 0
+    }
+  },
   "redactionChecklist": {
     "customerNameRemoved": true,
     "customerContactRemoved": true,
