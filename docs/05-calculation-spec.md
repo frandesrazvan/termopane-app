@@ -157,8 +157,9 @@ the expected values.
 
 ## COD-038 redacted historical validation notes
 
-`pnpm reference:validate` validates the committed synthetic reference pack and any redacted pack path
-passed to the command. The report includes case count, missing business inputs, warning mismatches,
+`pnpm reference:validate` validates the committed synthetic reference pack, the committed
+owner-validated historical intake pack, and any redacted pack path passed to the command. The report
+includes pass/fail/missing-data status, case count, missing business inputs, warning mismatches,
 total mismatches, template/PDF field mismatches, validation errors, validation warnings, and review
 readiness.
 
@@ -192,9 +193,29 @@ Reference fixtures may declare owner-approved rounding tolerances per expected t
 historical fixture using tolerance must set `approvedBy = "business-owner"`; otherwise the harness
 rejects the case.
 
-No 10-20 case owner-validated historical pack is committed yet. Until owners provide redacted
-historical cases, the committed regression coverage remains synthetic and must not be treated as
-production formula validation.
+No 10-20 case owner-validated historical data set is committed yet. The committed
+`fixtures/reference-offers/owner-validated-historical-pack.json` file is an empty redacted intake
+structure and should report `missing-data` until owners provide reviewed historical cases. Until
+then, the committed regression coverage remains synthetic and must not be treated as production
+formula validation.
+
+## COD-042 owner-validated historical pack notes
+
+The owner-validated historical pack starts as `packType = "redacted-historical-review"` with no
+cases because no real owner-approved data is available in source control yet. Populate it only after
+owner review, using `fixtures/reference-offers/templates/quote-case.template.json` for each redacted
+historical offer.
+
+Each populated case must include redaction status, business input status, a frozen
+`calculationInput` snapshot, expected totals, expected warning codes, and expected
+`pdfOutputFields`. Unknown rules stay `missing`, `pending-business-owner`,
+`requires-business-validation`, or case-level `blocked-missing-data`; do not backfill production
+formulas from memory.
+
+After 10-20 cases have every required business input marked `validated` or `not-applicable`, no
+private artifacts committed, and matching totals/warnings/template fields, the pack can be changed
+to `packType = "validated-historical-recreation"` and
+`dataClassification = "redacted-validated-historical"`.
 
 ## COD-028 door MVP calculation notes
 

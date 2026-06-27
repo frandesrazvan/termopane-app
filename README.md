@@ -72,16 +72,17 @@ production formulas.
   dashboard navigation, Romanian loading/error states, and sticky quote total/actions are present for
   mobile sales workflows.
 - Pilot reference-offer fixtures are prepared under `fixtures/reference-offers` with synthetic
-  redacted examples, a Romanian business-owner collection checklist, sample-output requirements, and
-  a pure calculation comparison harness for recreating 10-20 validated historical quotes later.
-  `pnpm reference:validate` reports case count, missing business inputs, warning mismatches, total
+  redacted examples, an empty owner-validated historical intake pack, a Romanian business-owner
+  collection checklist, sample-output requirements, and a pure calculation comparison harness for
+  recreating 10-20 validated historical quotes later. `pnpm reference:validate` reports pass,
+  fail, or missing-data status, case count, missing business inputs, warning mismatches, total
   mismatches, and template/PDF field mismatches without committing private PDFs or customer data.
 - Calculation calibration now accepts owner-provided glass deduction rule snapshots, explicit
   rectangular profile-meter rule snapshots, and explicit hardware/accessory/service material rules.
   Automatic hardware quantities, door production formulas, supplier formulas, transport distance,
   installation labor, and production cutting remain unvalidated until owner-approved data is
-  supplied. The committed pack is still synthetic; a 10-20 case owner-validated historical pack has
-  not yet been added.
+  supplied. The committed owner-validated historical pack is an empty redacted intake structure
+  until business owners provide 10-20 reviewed historical cases.
 
 ## Stack
 
@@ -403,6 +404,11 @@ pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+`pnpm reference:validate` validates both the synthetic reference pack and
+`fixtures/reference-offers/owner-validated-historical-pack.json`. Until owner-reviewed historical
+cases are added, the historical pack should report `Status: missing-data`; `Status: fail` means a
+validation error or calculation/template mismatch needs correction before review.
 
 For pilot deployment verification, also run:
 

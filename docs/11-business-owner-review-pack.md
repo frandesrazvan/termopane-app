@@ -6,16 +6,16 @@ regulile neconfirmate ca date configurabile sau `requires business validation`.
 
 ## Checklist de colectare
 
-| Zonă | Ce se colectează | Decizie necesară |
-| --- | --- | --- |
-| Sisteme de profil | Furnizor, serie, material, coduri, status activ/inactiv, versiune listă | Ce sisteme intră în MVP și ce coduri apar pe ofertă |
-| Deducții sticlă | Deducție lățime/înălțime pe sistem, pachet sau tip deschidere | Valori exacte, unitate mm, prioritate când există mai multe reguli |
-| Reguli metru liniar profil | Profile toc/cercevea/montant/traversă/prag, pierderi, armare | Regula de calcul sau marcaj explicit ca nevalidat |
-| Feronerie | Seturi, tip deschidere, cantități explicite, limite de dimensiuni | Când se selectează manual și când se poate calcula automat |
-| Accesorii și servicii | Glafuri, plase, transport, montaj, unități și prețuri | Ce este vizibil clientului și ce rămâne doar intern |
-| TVA, discount, adaos | Cote TVA, adaos, discount, rotunjire, override manual | Ordinea aplicării și permisiunile de rol |
-| Template PDF preferat | `template-a` sau `template-b`, texte obligatorii, logo, footer | Template implicit și cerințe minime de ieșire |
-| Cerințe pentru output de probă | Totaluri, poziții, denumiri, avertizări, note client | Ce trebuie să se potrivească pentru acceptarea unui caz istoric |
+| Zonă                           | Ce se colectează                                                        | Decizie necesară                                                   |
+| ------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Sisteme de profil              | Furnizor, serie, material, coduri, status activ/inactiv, versiune listă | Ce sisteme intră în MVP și ce coduri apar pe ofertă                |
+| Deducții sticlă                | Deducție lățime/înălțime pe sistem, pachet sau tip deschidere           | Valori exacte, unitate mm, prioritate când există mai multe reguli |
+| Reguli metru liniar profil     | Profile toc/cercevea/montant/traversă/prag, pierderi, armare            | Regula de calcul sau marcaj explicit ca nevalidat                  |
+| Feronerie                      | Seturi, tip deschidere, cantități explicite, limite de dimensiuni       | Când se selectează manual și când se poate calcula automat         |
+| Accesorii și servicii          | Glafuri, plase, transport, montaj, unități și prețuri                   | Ce este vizibil clientului și ce rămâne doar intern                |
+| TVA, discount, adaos           | Cote TVA, adaos, discount, rotunjire, override manual                   | Ordinea aplicării și permisiunile de rol                           |
+| Template PDF preferat          | `template-a` sau `template-b`, texte obligatorii, logo, footer          | Template implicit și cerințe minime de ieșire                      |
+| Cerințe pentru output de probă | Totaluri, poziții, denumiri, avertizări, note client                    | Ce trebuie să se potrivească pentru acceptarea unui caz istoric    |
 
 ## Ghid de intake pentru fixture-uri
 
@@ -61,6 +61,21 @@ Pentru un pack in lucru folositi `packType = "redacted-historical-review"` si
 `packType = "validated-historical-recreation"` si
 `dataClassification = "redacted-validated-historical"`.
 
+## Actualizare dupa review owner
+
+1. Deschideti `fixtures/reference-offers/owner-validated-historical-pack.json`.
+2. Pastrati `packType = "redacted-historical-review"` cat timp lipsesc cazuri sau inputuri owner.
+3. Pentru fiecare oferta aprobata, copiati forma din `templates/quote-case.template.json` si
+   completati doar snapshot-uri JSON redactate: status redactare, status input business, input
+   calcul, totaluri asteptate, coduri de avertizare si campuri PDF/template asteptate.
+4. Marcati orice regula necunoscuta ca `missing`, `pending-business-owner`,
+   `requires-business-validation` sau cazul ca `blocked-missing-data`.
+5. Rulati `pnpm reference:validate`. `Status: missing-data` este asteptat pentru pachetele in lucru;
+   `Status: fail` inseamna erori de validare sau mismatch-uri ce trebuie discutate cu ownerii.
+6. Treceti la `packType = "validated-historical-recreation"` si
+   `dataClassification = "redacted-validated-historical"` numai dupa 10-20 cazuri fara date private,
+   cu inputuri validate si comparatii trecute.
+
 ## Calibrare reguli COD-039
 
 Pentru calibrare se copiaza doar reguli validate explicit de owner:
@@ -84,8 +99,16 @@ Tolerantele de rotunjire sunt permise doar in `expected.tolerances` cu `approved
   "packType": "validated-historical-recreation",
   "dataClassification": "redacted-validated-historical",
   "requirementsChecklist": [
-    { "key": "profilePriceList", "label": "Liste profile", "status": "validated" },
-    { "key": "sampleOutputRequirements", "label": "Output proba", "status": "validated" }
+    {
+      "key": "profilePriceList",
+      "label": "Liste profile",
+      "status": "validated"
+    },
+    {
+      "key": "sampleOutputRequirements",
+      "label": "Output proba",
+      "status": "validated"
+    }
   ],
   "cases": [
     {
@@ -166,8 +189,9 @@ Comandă recomandată:
 pnpm reference:validate
 ```
 
-Comanda afiseaza numarul de cazuri, inputurile business lipsa, mismatch-urile de avertizari,
-mismatch-urile de totaluri si mismatch-urile de campuri PDF/template.
+Comanda afiseaza statusul `pass`, `fail` sau `missing-data`, numarul de cazuri, inputurile business
+lipsa, mismatch-urile de avertizari, mismatch-urile de totaluri si mismatch-urile de campuri
+PDF/template.
 
 Raportul `createReferenceOfferComparisonReport` întoarce numărul de cazuri, erori de validare,
 cazuri trecute/eșuate și dacă pachetul este pregătit pentru sesiunea de review.
