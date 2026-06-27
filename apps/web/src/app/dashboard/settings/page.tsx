@@ -462,7 +462,6 @@ function CompanyLogoPanel({
           <form
             action={uploadCompanyLogoAction}
             className="grid gap-3 sm:grid-cols-[1fr_auto]"
-            encType="multipart/form-data"
           >
             <input
               accept="image/png,image/jpeg,image/webp"

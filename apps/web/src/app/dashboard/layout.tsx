@@ -1,4 +1,4 @@
-import { Building2, LogOut } from "lucide-react";
+import { Building2, LogOut, RefreshCw } from "lucide-react";
 import { listTenantMemberships, requireTenant } from "@/lib/auth";
 import { tenantRoleLabel } from "@/lib/i18n";
 import { logoutAction } from "../logout/actions";
@@ -54,8 +54,9 @@ export default async function DashboardLayout({
                     </option>
                   ))}
                 </select>
-                <button className="hidden h-11 rounded-md border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 active:bg-stone-100 sm:inline-flex sm:items-center">
-                  Schimbă
+                <button className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-sm font-semibold text-zinc-800 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 active:bg-stone-100 sm:h-11 sm:w-auto sm:px-3">
+                  <RefreshCw aria-hidden="true" size={16} />
+                  <span className="sr-only sm:not-sr-only sm:ml-2">Schimbă</span>
                 </button>
               </form>
               <form action={logoutAction}>

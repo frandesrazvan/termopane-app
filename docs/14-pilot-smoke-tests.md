@@ -21,6 +21,11 @@ Run the narrower storage smoke test, `pnpm storage:smoke`, when you only need to
 credentials or endpoint behavior. Run `pnpm pilot:smoke` when you need confidence that the deployed
 app can boot safely, reach the database, use storage, and render quote/PDF basics.
 
+Run `pnpm pilot:acceptance` against a disposable local/development database before each pilot
+release candidate when you need browser-level proof that the current MVP commercial flow still works
+end to end. It complements this smoke script rather than replacing it: `pilot:smoke` is deployable
+environment health, while `pilot:acceptance` is the synthetic Romanian UI flow.
+
 ## Command
 
 ```powershell
@@ -36,6 +41,21 @@ pnpm pilot:smoke
 
 If `BASE_URL` is not configured, the HTTP health check is skipped and the local runtime, storage,
 database, and synthetic quote/PDF checks still run.
+
+## Acceptance command
+
+```powershell
+pnpm pilot:acceptance
+```
+
+The acceptance command runs Prisma generate, committed migration deploy, synthetic seed, and a
+Playwright mobile browser test. The suite uses only seeded `@example.test` users and synthetic
+records under `seed_tenant_synthetic_termopane`, cleans up prior acceptance records by prefix, and
+uses the local email/storage providers. On a fresh machine, install Chromium once with
+`pnpm exec playwright install chromium`.
+
+Do not run `pnpm pilot:acceptance` against pilot or production data because it creates and sends a
+synthetic quote through the local test workflow.
 
 ## Environment values
 
