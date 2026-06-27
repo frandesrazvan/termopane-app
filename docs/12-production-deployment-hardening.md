@@ -24,6 +24,7 @@ for generated PDFs.
   variables.
 - Configure the platform health check to call `/api/health`.
 - Run the storage smoke test against the target environment before sending real pilot offers.
+- Run the full pilot smoke test before and after deploy.
 
 ## Runtime safety checks
 
@@ -107,6 +108,31 @@ The command writes, reads, and deletes a synthetic PDF-like object through the c
 `DOCUMENT_STORAGE_PROVIDER`. It does not use customer data and should be run once for every new
 bucket, endpoint, credential rotation, or host environment.
 
+## Pilot deployment smoke test
+
+Run the full smoke test after target env values are configured:
+
+```powershell
+pnpm pilot:smoke
+```
+
+Set `BASE_URL` when checking a deployed service:
+
+```powershell
+$env:BASE_URL="https://your-pilot-host.example"
+pnpm pilot:smoke
+```
+
+The full smoke command checks runtime safety, `/api/health` when `BASE_URL` exists, document
+storage write/read/delete, Prisma database connectivity, tenant/user bootstrap records, and
+synthetic quote/PDF basics. It prints check names and issue codes only; do not add logs that print
+database URLs, auth secrets, storage credentials, invite tokens, emails, cookies, or customer
+records.
+
+Use `pnpm storage:smoke` for bucket-only verification. Use `pnpm pilot:smoke` before/after deploy
+or after migrations, credential rotation, or infrastructure changes. See
+`docs/14-pilot-smoke-tests.md` for required env values and failure meanings.
+
 ## Backup and restore notes
 
 Database backups:
@@ -154,6 +180,8 @@ Recommended Render settings:
 
 - Health check path: `/api/health`.
 - Secrets: configure all production env values from the checklist in Render environment variables.
+- Smoke verification: run `pnpm pilot:smoke` with `BASE_URL` set to the Render service URL after the
+  service is live.
 
 Do not deploy the `.env.example` defaults as production secrets. They are development placeholders
 and CI checks keep unsafe production defaults disabled.

@@ -23,8 +23,8 @@ production formulas.
 - Document storage now goes through a provider interface. The local provider remains the default
   for dev/test, and an SDK-backed S3-compatible provider is available for deployable object storage.
 - Production deployment hardening now includes runtime env validation, production dev-login blocking,
-  `/api/health`, PII-redacting server logging helpers, a storage smoke test command, and a Render
-  pilot deployment checklist.
+  `/api/health`, PII-redacting server logging helpers, storage and full pilot smoke test commands,
+  and a Render pilot deployment checklist.
 - Catalog schema and synthetic seed data are present for suppliers, profile systems, profile items,
   glass packages, hardware kits, colors, accessories, services, tax rates, price lists, price-list
   items, and pricing rules.
@@ -249,6 +249,32 @@ Run the storage smoke test after setting target storage env values:
 pnpm storage:smoke
 ```
 
+`pnpm storage:smoke` validates only the configured document storage provider. Use the full pilot
+smoke command below when you also need runtime, health, database, tenant/user bootstrap, and
+quote/PDF basics.
+
+## Pilot Smoke Test
+
+Run the full pilot smoke test after configuring the target environment:
+
+```powershell
+pnpm pilot:smoke
+```
+
+Set `BASE_URL` when checking a deployed web service so the script also calls `/api/health`:
+
+```powershell
+$env:BASE_URL="https://your-pilot-host.example"
+pnpm pilot:smoke
+```
+
+The command uses existing runtime validators, performs a synthetic storage write/read/delete,
+checks the Prisma connection, verifies at least one tenant/user/active membership exists, renders a
+synthetic PDF in memory, and inspects seeded synthetic quote metadata when present. It prints issue
+codes only and does not print secrets, emails, tokens, cookies, or customer records. See
+`docs/14-pilot-smoke-tests.md` for failure meanings and the difference between `storage:smoke` and
+`pilot:smoke`.
+
 ## Deployment Readiness
 
 See `docs/12-production-deployment-hardening.md` for the full pilot checklist, backup/restore notes,
@@ -282,6 +308,12 @@ pnpm --filter web start
 Review committed Prisma migration SQL before a real environment deploy. Do not use undocumented
 `prisma db push` behavior for pilot deployment.
 
+After migrations and service startup, run:
+
+```bash
+pnpm pilot:smoke
+```
+
 Configure the host health check path as:
 
 ```text
@@ -307,6 +339,12 @@ pnpm test
 pnpm build
 ```
 
+For pilot deployment verification, also run:
+
+```powershell
+pnpm pilot:smoke
+```
+
 Or run the aggregate local check after dependencies are installed:
 
 ```powershell
@@ -320,7 +358,7 @@ pnpm verify
 - `packages/drawing`: deterministic SVG schematic renderer.
 - `packages/pdf`: Template A and Template B HTML/PDF rendering package.
 - `prisma`: schema, migrations, and synthetic seed entrypoint.
-- `scripts`: operational checks such as env-default and storage smoke tests.
+- `scripts`: operational checks such as env-default, storage smoke, and pilot smoke tests.
 - `docs`: product, data, calculation, PDF, UX, and tasking docs.
 
 ## Not Done Yet

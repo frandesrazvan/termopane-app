@@ -57,6 +57,9 @@ pnpm --filter web start
 
 `pnpm db:migrate:deploy` requires `DATABASE_URL` for the target PostgreSQL database and applies only
 the committed migration directories. It should run once per deployment before serving traffic.
+After the service starts, run `pnpm pilot:smoke` with `BASE_URL` set to the deployed host to verify
+runtime safety, database connectivity, storage, health, tenant/user bootstrap data, and synthetic
+quote/PDF basics.
 
 CI does not run `pnpm db:migrate:deploy` because that command needs a real PostgreSQL database and
 migration history table. The test suite instead checks that committed migration SQL exists for the
