@@ -113,15 +113,31 @@ deployment concern.
 ## COD-031 send/download workflow notes
 
 The customer send workflow requires an existing generated quote PDF for the current locked version.
-Sending does not regenerate or rewrite the PDF; it records `QUOTE_SENT`, sets the quote version
-`sentAt`, updates the quote shell to `SENT`, and stores the selected `documentId` plus optional
-intended recipient fields in audit metadata. The email path is a stub until a real provider is
-explicitly configured in a future task.
+Sending does not regenerate or rewrite the PDF; it delivers the selected PDF through the configured
+email provider, records `QUOTE_SENT`, sets the quote version `sentAt`, updates the quote shell to
+`SENT`, stores a tenant-owned delivery status row, and stores only redacted recipient metadata in
+audit.
 
 The send confirmation screen is customer-safe: it renders explicit document metadata and visible
 customer totals only, and it does not print raw snapshots, supplier costs, margins, or calculation
 trace details. Corrections after send require a new quote revision rather than mutating the sent
 version or rebinding the sent document.
+
+## COD-040 real customer email delivery notes
+
+Customer offer delivery now uses `EMAIL_PROVIDER`. The local provider is development/test only and
+logs a synthetic redacted event without contacting an email service. Production/pilot delivery
+supports Resend through server-side `RESEND_API_KEY`, `EMAIL_FROM`, and optional `EMAIL_REPLY_TO`.
+
+The delivery service reads the already-generated PDF from the configured document storage provider
+and attaches those bytes to a Romanian customer-facing email. It uses the snapshotted tenant company
+name/email as sender or reply-to values where configured. The email body must not include internal
+costs, supplier prices, margins, calculation traces, storage keys, or raw snapshots.
+
+Delivery is rejected when the selected document is not a tenant-owned quote PDF for the current
+locked version. Provider failures do not silently mark the quote as sent. Full recipient emails are
+passed only to the provider and tenant-owned delivery record; server logs and `QUOTE_SENT` audit
+metadata use redacted recipient values.
 
 ## COD-029 accessory/service line output notes
 

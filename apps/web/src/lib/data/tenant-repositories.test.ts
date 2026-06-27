@@ -29,6 +29,7 @@ import {
   type Project,
   type Quote,
   type QuoteCalculationResult,
+  type QuoteDelivery,
   type QuoteItem,
   type QuoteNumberSettings,
   type QuoteVersion,
@@ -705,6 +706,7 @@ function testClient(
     ] as unknown as QuoteItem[]),
     quoteCalculationResult: delegate([] as QuoteCalculationResult[]),
     document: delegate([] as Document[]),
+    quoteDelivery: delegate([] as QuoteDelivery[]),
     auditLog: delegate(options.auditLogs ?? ([] as AuditLog[])),
     companySettings: delegate([
       {
@@ -2351,14 +2353,22 @@ describe("tenant repositories", () => {
         },
       },
     );
+    const documentBeforeSend = await data.getTenantDocument(
+      { tenantId: "tenant-a" },
+      document!.id,
+    );
     const result = await data.sendTenantQuote(
       { tenantId: "tenant-a" },
       "quote-a",
       {
         actorUserId: "user-a",
+        completedAt: new Date("2026-06-26T09:30:02.000Z"),
+        deliveryProvider: "local",
+        deliveryStatus: "logged",
         documentId: document!.id,
-        intendedRecipientEmail: "client.sintetic@example.test",
-        intendedRecipientName: "Contact sintetic",
+        providerMessageId: "local-synthetic-event",
+        recipientEmail: "client.sintetic@example.test",
+        recipientName: "Contact sintetic",
       },
     );
 
@@ -2377,7 +2387,21 @@ describe("tenant repositories", () => {
         id: document?.id,
         quoteVersionId: "version-a",
       },
+      delivery: {
+        documentId: document?.id,
+        provider: "local",
+        providerMessageId: "local-synthetic-event",
+        quoteId: "quote-a",
+        quoteVersionId: "version-a",
+        recipientEmail: "client.sintetic@example.test",
+        recipientEmailRedacted: "c***@e***.test",
+        status: "logged",
+        tenantId: "tenant-a",
+      },
     });
+    await expect(
+      data.getTenantDocument({ tenantId: "tenant-a" }, document!.id),
+    ).resolves.toEqual(documentBeforeSend);
     await expect(
       data.getTenantQuoteDocument(
         { tenantId: "tenant-a" },
@@ -2394,6 +2418,19 @@ describe("tenant repositories", () => {
         status: QuoteVersionStatus.SENT,
       },
     });
+    await expect(
+      data.listTenantQuoteDocumentDeliveries(
+        { tenantId: "tenant-a" },
+        "quote-a",
+        document!.id,
+      ),
+    ).resolves.toMatchObject([
+      {
+        id: result?.delivery?.id,
+        status: "logged",
+        provider: "local",
+      },
+    ]);
     await expect(
       data.updateTenantQuoteItem({ tenantId: "tenant-a" }, "item-a", {
         customerDescription: "Blocked after send",
@@ -2425,10 +2462,17 @@ describe("tenant repositories", () => {
         quoteId: "quote-a",
         targetStatus: QuoteVersionStatus.SENT,
         documentId: document?.id,
-        intendedRecipientEmail: "client.sintetic@example.test",
-        providerStatus: "stub_recorded",
+        deliveryId: result?.delivery?.id,
+        deliveryProvider: "local",
+        deliveryStatus: "logged",
+        providerMessageId: "local-synthetic-event",
+        recipientEmailRedacted: "c***@e***.test",
+        recipientNamePresent: true,
       },
     });
+    expect(JSON.stringify(auditLogs[2])).not.toContain(
+      "client.sintetic@example.test",
+    );
   });
 
   it("rejects sending with a document from another tenant", async () => {

@@ -14,12 +14,15 @@ for generated PDFs.
   value is accidentally set to `true`.
 - Set `AUTH_COOKIE_NAME=termopane_session` or another tenant-safe cookie name.
 - Set `AUTH_SESSION_DAYS` to the intended pilot session length.
-- Use tenant invite links for pilot authentication and keep invite delivery manual until an email
-  provider is configured in a later task.
+- Use tenant invite links for pilot authentication and keep invite delivery manual until invite
+  email delivery is implemented separately.
 - Set `DOCUMENT_STORAGE_PROVIDER=s3` for pilot deployments.
 - Configure `DOCUMENT_STORAGE_S3_ENDPOINT`, `DOCUMENT_STORAGE_S3_REGION`,
   `DOCUMENT_STORAGE_S3_BUCKET`, `DOCUMENT_STORAGE_S3_ACCESS_KEY_ID`,
   `DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY`, and `DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE`.
+- Set `EMAIL_PROVIDER=resend` for pilot customer offer delivery.
+- Configure `EMAIL_FROM`, optional `EMAIL_REPLY_TO`, and `RESEND_API_KEY` from the host secret
+  store.
 - Keep all credentials in the host secret store, not in Git or browser-exposed `NEXT_PUBLIC_*`
   variables.
 - Configure the platform health check to call `/api/health`.
@@ -36,6 +39,8 @@ Production health checks fail when:
 - `DATABASE_URL` is missing;
 - document storage is missing, unsupported, or left as `local`;
 - S3-compatible document storage is selected without all required S3 env values.
+- customer offer email delivery is missing, unsupported, left as `local`, or selected as Resend
+  without all required Resend env values.
 
 Development login is opt-in for local work and is blocked whenever `NODE_ENV=production`.
 Pilot login does not depend on development login; invited users accept single-use tenant invite links
@@ -95,6 +100,10 @@ Do not log:
 - full quote snapshots, PDF payloads, document bytes, storage credentials, auth secrets, session
   tokens, cookies, or authorization headers;
 - internal material costs in customer/dealer-facing flows.
+
+Customer offer email delivery must log only synthetic/redacted metadata. Full recipient emails may be
+used for provider delivery and tenant-owned delivery records, but `QUOTE_SENT` audit metadata and
+server logs must use redacted recipient values only.
 
 ## Storage provider smoke test
 

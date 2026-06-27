@@ -32,7 +32,11 @@ for (const [key, value] of Object.entries(defaults)) {
   }
 }
 
-for (const key of ["DOCUMENT_STORAGE_S3_ACCESS_KEY_ID", "DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY"]) {
+for (const key of [
+  "DOCUMENT_STORAGE_S3_ACCESS_KEY_ID",
+  "DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY",
+  "RESEND_API_KEY",
+]) {
   const value = defaults[key]?.trim();
 
   if (value && !looksLikePlaceholder(value)) {

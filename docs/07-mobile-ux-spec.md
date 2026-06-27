@@ -124,13 +124,22 @@ automatic formula execution, or changes to locked historical quote snapshots.
 
 ## COD-031 customer delivery UX notes
 
-Generated PDFs on a locked version expose a Romanian `Trimite către client` action with optional
-recipient name/email fields. The current MVP records this as a stub only; the UI must not imply that
-a real email provider sent the message.
+Generated PDFs on a locked version expose a Romanian `Trimite către client` action with required
+recipient email and optional recipient name fields. The action delivers the selected generated PDF
+through the configured email provider. In local development the provider records only a synthetic
+redacted delivery event; production/pilot should configure a real provider.
 
 After send, users land on a confirmation screen with the quote number, version, sent timestamp,
-download action, and customer-visible totals. The screen avoids internal costs and trace details, and
-the quote detail page explains that a revision is the only way to change a sent offer.
+download action, customer-visible totals, and delivery status with only a redacted recipient email.
+The screen avoids internal costs and trace details, and the quote detail page explains that a
+revision is the only way to change a sent offer.
+
+## COD-040 customer email delivery UX notes
+
+Send errors distinguish invalid recipient email, unreadable stored PDF, provider failure, and
+not-locked/not-current document state. The UI must not display full recipient emails from delivery
+logs or audit metadata, and it must not imply invite-email automation; invite links remain manually
+delivered until a separate auth-invite email task is implemented.
 
 ## COD-020 commercial adjustment UX notes
 

@@ -51,7 +51,11 @@ pilot-like runs, the existing runtime validator also requires:
 - `DOCUMENT_STORAGE_S3_BUCKET`;
 - `DOCUMENT_STORAGE_S3_ACCESS_KEY_ID`;
 - `DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY`;
-- `DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE` when the provider needs path-style requests.
+- `DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE` when the provider needs path-style requests;
+- `EMAIL_PROVIDER=resend`;
+- `EMAIL_FROM`;
+- `RESEND_API_KEY`;
+- optional `EMAIL_REPLY_TO`.
 
 Optional smoke values:
 

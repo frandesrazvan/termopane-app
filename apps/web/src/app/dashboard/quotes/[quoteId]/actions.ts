@@ -42,7 +42,6 @@ import {
   listTenantPriceListItems,
   listTenantPriceLists,
   lockTenantQuoteVersion,
-  sendTenantQuote,
   updateTenantQuoteItem,
   type TenantQuoteItemUpdateInput,
   type TenantQuoteItemWriteInput,
@@ -52,6 +51,7 @@ import {
   doorDrawingSnapshot,
   fixedWindowDrawingSnapshot,
 } from "@/lib/drawing/quote-item-drawings";
+import { deliverTenantQuotePdfToCustomer } from "@/lib/email/customer-offer-delivery";
 import { generateTenantQuotePdf } from "@/lib/pdf/quote-pdf-generator";
 
 const optionalText = (maxLength: number) =>
@@ -71,15 +71,14 @@ const optionalCatalogIdSchema = z
   .trim()
   .max(191)
   .transform((value) => (value.length > 0 ? value : null));
-const optionalEmailSchema = z
+const emailSchema = z
   .string()
   .trim()
+  .min(1)
   .max(254)
-  .transform((value) => (value.length > 0 ? value : null))
-  .refine(
-    (value) => value === null || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
-    "Invalid email address.",
-  );
+  .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
+    message: "Invalid email address.",
+  });
 const optionalMoneySchema = z
   .string()
   .trim()
@@ -226,8 +225,8 @@ const quoteDiscountSchema = z
 
 const quoteSendSchema = z.object({
   documentId: catalogIdSchema,
-  intendedRecipientEmail: optionalEmailSchema,
-  intendedRecipientName: optionalText(120),
+  recipientEmail: emailSchema,
+  recipientName: optionalText(120),
 });
 
 type TenantActionContext = Awaited<ReturnType<typeof requireTenant>>;
@@ -615,28 +614,50 @@ export async function sendQuoteToCustomerAction(
 
   const parsed = quoteSendSchema.safeParse({
     documentId: formText(formData, "documentId"),
-    intendedRecipientEmail: formText(formData, "intendedRecipientEmail"),
-    intendedRecipientName: formText(formData, "intendedRecipientName"),
+    recipientEmail: formText(formData, "recipientEmail"),
+    recipientName: formText(formData, "recipientName"),
   });
 
   if (!parsed.success) {
     redirectWithDocumentError(quoteId, "recipient");
   }
 
-  const result = await sendTenantQuote(context, quoteId, {
-    actorUserId: context.user.id,
-    documentId: parsed.data.documentId,
-    intendedRecipientEmail: parsed.data.intendedRecipientEmail,
-    intendedRecipientName: parsed.data.intendedRecipientName,
-    emailProviderConfigured: false,
-  });
+  const result = await deliverTenantQuotePdfToCustomer(
+    context,
+    quoteId,
+    parsed.data.documentId,
+    {
+      actorUserId: context.user.id,
+      recipientEmail: parsed.data.recipientEmail,
+      recipientName: parsed.data.recipientName,
+    },
+  );
 
-  if (!result) {
+  if (!result.ok) {
+    if (result.reason === "recipient_required") {
+      redirectWithDocumentError(quoteId, "recipient");
+    }
+
+    if (result.reason === "not_locked") {
+      redirectWithDocumentError(quoteId, "locked");
+    }
+
+    if (
+      result.reason === "document_not_readable" ||
+      result.reason === "storage_read_failed"
+    ) {
+      redirectWithDocumentError(quoteId, "storage");
+    }
+
+    if (result.reason === "provider_failed") {
+      redirectWithDocumentError(quoteId, "provider");
+    }
+
     redirectWithDocumentError(quoteId, "send");
   }
 
   redirect(
-    `${quotePath(quoteId)}/send-confirmation?documentId=${encodeURIComponent(result.document.id)}`,
+    `${quotePath(quoteId)}/send-confirmation?documentId=${encodeURIComponent(result.documentId)}`,
   );
 }
 
@@ -1386,7 +1407,13 @@ function redirectWithDocumentEvent(quoteId: string, event: "generated"): never {
 
 function redirectWithDocumentError(
   quoteId: string,
-  error: "locked" | "generate" | "recipient" | "send",
+  error:
+    | "generate"
+    | "locked"
+    | "provider"
+    | "recipient"
+    | "send"
+    | "storage",
 ): never {
   redirect(`${quotePath(quoteId)}?documentError=${error}#documents`);
 }

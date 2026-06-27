@@ -1,7 +1,10 @@
 import { DocumentType, QuoteVersionStatus } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/auth";
-import { getTenantQuoteDocument } from "@/lib/data";
+import {
+  getTenantQuoteDocument,
+  listTenantQuoteDocumentDeliveries,
+} from "@/lib/data";
 import { QuoteSendConfirmationView } from "./send-confirmation-view";
 
 export const dynamic = "force-dynamic";
@@ -38,8 +41,15 @@ export default async function QuoteSendConfirmationPage({
     notFound();
   }
 
+  const deliveries = await listTenantQuoteDocumentDeliveries(
+    context,
+    quoteId,
+    documentId,
+  );
+
   return (
     <QuoteSendConfirmationView
+      delivery={deliveries[0] ?? null}
       document={result.document}
       quote={result.quote}
       quoteVersion={result.quoteVersion}

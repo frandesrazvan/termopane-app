@@ -7,7 +7,11 @@ export type RuntimeEnvironmentIssueCode =
   | "document_storage_provider_missing"
   | "document_storage_provider_unsupported"
   | "document_storage_local_in_production"
-  | "document_storage_s3_missing";
+  | "document_storage_s3_missing"
+  | "email_provider_missing"
+  | "email_provider_unsupported"
+  | "email_local_in_production"
+  | "email_resend_missing";
 
 export type RuntimeEnvironmentIssue = Readonly<{
   code: RuntimeEnvironmentIssueCode;
@@ -25,6 +29,7 @@ const unsafeAuthSecretFragments = [
   "test-secret",
 ];
 const supportedStorageProviders = new Set(["local", "s3"]);
+const supportedEmailProviders = new Set(["local", "resend"]);
 const requiredS3EnvKeys = [
   "DOCUMENT_STORAGE_S3_ENDPOINT",
   "DOCUMENT_STORAGE_S3_REGION",
@@ -32,6 +37,7 @@ const requiredS3EnvKeys = [
   "DOCUMENT_STORAGE_S3_ACCESS_KEY_ID",
   "DOCUMENT_STORAGE_S3_SECRET_ACCESS_KEY",
 ] as const;
+const requiredResendEnvKeys = ["RESEND_API_KEY", "EMAIL_FROM"] as const;
 
 export class RuntimeEnvironmentError extends Error {
   readonly issues: readonly RuntimeEnvironmentIssue[];
@@ -130,6 +136,7 @@ export function runtimeEnvironmentIssues(
   }
 
   issues.push(...documentStorageProductionIssues(env));
+  issues.push(...emailProductionIssues(env));
 
   return issues;
 }
@@ -181,6 +188,49 @@ function documentStorageProductionIssues(env: NodeJS.ProcessEnv): RuntimeEnviron
       issues.push({
         code: "document_storage_s3_missing",
         message: `S3-compatible document storage is missing required values: ${missing.join(", ")}.`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+function emailProductionIssues(env: NodeJS.ProcessEnv): RuntimeEnvironmentIssue[] {
+  const provider = env.EMAIL_PROVIDER?.trim().toLowerCase();
+  const issues: RuntimeEnvironmentIssue[] = [];
+
+  if (!provider) {
+    return [
+      {
+        code: "email_provider_missing",
+        message: "EMAIL_PROVIDER must be configured in production.",
+      },
+    ];
+  }
+
+  if (!supportedEmailProviders.has(provider)) {
+    return [
+      {
+        code: "email_provider_unsupported",
+        message: "EMAIL_PROVIDER must be local or resend.",
+      },
+    ];
+  }
+
+  if (provider === "local") {
+    issues.push({
+      code: "email_local_in_production",
+      message: "Use a real email provider for production customer offer delivery.",
+    });
+  }
+
+  if (provider === "resend") {
+    const missing = requiredResendEnvKeys.filter((key) => !env[key]?.trim());
+
+    if (missing.length > 0) {
+      issues.push({
+        code: "email_resend_missing",
+        message: `Resend email delivery is missing required values: ${missing.join(", ")}.`,
       });
     }
   }
