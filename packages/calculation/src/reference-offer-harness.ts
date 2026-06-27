@@ -18,19 +18,28 @@ export const requiredReviewInputKeys = [
 
 export type RequiredReviewInputKey = (typeof requiredReviewInputKeys)[number];
 
-export type ReferenceOfferPackType = "synthetic-pilot" | "validated-historical-recreation";
+export type ReferenceOfferPackType =
+  | "synthetic-pilot"
+  | "redacted-historical-review"
+  | "validated-historical-recreation";
 
 export type ReferenceOfferDataClassification =
   | "synthetic-redacted"
+  | "redacted-historical"
   | "redacted-validated-historical";
 
 export type ReferenceOfferReviewStatus =
   | "synthetic-baseline"
   | "pending-business-validation"
-  | "validated-historical";
+  | "draft-redacted"
+  | "business-reviewed"
+  | "validated-historical"
+  | "blocked-missing-data";
 
 export type ReferenceRequirementStatus =
+  | "missing"
   | "pending-business-owner"
+  | "requires-business-validation"
   | "synthetic"
   | "collected-redacted"
   | "validated"
@@ -70,6 +79,17 @@ export type ReferenceOfferTotalsExpectation = Partial<
   }>
 >;
 
+export type ReferencePdfOutputFieldValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly string[];
+
+export type ReferencePdfOutputFieldsExpectation = Readonly<
+  Record<string, ReferencePdfOutputFieldValue>
+>;
+
 export type ReferenceOfferExpectation = Readonly<{
   itemCount: number;
   materialRequirementCount?: number;
@@ -77,6 +97,7 @@ export type ReferenceOfferExpectation = Readonly<{
   profileGroupCount?: number;
   warningCodes?: readonly CalculationWarningCode[];
   totals: ReferenceOfferTotalsExpectation;
+  pdfOutputFields?: ReferencePdfOutputFieldsExpectation;
 }>;
 
 export type ReferenceOfferCase = Readonly<{
@@ -111,6 +132,9 @@ export type ReferenceOfferRecreationResult = Readonly<{
   caseId: string;
   passed: boolean;
   mismatches: readonly string[];
+  warningMismatches: readonly string[];
+  totalMismatches: readonly string[];
+  templateFieldMismatches: readonly string[];
   result: QuoteCalculationResult;
 }>;
 
@@ -121,8 +145,13 @@ export type ReferenceOfferPackRecreationResult = Readonly<{
 
 export type ReferenceOfferComparisonCaseSummary = Readonly<{
   caseId: string;
+  reviewStatus: ReferenceOfferReviewStatus;
   passed: boolean;
   mismatchCount: number;
+  missingBusinessInputs: readonly RequiredReviewInputKey[];
+  warningMismatchCount: number;
+  totalMismatchCount: number;
+  templateFieldMismatchCount: number;
   totalWithVatMinor: number;
   warningCodes: readonly CalculationWarningCode[];
 }>;
@@ -131,6 +160,10 @@ export type ReferenceOfferComparisonReport = Readonly<{
   packId: string;
   packType: ReferenceOfferPackType;
   caseCount: number;
+  missingBusinessInputCount: number;
+  warningMismatchCount: number;
+  totalMismatchCount: number;
+  templateFieldMismatchCount: number;
   validationErrorCount: number;
   validationWarningCount: number;
   passedCaseCount: number;
@@ -160,6 +193,20 @@ export function validateReferenceOfferPack(
 
   if (pack.packType === "validated-historical-recreation" && !isValidatedHistoricalPackSize(pack.cases.length)) {
     errors.push("Validated historical recreation packs must contain 10-20 cases.");
+  }
+
+  if (
+    pack.packType === "validated-historical-recreation" &&
+    pack.dataClassification !== "redacted-validated-historical"
+  ) {
+    errors.push("Validated historical recreation packs must be redacted-validated-historical.");
+  }
+
+  if (
+    pack.packType === "redacted-historical-review" &&
+    !["redacted-historical", "redacted-validated-historical"].includes(pack.dataClassification)
+  ) {
+    errors.push("Redacted historical review packs must use a redacted data classification.");
   }
 
   const checklistKeys = new Set(pack.requirementsChecklist.map((requirement) => requirement.key));
@@ -217,6 +264,17 @@ export function validateReferenceOfferCase(
     warnings.push(`${prefix} references redacted source documents; keep originals outside Git.`);
   }
 
+  if (isRedactedHistoricalStatus(referenceCase.reviewStatus) && referenceCase.source.kind !== "redacted-historical-json") {
+    errors.push(`${prefix} redacted historical cases must use redacted-historical-json source kind.`);
+  }
+
+  if (
+    isRedactedHistoricalStatus(referenceCase.reviewStatus) &&
+    (referenceCase.redaction.customer !== "redacted" || referenceCase.redaction.project !== "redacted")
+  ) {
+    errors.push(`${prefix} redacted historical cases must redact customer and project fields.`);
+  }
+
   if (
     referenceCase.reviewStatus === "validated-historical" &&
     referenceCase.dataClassification !== "redacted-validated-historical"
@@ -227,6 +285,26 @@ export function validateReferenceOfferCase(
   for (const key of requiredReviewInputKeys) {
     if (!referenceCase.businessInputStatus[key]) {
       errors.push(`${prefix} missing business input status: ${key}.`);
+    }
+  }
+
+  const missingBusinessInputs = missingBusinessInputKeysForCase(referenceCase);
+
+  if (referenceCase.reviewStatus === "blocked-missing-data" && missingBusinessInputs.length === 0) {
+    warnings.push(`${prefix} is blocked-missing-data but no missing business inputs were listed.`);
+  }
+
+  if (referenceCase.reviewStatus === "validated-historical") {
+    const unvalidatedBusinessInputs = requiredReviewInputKeys.filter(
+      (key) => !isValidatedHistoricalBusinessInputStatus(referenceCase.businessInputStatus[key]),
+    );
+
+    if (unvalidatedBusinessInputs.length > 0) {
+      errors.push(
+        `${prefix} validated historical cases need validated or not-applicable business inputs: ${unvalidatedBusinessInputs.join(
+          ", ",
+        )}.`,
+      );
     }
   }
 
@@ -249,6 +327,9 @@ export function recreateReferenceOfferCase(
 ): ReferenceOfferRecreationResult {
   const result = calculateQuote(referenceCase.calculationInput);
   const mismatches: string[] = [];
+  const warningMismatches: string[] = [];
+  const totalMismatches: string[] = [];
+  const templateFieldMismatches: string[] = [];
 
   compareNumber("itemCount", result.items.length, referenceCase.expected.itemCount, mismatches);
   compareOptionalNumber(
@@ -273,7 +354,7 @@ export function recreateReferenceOfferCase(
   for (const [key, expectedValue] of Object.entries(referenceCase.expected.totals)) {
     const actualValue = result.totals[key as keyof typeof result.totals];
 
-    compareNumber(`totals.${key}`, actualValue, expectedValue, mismatches);
+    compareNumber(`totals.${key}`, actualValue, expectedValue, mismatches, totalMismatches);
   }
 
   const actualWarningCodes = uniqueSortedWarningCodes(
@@ -284,17 +365,29 @@ export function recreateReferenceOfferCase(
   );
 
   if (actualWarningCodes.join(",") !== expectedWarningCodes.join(",")) {
-    mismatches.push(
-      `warningCodes expected ${expectedWarningCodes.join(",") || "none"} but received ${
-        actualWarningCodes.join(",") || "none"
-      }`,
-    );
+    const mismatch = `warningCodes expected ${
+      expectedWarningCodes.join(",") || "none"
+    } but received ${actualWarningCodes.join(",") || "none"}`;
+
+    mismatches.push(mismatch);
+    warningMismatches.push(mismatch);
   }
+
+  comparePdfOutputFields(
+    result,
+    referenceCase,
+    referenceCase.expected.pdfOutputFields,
+    mismatches,
+    templateFieldMismatches,
+  );
 
   return Object.freeze({
     caseId: referenceCase.caseId,
     passed: mismatches.length === 0,
     mismatches: Object.freeze(mismatches),
+    warningMismatches: Object.freeze(warningMismatches),
+    totalMismatches: Object.freeze(totalMismatches),
+    templateFieldMismatches: Object.freeze(templateFieldMismatches),
     result,
   });
 }
@@ -317,6 +410,28 @@ export function createReferenceOfferComparisonReport(
   const recreation = recreateReferenceOfferPack(pack);
   const passedCaseCount = recreation.cases.filter((result) => result.passed).length;
   const failedCaseCount = recreation.cases.length - passedCaseCount;
+  const missingBusinessInputsByCase = new Map(
+    pack.cases.map((referenceCase) => [
+      referenceCase.caseId,
+      missingBusinessInputKeysForCase(referenceCase),
+    ]),
+  );
+  const missingBusinessInputCount = [...missingBusinessInputsByCase.values()].reduce(
+    (count, missingInputs) => count + missingInputs.length,
+    0,
+  );
+  const warningMismatchCount = recreation.cases.reduce(
+    (count, result) => count + result.warningMismatches.length,
+    0,
+  );
+  const totalMismatchCount = recreation.cases.reduce(
+    (count, result) => count + result.totalMismatches.length,
+    0,
+  );
+  const templateFieldMismatchCount = recreation.cases.reduce(
+    (count, result) => count + result.templateFieldMismatches.length,
+    0,
+  );
   const historicalCaseWindowSatisfied =
     pack.packType !== "validated-historical-recreation" ||
     isValidatedHistoricalPackSize(pack.cases.length);
@@ -325,6 +440,10 @@ export function createReferenceOfferComparisonReport(
     packId: pack.packId,
     packType: pack.packType,
     caseCount: pack.cases.length,
+    missingBusinessInputCount,
+    warningMismatchCount,
+    totalMismatchCount,
+    templateFieldMismatchCount,
     validationErrorCount: validation.errors.length,
     validationWarningCount: validation.warnings.length,
     passedCaseCount,
@@ -332,20 +451,30 @@ export function createReferenceOfferComparisonReport(
     historicalCaseWindowSatisfied,
     readyForReviewSession:
       validation.errors.length === 0 &&
+      missingBusinessInputCount === 0 &&
       failedCaseCount === 0 &&
       historicalCaseWindowSatisfied,
     cases: Object.freeze(
-      recreation.cases.map((result) =>
-        Object.freeze({
+      recreation.cases.map((result) => {
+        const referenceCase = pack.cases.find((item) => item.caseId === result.caseId);
+
+        return Object.freeze({
           caseId: result.caseId,
+          reviewStatus: referenceCase?.reviewStatus ?? "pending-business-validation",
           passed: result.passed,
           mismatchCount: result.mismatches.length,
+          missingBusinessInputs: Object.freeze(
+            missingBusinessInputsByCase.get(result.caseId) ?? [],
+          ),
+          warningMismatchCount: result.warningMismatches.length,
+          totalMismatchCount: result.totalMismatches.length,
+          templateFieldMismatchCount: result.templateFieldMismatches.length,
           totalWithVatMinor: result.result.totals.totalWithVatMinor,
           warningCodes: uniqueSortedWarningCodes(
             result.result.warnings.map((warning) => warning.code),
           ),
-        }),
-      ),
+        });
+      }),
     ),
   });
 }
@@ -354,14 +483,28 @@ export function isValidatedHistoricalPackSize(caseCount: number) {
   return Number.isInteger(caseCount) && caseCount >= 10 && caseCount <= 20;
 }
 
+export function missingBusinessInputKeysForCase(
+  referenceCase: ReferenceOfferCase,
+): readonly RequiredReviewInputKey[] {
+  return Object.freeze(
+    requiredReviewInputKeys.filter((key) =>
+      isMissingBusinessInputStatus(referenceCase.businessInputStatus[key]),
+    ),
+  );
+}
+
 function compareNumber(
   label: string,
   actualValue: number,
   expectedValue: number,
   mismatches: string[],
+  categoryMismatches?: string[],
 ) {
   if (actualValue !== expectedValue) {
-    mismatches.push(`${label} expected ${expectedValue} but received ${actualValue}`);
+    const mismatch = `${label} expected ${expectedValue} but received ${actualValue}`;
+
+    mismatches.push(mismatch);
+    categoryMismatches?.push(mismatch);
   }
 }
 
@@ -376,6 +519,87 @@ function compareOptionalNumber(
   }
 
   compareNumber(label, actualValue, expectedValue, mismatches);
+}
+
+function comparePdfOutputFields(
+  result: QuoteCalculationResult,
+  referenceCase: ReferenceOfferCase,
+  expectedFields: ReferencePdfOutputFieldsExpectation | undefined,
+  mismatches: string[],
+  templateFieldMismatches: string[],
+) {
+  if (!expectedFields) {
+    return;
+  }
+
+  const actualFields = createComparablePdfOutputFields(referenceCase, result);
+
+  for (const [key, expectedValue] of Object.entries(expectedFields)) {
+    const actualValue = actualFields[key];
+
+    if (!samePdfFieldValue(actualValue, expectedValue)) {
+      const mismatch = `pdfOutputFields.${key} expected ${formatPdfFieldValue(
+        expectedValue,
+      )} but received ${formatPdfFieldValue(actualValue)}`;
+
+      mismatches.push(mismatch);
+      templateFieldMismatches.push(mismatch);
+    }
+  }
+}
+
+function createComparablePdfOutputFields(
+  referenceCase: ReferenceOfferCase,
+  result: QuoteCalculationResult,
+): ReferencePdfOutputFieldsExpectation {
+  return Object.freeze({
+    templateKey: referenceCase.preferredTemplateKey,
+    quoteId: referenceCase.calculationInput.quoteId,
+    itemCount: result.items.length,
+    totalWithVatMinor: result.totals.totalWithVatMinor,
+    warningCodes: uniqueSortedWarningCodes(result.warnings.map((warning) => warning.code)),
+  });
+}
+
+function samePdfFieldValue(
+  actualValue: ReferencePdfOutputFieldValue | undefined,
+  expectedValue: ReferencePdfOutputFieldValue,
+) {
+  if (actualValue === undefined) {
+    return false;
+  }
+
+  if (Array.isArray(actualValue) || Array.isArray(expectedValue)) {
+    return JSON.stringify(actualValue) === JSON.stringify(expectedValue);
+  }
+
+  return actualValue === expectedValue;
+}
+
+function formatPdfFieldValue(value: ReferencePdfOutputFieldValue | undefined) {
+  return value === undefined ? "missing" : JSON.stringify(value);
+}
+
+function isRedactedHistoricalStatus(status: ReferenceOfferReviewStatus) {
+  return (
+    status === "draft-redacted" ||
+    status === "business-reviewed" ||
+    status === "validated-historical" ||
+    status === "blocked-missing-data"
+  );
+}
+
+function isMissingBusinessInputStatus(status: ReferenceRequirementStatus | undefined) {
+  return (
+    status === undefined ||
+    status === "missing" ||
+    status === "pending-business-owner" ||
+    status === "requires-business-validation"
+  );
+}
+
+function isValidatedHistoricalBusinessInputStatus(status: ReferenceRequirementStatus | undefined) {
+  return status === "validated" || status === "not-applicable";
 }
 
 function uniqueSortedWarningCodes(codes: readonly CalculationWarningCode[]) {

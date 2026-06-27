@@ -1,0 +1,61 @@
+{
+  "templateKind": "profile-glass-accessory-service-price-snapshot",
+  "dataClassification": "redacted-historical",
+  "privateArtifactChecklist": {
+    "originalPriceListsStoredOutsideGit": true,
+    "supplierConfidentialColumnsRemoved": true,
+    "customerDataRemoved": true,
+    "internalCostFieldsIncludedOnlyWhenApprovedForHarness": false
+  },
+  "priceListSnapshot": {
+    "snapshotId": "redacted-price-snapshot-00",
+    "currency": "RON",
+    "versionLabel": "redacted-owner-approved-version",
+    "businessValidationStatus": "requires-business-validation",
+    "profiles": [
+      {
+        "id": "redacted-profile-frame-00",
+        "profileSystemId": "redacted-profile-system-00",
+        "label": "Redacted frame profile",
+        "material": "PVC",
+        "profileType": "frame",
+        "unit": "linear-meter",
+        "unitPriceMinorPerMeter": 0,
+        "deductionRuleKey": "requires business validation",
+        "businessValidationStatus": "requires-business-validation"
+      }
+    ],
+    "glassPackages": [
+      {
+        "id": "redacted-glass-00",
+        "label": "Redacted glass package",
+        "unit": "square-meter",
+        "unitPriceMinorPerM2": 0,
+        "deductionWidthMm": 0,
+        "deductionHeightMm": 0,
+        "minBillableAreaM2": 0,
+        "businessValidationStatus": "requires-business-validation"
+      }
+    ],
+    "accessories": [
+      {
+        "id": "redacted-accessory-00",
+        "label": "Redacted accessory",
+        "unit": "each",
+        "unitPriceMinor": 0,
+        "customerVisible": true,
+        "businessValidationStatus": "requires-business-validation"
+      }
+    ],
+    "services": [
+      {
+        "id": "redacted-service-00",
+        "label": "Redacted service",
+        "unit": "fixed",
+        "unitPriceMinor": 0,
+        "customerVisible": true,
+        "businessValidationStatus": "requires-business-validation"
+      }
+    ]
+  }
+}

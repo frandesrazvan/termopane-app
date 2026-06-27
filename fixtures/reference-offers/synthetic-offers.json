@@ -142,6 +142,13 @@
           "totalBeforeManualOverrideMinor": 67116,
           "manualAdjustmentMinor": 0,
           "totalWithVatMinor": 67116
+        },
+        "pdfOutputFields": {
+          "templateKey": "template-a",
+          "quoteId": "synthetic-offer-001",
+          "itemCount": 2,
+          "totalWithVatMinor": 67116,
+          "warningCodes": []
         }
       }
     },
@@ -240,6 +247,13 @@
           "totalBeforeManualOverrideMinor": 63703,
           "manualAdjustmentMinor": 297,
           "totalWithVatMinor": 64000
+        },
+        "pdfOutputFields": {
+          "templateKey": "template-b",
+          "quoteId": "synthetic-offer-002",
+          "itemCount": 1,
+          "totalWithVatMinor": 64000,
+          "warningCodes": ["MANUAL_OVERRIDE_APPLIED"]
         }
       }
     }

@@ -1,0 +1,22 @@
+{
+  "templateKind": "expected-reference-offer-totals",
+  "currency": "RON",
+  "minorUnit": "bani",
+  "businessValidationStatus": "requires-business-validation",
+  "totals": {
+    "materialCostMinor": 0,
+    "markupMinor": 0,
+    "itemDiscountMinor": 0,
+    "quoteDiscountMinor": 0,
+    "discountMinor": 0,
+    "subtotalAfterDiscountMinor": 0,
+    "vatMinor": 0,
+    "totalBeforeManualOverrideMinor": 0,
+    "manualAdjustmentMinor": 0,
+    "totalWithVatMinor": 0
+  },
+  "notes": [
+    "Copy only owner-approved redacted values.",
+    "Leave unknown business rules marked as requires business validation."
+  ]
+}

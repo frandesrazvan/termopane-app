@@ -158,6 +158,16 @@ PDFs and source price lists must remain outside Git. Future validated cases shou
 redacted snapshot facts needed to reproduce the quote totals and selected `template-a` or
 `template-b` output.
 
+## COD-038 redacted output-field validation notes
+
+Reference offer fixtures can include `expected.pdfOutputFields` for customer-safe template/PDF fields
+that are comparable without committing real PDFs. The current harness compares `templateKey`,
+`quoteId`, `itemCount`, `totalWithVatMinor`, and `warningCodes`; richer visible fields should be added
+only when the renderer exposes redacted snapshot values suitable for source control.
+
+Private historical PDFs, images, Office documents, supplier spreadsheets, customer names, contact
+data, site addresses, and fiscal identifiers must remain outside Git.
+
 ## COD-025 storage/deployment readiness notes
 
 Generated quote PDFs now go through a document storage provider interface. The local provider keeps

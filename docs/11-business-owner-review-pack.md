@@ -36,6 +36,33 @@ regulile neconfirmate ca date configurabile sau `requires business validation`.
 Fixture-urile istorice trebuie să urmeze forma din
 `fixtures/reference-offers/synthetic-offers.json`, dar cu date redactate și statusuri validate:
 
+## Conversie sigura in fixture-uri redacted
+
+Folositi template-urile din `fixtures/reference-offers/templates/`:
+
+- `price-snapshot.template.json` pentru snapshot-uri profile, sticla, accesorii si servicii;
+- `quote-case.template.json` pentru fiecare caz istoric redacted;
+- `expected-totals.template.json` pentru totaluri in unitati minore;
+- `expected-pdf-output-fields.template.json` pentru campurile PDF/template comparabile.
+
+Statusurile permise pentru cazurile istorice sunt:
+
+- `draft-redacted`: datele sunt redactate, dar nu au fost revizuite de owner;
+- `business-reviewed`: ownerul a revizuit cazul, dar comparatia nu este finala;
+- `validated-historical`: totaluri, avertizari si campuri PDF/template validate;
+- `blocked-missing-data`: lipsesc inputuri business, deci cazul ramane blocat.
+
+Nu schimbati un caz in `validated-historical` pana cand toate intrarile din `businessInputStatus`
+sunt `validated` sau `not-applicable`, `source.privateArtifactsCommitted` este `false`, iar
+`source.originalDocumentAvailable` este `false`.
+
+Pentru un pack in lucru folositi `packType = "redacted-historical-review"` si
+`dataClassification = "redacted-historical"`. Dupa ce exista 10-20 cazuri validate, schimbati la
+`packType = "validated-historical-recreation"` si
+`dataClassification = "redacted-validated-historical"`.
+
+## Exemplu JSON validat
+
 ```json
 {
   "schemaVersion": 1,
@@ -96,6 +123,13 @@ Fixture-urile istorice trebuie să urmeze forma din
         "warningCodes": [],
         "totals": {
           "totalWithVatMinor": 0
+        },
+        "pdfOutputFields": {
+          "templateKey": "template-a",
+          "quoteId": "redacted-historical-01",
+          "itemCount": 1,
+          "totalWithVatMinor": 0,
+          "warningCodes": []
         }
       }
     }
@@ -115,8 +149,11 @@ validate, dimensiunea acceptată este 10-20 cazuri.
 Comandă recomandată:
 
 ```powershell
-pnpm --filter @termopane/calculation test -- reference-offer-harness
+pnpm reference:validate
 ```
+
+Comanda afiseaza numarul de cazuri, inputurile business lipsa, mismatch-urile de avertizari,
+mismatch-urile de totaluri si mismatch-urile de campuri PDF/template.
 
 Raportul `createReferenceOfferComparisonReport` întoarce numărul de cazuri, erori de validare,
 cazuri trecute/eșuate și dacă pachetul este pregătit pentru sesiunea de review.
