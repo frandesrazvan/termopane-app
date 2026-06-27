@@ -1,10 +1,12 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { cwd, exit } from "node:process";
 import assert from "node:assert/strict";
 
 const schemaPath = join(cwd(), "prisma", "schema.prisma");
 const seedPath = join(cwd(), "prisma", "seed.ts");
+const migrationsPath = join(cwd(), "prisma", "migrations");
+const migrationLockPath = join(migrationsPath, "migration_lock.toml");
 const schema = readFileSync(schemaPath, "utf8");
 const seed = readFileSync(seedPath, "utf8");
 
@@ -97,7 +99,48 @@ function modelBlock(modelName: string): string {
   return match[1] ?? "";
 }
 
+function schemaDeclarationNames(keyword: "enum" | "model"): string[] {
+  return [...schema.matchAll(new RegExp(`^${keyword}\\s+(\\w+)\\s+\\{`, "gm"))].map(
+    (match) => match[1] ?? "",
+  );
+}
+
 try {
+  assert.ok(existsSync(migrationsPath), "Expected committed Prisma migrations directory to exist.");
+  assert.ok(existsSync(migrationLockPath), "Expected Prisma migration_lock.toml to be committed.");
+  assert.match(
+    readFileSync(migrationLockPath, "utf8"),
+    /provider = "postgresql"/,
+    "Prisma migration lock should use the PostgreSQL provider.",
+  );
+
+  const migrationSqlFiles = readdirSync(migrationsPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(migrationsPath, entry.name, "migration.sql"))
+    .filter((migrationPath) => existsSync(migrationPath))
+    .sort();
+  const migrationSql = migrationSqlFiles
+    .map((migrationPath) => readFileSync(migrationPath, "utf8"))
+    .join("\n");
+
+  assert.ok(migrationSqlFiles.length > 0, "Expected at least one committed Prisma migration SQL file.");
+
+  for (const enumName of schemaDeclarationNames("enum")) {
+    assert.match(
+      migrationSql,
+      new RegExp(`CREATE TYPE "${enumName}" AS ENUM`),
+      `${enumName} enum must be covered by migrations.`,
+    );
+  }
+
+  for (const modelName of schemaDeclarationNames("model")) {
+    assert.match(
+      migrationSql,
+      new RegExp(`CREATE TABLE "${modelName}"`),
+      `${modelName} table must be covered by migrations.`,
+    );
+  }
+
   for (const modelName of tenantOwnedModels) {
     const block = modelBlock(modelName);
     assert.match(block, /^\s*tenantId\s+String\b/m, `${modelName} must include tenantId String.`);

@@ -50,10 +50,11 @@ Run deployment migrations before starting the web process:
 pnpm db:migrate:deploy
 ```
 
-The repository currently has no committed migration directory. Before a real pilot cutover, create
-and review the first migration from the Prisma schema in a controlled environment, then deploy that
-migration to the pilot database with the command above. Do not use `prisma db push` as an
-undocumented production path.
+Committed migrations live under `prisma/migrations`. Review every new `migration.sql` before pilot
+deployment, then deploy the committed migration history to the pilot database with the command above.
+Do not use `prisma db push` as an undocumented production path. See
+`docs/13-database-migrations.md` for the local workflow, SQL review checklist, seeding rules, and CI
+limitation for database-backed migration deploy checks.
 
 ## Health check
 
